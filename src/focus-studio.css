@@ -1,36 +1,36 @@
 /* Focus studio: shared presentation only. Scene colors are independent of UI theme. */
 :root, :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg-primary: #17191d; --bg-secondary: #202328; --bg-card: #202328;
-  --bg-card-hover: #292d34; --bg-sidebar: #1c1f24; --bg-input: #252930;
-  --border-color: #363c46; --border-subtle: #2c3139;
-  --text-primary: #edf0f6; --text-secondary: #adb5c3; --text-muted: #929cac;
+  --bg-primary: #15181d; --bg-secondary: #1e232b; --bg-card: #242a33;
+  --bg-card-hover: #303844; --bg-sidebar: #1b2027; --bg-input: #20262f;
+  --border-color: #3a4351; --border-subtle: #2b333f;
+  --text-primary: #eef2f8; --text-secondary: #b2bdcd; --text-muted: #919fb3;
   --accent-blue: #b9caf1; --accent-purple: #b9caf1; --accent-green: #97d5b4;
   --cta-blue: #b9caf1; --cta-blue-hover: #cfdbf6; --on-accent: #182641;
-  --selection: #b9caf117; --selection-border: #b9caf166;
+  --selection: #b9caf11a; --selection-border: #b9caf16b;
   --focus-error: #ffa9b0; --focus-success: #a5dfbd;
-  --shadow-glow: 0 16px 60px #0002; --rail-width: 80px;
+  --shadow-glow: 0 16px 48px #0004, 0 2px 8px #0003; --rail-width: 80px;
   --ep-accent: var(--accent-blue); --ep-border: var(--border-color);
   --ep-surface: var(--bg-input); --ep-surface-hover: var(--bg-card-hover);
   --ep-radius-md: 8px; --ep-radius-lg: 12px; --ep-radius-pill: 999px;
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg-primary: #f3f5f7; --bg-secondary: #fff; --bg-card: #fff;
-  --bg-card-hover: #edf1f6; --bg-sidebar: #fafbfc; --bg-input: #f0f3f7;
-  --border-color: #ccd3dd; --border-subtle: #e0e5ec;
+  --bg-primary: #f4f5f8; --bg-secondary: #fff; --bg-card: #fff;
+  --bg-card-hover: #e8edf5; --bg-sidebar: #eef1f6; --bg-input: #f6f8fb;
+  --border-color: #c8d1df; --border-subtle: #dce2eb;
   --text-primary: #242c39; --text-secondary: #536073; --text-muted: #657184;
-  --accent-blue: #385ac8; --accent-purple: #385ac8; --accent-green: #237844;
-  --cta-blue: #385ac8; --cta-blue-hover: #2a48ac; --on-accent: #fff;
+  --accent-blue: #3d5fb9; --accent-purple: #3d5fb9; --accent-green: #237844;
+  --cta-blue: #3d5fb9; --cta-blue-hover: #2c4c9e; --on-accent: #fff;
   --selection: #385ac80d; --selection-border: #385ac866;
   --focus-error: #ae263b; --focus-success: #247141;
-  --shadow-glow: 0 16px 60px #18264112;
+  --shadow-glow: 0 16px 48px #1826411a, 0 2px 8px #1826410a;
 }
 html[data-theme] .editor-app-root {
   --ep-accent: var(--accent-blue); --ep-border: var(--border-color);
   --ep-surface: var(--bg-input); --ep-surface-hover: var(--bg-card-hover);
 }
-html[data-theme="dark"] .editor-app-root { --text-secondary: #adb5c3; --text-muted: #929cac; }
+html[data-theme="dark"] .editor-app-root { --text-secondary: #b2bdcd; --text-muted: #919fb3; }
 html[data-theme="light"] .editor-app-root { --text-secondary: #536073; --text-muted: #657184; }
 html[data-theme] [hidden] { display: none !important; }
 body { margin: 0; }

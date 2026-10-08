@@ -1,0 +1,207 @@
+/* Presentation pass only: existing layout, breakpoints and control behaviour stay
+   in their component styles. The themed selectors also cover portalled cards. */
+:root {
+  --ui-top-edge: #ffffff0c;
+  --ui-control-shadow: inset 0 1px 0 var(--ui-top-edge), 0 1px 2px #0002;
+  --ui-panel-shadow: inset 0 1px 0 var(--ui-top-edge), var(--shadow-glow);
+  --ui-ring: color-mix(in srgb, var(--accent-blue) 24%, transparent);
+  --ui-radius: 9px;
+  --ui-motion: 150ms ease;
+}
+:root[data-theme="light"] { --ui-top-edge: #ffffffd9; }
+html[data-theme] { -webkit-font-smoothing: antialiased; }
+html[data-theme] ::selection { background: var(--selection-border); color: var(--text-primary); }
+
+/* Quiet chrome, with one accent for the current place and primary action. */
+html[data-theme] .studio-rail { box-shadow: inset -1px 0 0 var(--ui-top-edge); }
+html[data-theme] .studio-rail nav button { transition: background var(--ui-motion), color var(--ui-motion), border-color var(--ui-motion); }
+html[data-theme] .studio-rail nav button[aria-current="page"] {
+  background: linear-gradient(145deg, var(--selection), transparent);
+  box-shadow: inset 0 1px 0 var(--ui-top-edge);
+  color: var(--text-primary);
+}
+html[data-theme] .studio-rail nav button[aria-current="page"]::before {
+  content: ''; position: absolute; left: -1px; top: 18px; bottom: 18px;
+  width: 2px; border-radius: 2px; background: var(--accent-blue);
+}
+html[data-theme] .studio-rail nav button[aria-current="page"] svg { color: var(--accent-blue); }
+html[data-theme] .editor-toolbar--main { box-shadow: inset 0 -1px 0 var(--ui-top-edge); }
+html[data-theme] .editor-scene-name { letter-spacing: -.015em; font-weight: 600; }
+html[data-theme] .editor-scene-name:hover { background: var(--bg-input); }
+html[data-theme] .viewport-tools { background: var(--bg-sidebar); }
+html[data-theme] .editor-history-controls { border-color: var(--border-subtle); }
+
+/* Shared button finish. Primary, selected, destructive and disabled states
+   retain distinct semantics; these rules do not change hit areas or order. */
+html[data-theme] :is(.ep-btn,.ep-pill,.tool-btn--ghost,.tool-btn--export,.focus-icon-button,.focus-panel-toggle,
+  .btn-open,.btn-modal-cancel,.snapshot-button,.snapshot-camera-nudges > :where(button),
+  .wrap-actions :where(button),.sleeve-section-tabs :where(button),.tattoo-transform-row :where(button),
+  .body-region-card :where(footer button),.body-region-card-lock :where(button),.tattoo-bounds-controls :where(button)) {
+  border-radius: var(--ui-radius);
+  border-color: var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  box-shadow: var(--ui-control-shadow);
+  font-weight: 500;
+  transition: color var(--ui-motion), background var(--ui-motion), border-color var(--ui-motion), box-shadow var(--ui-motion);
+}
+html[data-theme] :is(.ep-btn,.ep-pill,.tool-btn--ghost,.tool-btn--export,.focus-icon-button,.focus-panel-toggle,
+  .btn-open,.btn-modal-cancel,.snapshot-button,.snapshot-camera-nudges > :where(button),
+  .wrap-actions :where(button),.sleeve-section-tabs :where(button),.tattoo-transform-row :where(button),
+  .body-region-card :where(footer button),.body-region-card-lock :where(button),.tattoo-bounds-controls :where(button)):hover:not(:disabled) {
+  background: var(--bg-card-hover); color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--border-color) 55%, var(--text-secondary));
+}
+html[data-theme] :is(.focus-primary,.tool-btn--primary,.ep-btn.ep-btn--primary,.btn-create,.btn-continue,.btn-modal-primary,.snapshot-button.snapshot-button--primary) {
+  border-radius: var(--ui-radius); font-weight: 650; letter-spacing: -.01em;
+  background: var(--accent-blue); border-color: var(--accent-blue); color: var(--on-accent);
+  box-shadow: inset 0 1px 0 #ffffff26, 0 2px 5px #0002;
+}
+html[data-theme] :is(.focus-primary,.tool-btn--primary,.ep-btn.ep-btn--primary,.btn-create,.btn-continue,.btn-modal-primary,.snapshot-button.snapshot-button--primary):hover:not(:disabled) {
+  background: var(--cta-blue-hover); border-color: var(--cta-blue-hover); color: var(--on-accent);
+}
+html[data-theme] :is(.ep-btn,.ep-pill,.sleeve-section-tabs :where(button))[aria-pressed="true"] {
+  background: var(--selection); color: var(--accent-blue); border-color: var(--selection-border);
+  box-shadow: inset 0 1px 0 var(--ui-top-edge);
+}
+html[data-theme] :is(.editor-app-root,.dashboard,.focus-dialog,.body-region-card) :is(button,input,select,summary,a):focus-visible {
+  outline: 2px solid var(--accent-blue); outline-offset: 3px;
+}
+html[data-theme] :is(.editor-app-root,.dashboard,.focus-dialog) button:disabled { box-shadow: none; }
+
+/* Readable labels and consistently inset fields. */
+html[data-theme] :is(.ep-section-label,.shape-group-label,.viewport-card-eyebrow,.focus-eyebrow) {
+  color: var(--text-muted); font-size: 10px; font-weight: 650; letter-spacing: .1em;
+}
+html[data-theme] :is(.ep-hint,.ep-control-hint,.viewport-card-hint,.focus-muted) { line-height: 1.6; }
+html[data-theme] :is(.ep-select,.modal-input,.modal-select,.login-input,.account-settings input,.focus-name-label input,
+  .ep-adjustment-number,.snapshot-camera-number input,.measure-input input,.shot-style-controls select,.wrap-tattoo-controls select) {
+  color: var(--text-primary); background-color: var(--bg-input); border-color: var(--border-color);
+  border-radius: var(--ui-radius); box-shadow: inset 0 1px 2px #0000000a;
+  transition: border-color var(--ui-motion), box-shadow var(--ui-motion);
+}
+html[data-theme] :is(.ep-adjustment-number,.search-box):focus-within {
+  border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--ui-ring);
+}
+html[data-theme] :is(.ep-select,.modal-input,.login-input,.account-settings input,.focus-name-label input):focus {
+  border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--ui-ring);
+}
+html[data-theme] .ep-select { padding-right: 30px; }
+html[data-theme] :is(.ep-adjustment-number input,.body-region-card-control output,.wrap-tattoo-controls output,.tattoo-transform-row output) {
+  font-variant-numeric: tabular-nums; font-weight: 550;
+}
+html[data-theme] .ep-reset-control { border-color: transparent; background: transparent; color: var(--text-muted); }
+html[data-theme] .ep-reset-control:hover:not(:disabled) { border-color: var(--border-color); color: var(--text-primary); background: var(--bg-input); }
+
+/* Segment groups use the same inset track, including the new sleeve controls. */
+html[data-theme] :is(.ep-inspector-tabs,.sleeve-section-tabs,.snapshot-quality,.snapshot-panel-tabs) {
+  background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: 11px;
+  padding: 3px; gap: 3px;
+}
+html[data-theme] .ep-inspector-tabs { margin-bottom: 14px; }
+html[data-theme] :is(.ep-inspector-tab,.sleeve-section-tabs :where(button),.snapshot-quality button,.snapshot-panel-tabs > button) {
+  border: 1px solid transparent; border-radius: 8px; background: transparent; box-shadow: none;
+  color: var(--text-secondary); font-weight: 500;
+}
+html[data-theme] :is(.ep-inspector-tab[aria-selected="true"],.sleeve-section-tabs :where(button)[aria-pressed="true"],
+  .snapshot-quality button[aria-pressed="true"],.snapshot-panel-tabs > button[aria-selected="true"]) {
+  background: var(--bg-card); color: var(--text-primary); border-color: var(--border-color);
+  box-shadow: var(--ui-control-shadow); font-weight: 600;
+}
+html[data-theme] .snapshot-panel-tabs { border-radius: 0; border-width: 0 0 1px; padding: 8px; }
+
+/* Native range inputs keep their existing values, bounds and keyboard support.
+   The shared adjustment's inline progress/zero marker background is preserved. */
+html[data-theme] :is(.wrap-tattoo-controls,.body-region-card-control,.shot-style-controls,.snapshot-camera-control) input[type="range"]:not(.ep-adjustment-range) {
+  appearance: none; -webkit-appearance: none; height: 22px; min-height: 22px;
+  background: transparent; accent-color: var(--accent-blue); cursor: ew-resize;
+}
+html[data-theme] :is(.wrap-tattoo-controls,.body-region-card-control,.shot-style-controls,.snapshot-camera-control) input[type="range"]:not(.ep-adjustment-range)::-webkit-slider-runnable-track {
+  height: 4px; background: var(--border-color); border-radius: 10px;
+}
+html[data-theme] :is(.wrap-tattoo-controls,.body-region-card-control,.shot-style-controls,.snapshot-camera-control) input[type="range"]:not(.ep-adjustment-range)::-moz-range-track {
+  height: 4px; background: var(--border-color); border-radius: 10px;
+}
+html[data-theme] :is(.wrap-tattoo-controls,.body-region-card-control,.shot-style-controls,.snapshot-camera-control) input[type="range"]:not(.ep-adjustment-range)::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none; margin-top: -6px;
+  width: 16px; height: 16px; border: 3px solid var(--bg-card); border-radius: 50%;
+  background: var(--accent-blue); box-shadow: 0 0 0 1px var(--selection-border), 0 2px 4px #0003;
+}
+html[data-theme] :is(.wrap-tattoo-controls,.body-region-card-control,.shot-style-controls,.snapshot-camera-control) input[type="range"]:not(.ep-adjustment-range)::-moz-range-thumb {
+  width: 10px; height: 10px; border: 3px solid var(--bg-card); border-radius: 50%;
+  background: var(--accent-blue); box-shadow: 0 0 0 1px var(--selection-border), 0 2px 4px #0003;
+}
+html[data-theme] .ep-adjustment-range::-webkit-slider-thumb { border: 3px solid var(--bg-card); background: var(--accent-blue); box-shadow: 0 0 0 1px var(--selection-border), 0 2px 4px #0003; }
+html[data-theme] .ep-adjustment-range::-moz-range-thumb { border-color: var(--bg-card); background: var(--accent-blue); box-shadow: 0 0 0 1px var(--selection-border); }
+
+/* Floating tools, menus and dialogs share a crisp edge and soft elevation. */
+html[data-theme] :is(.body-region-card,.tattoo-transform-card,.measure-card,.snapshot-compose-rail,
+  .focus-dialog,.editor-output-popover,.viewport-settings-panel,.account-menu) {
+  background: var(--bg-card); border-color: var(--border-color); border-radius: 14px;
+  box-shadow: var(--ui-panel-shadow);
+}
+html[data-theme] .tattoo-transform-card header { font-size: 12px; font-weight: 600; letter-spacing: -.01em; }
+html[data-theme] :is(.tattoo-transform-toggle,.viewport-card-close) { color: var(--text-muted); border-radius: 6px; }
+html[data-theme] :is(.tattoo-transform-toggle,.viewport-card-close):hover { background: var(--bg-card-hover); color: var(--text-primary); }
+html[data-theme] .wrap-tattoo-controls { row-gap: 11px; }
+html[data-theme] .wrap-tattoo-controls label { color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+html[data-theme] .wrap-tattoo-controls output { color: var(--text-primary); }
+html[data-theme] .wrap-tattoo-controls small { opacity: 1; color: var(--text-muted); }
+html[data-theme] .wrap-tattoo-controls > a { color: var(--accent-blue); font-size: 11px; text-underline-offset: 4px; }
+html[data-theme] .wrap-title span { border-color: var(--selection-border); color: var(--accent-blue); background: var(--selection); font-weight: 500; }
+html[data-theme] .body-region-card footer .viewport-card-done { background: var(--accent-blue); color: var(--on-accent); border-color: var(--accent-blue); }
+html[data-theme] .placement-help { background: color-mix(in srgb, var(--bg-sidebar) 94%, transparent); box-shadow: 0 3px 12px #0002; line-height: 1.5; }
+html[data-theme] .focus-dialog::backdrop { background: #080d166b; backdrop-filter: blur(7px); }
+html[data-theme] .focus-dialog > header h2 { font-weight: 550; }
+html[data-theme] .account-settings form { margin-bottom: 14px; }
+html[data-theme] .settings-session { border-color: var(--border-subtle); }
+html[data-theme] .settings-session h2 { font-size: 18px; font-weight: 550; letter-spacing: -.02em; margin-bottom: 8px; }
+html[data-theme] .settings-session p { margin-bottom: 14px; }
+html[data-theme] .account-settings + .ep-btn { margin-top: 10px; }
+
+/* Collections, template tiles and render presets: calmer framing, clear states. */
+html[data-theme] :is(.file-card,.template-card,.snapshot-preset) {
+  background: var(--bg-card); border-color: var(--border-subtle); border-radius: 12px;
+  box-shadow: inset 0 1px 0 var(--ui-top-edge), 0 3px 10px #0000000c;
+  transition: border-color var(--ui-motion), box-shadow var(--ui-motion), background var(--ui-motion);
+}
+html[data-theme] :is(.file-card,.template-card,.snapshot-preset):hover {
+  border-color: var(--selection-border); box-shadow: inset 0 1px 0 var(--ui-top-edge), 0 5px 18px #00000014;
+}
+html[data-theme] :is(.template-card,.snapshot-preset)[aria-pressed="true"] {
+  border-color: var(--accent-blue); background: var(--selection); box-shadow: 0 0 0 1px var(--selection-border);
+}
+html[data-theme] .file-thumb { border-bottom: 1px solid var(--border-subtle); }
+html[data-theme] .file-name { letter-spacing: -.015em; font-weight: 550; }
+html[data-theme] .snapshot-presets .snapshot-preset { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; }
+html[data-theme] .snapshot-presets .snapshot-preset img { flex: none; }
+html[data-theme] .snapshot-preset-description { color: var(--text-secondary); }
+html[data-theme] .snapshot-title-icon { color: var(--accent-blue); border-color: var(--selection-border); background: var(--selection); }
+html[data-theme] .snapshot-spinner { border-color: var(--selection-border); border-top-color: var(--accent-blue); }
+html[data-theme] .tattoo-asset-select:is(:hover,[aria-pressed="true"]) .tattoo-asset-art { border-color: var(--accent-blue); background: #f0ede6; }
+html[data-theme] .tattoo-library-upload { background: var(--selection); color: var(--accent-blue); border-color: var(--selection-border); }
+html[data-theme] .tattoo-library-upload:hover:not(:disabled) { background: var(--bg-card-hover); border-color: var(--accent-blue); }
+html[data-theme] .tattoo-library-search:focus-within { border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--ui-ring); }
+html[data-theme] .tattoo-library-filters { border: 1px solid var(--border-subtle); border-radius: 9px; padding: 3px; background: var(--bg-primary); }
+html[data-theme] .tattoo-library-filters button[aria-pressed="true"] { background: var(--bg-card); color: var(--text-primary); border-color: var(--border-color); box-shadow: var(--ui-control-shadow); }
+html[data-theme] .tattoo-asset-check { background: var(--accent-blue); color: var(--on-accent); }
+html[data-theme] .render-history-thumb--active { border-color: var(--accent-blue); box-shadow: 0 0 0 1px var(--selection-border); }
+html[data-theme] .file-card-actions .btn-delete:hover:not(:disabled) { color: var(--focus-error); border-color: var(--focus-error); background: color-mix(in srgb, var(--focus-error) 8%, transparent); }
+
+/* Subtle front-door refinements, using the existing composition and assets. */
+html[data-theme] .phase-one-landing :is(.phase-hero-art,.phase-shot-grid img) { border-radius: 10px; border-color: var(--border-subtle); }
+html[data-theme] .phase-one-landing .btn-quiet { border-radius: var(--ui-radius); background: var(--bg-input); box-shadow: var(--ui-control-shadow); }
+html[data-theme] .phase-one-landing .phase-image-tag { padding: 7px 9px; border-radius: 6px; border: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--bg-primary) 92%, transparent); color: var(--text-secondary); }
+html[data-theme] .phase-one-landing .phase-request-form { border-radius: 14px; box-shadow: var(--ui-panel-shadow); }
+html[data-theme] .phase-one-landing .request-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--ui-ring); }
+
+html[data-theme] :is(.ep-sidebar-body,.tattoo-transform-card,.body-region-card,.snapshot-rail-body,.focus-dialog) {
+  scrollbar-width: thin; scrollbar-color: var(--border-color) transparent;
+}
+@media (max-width: 760px) { html[data-theme] .ep-inspector-tabs { margin-bottom: 10px; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme] { --ui-motion: 0s; }
+}
+@media (forced-colors: active) {
+  html[data-theme] :is(.ep-inspector-tab[aria-selected="true"],.sleeve-section-tabs :where(button)[aria-pressed="true"],.studio-rail nav button[aria-current="page"]) { outline: 2px solid Highlight; }
+}

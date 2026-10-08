@@ -800,7 +800,7 @@
 .tattoo-library{padding-top:17px}
 .tattoo-library-intro strong{font-size:15px;font-weight:600;letter-spacing:-.025em;color:var(--text-primary)}
 .tattoo-library-intro p{font-size:11px;line-height:1.55;color:var(--text-secondary);margin:6px 0 13px}
-.tattoo-library-upload{width:100%;justify-content:center;gap:8px!important;background:#8b5cf61c!important;border-color:#8b5cf655!important;color:#d4c1ff!important}
+.tattoo-library-upload{width:100%;justify-content:center;gap:8px;background:var(--selection);border-color:var(--selection-border);color:var(--accent-blue)}
 .tattoo-library-search{display:flex;align-items:center;gap:8px;margin-top:14px;padding:0 10px;border:1px solid var(--ep-border);border-radius:8px;background:#ffffff04;color:var(--text-secondary)}
 .tattoo-library-search>svg{width:11px;flex-shrink:0}
 .tattoo-library-search input{width:100%;min-width:0;height:34px;border:0;background:transparent;color:var(--text-primary);font:inherit;font-size:11px;outline-offset:0}

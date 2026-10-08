@@ -40,6 +40,9 @@ export default function TattooViewportControls({ mesh, anchor, scale, rotation, 
     normal.current.transformDirection(body.matrixWorld);
     position.current.project(camera);
     const { width, height } = gl.domElement.getBoundingClientRect();
+    // The inspector can shorten the canvas. Keep long controls scrollable
+    // inside that visible area, rather than clipping below it.
+    element.style.maxHeight = `${Math.max(48, height - 74)}px`;
     const inView = Math.abs(position.current.x) <= 1.1 && Math.abs(position.current.y) <= 1.1 && position.current.z < 1 && (!!placement.wrap || !!placement.sleeve || normal.current.dot(toCamera.current) > .08);
     element.style.visibility = inView ? 'visible' : 'hidden';
     const x = (position.current.x + 1) * width / 2 + 58, y = (1 - position.current.y) * height / 2 - 34;

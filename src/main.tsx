@@ -6,6 +6,7 @@ import './index.css'
 import App from './App.tsx'
 import { ThemeRoot } from './Theme'
 import './focus-studio.css'
+import './studio-finish.css'
 import ErrorBoundary from './ErrorBoundary.tsx'
 import CrashScreen from './CrashScreen.tsx'
 
