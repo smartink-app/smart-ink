@@ -98,20 +98,27 @@ try {
   library.button('Create project').props.onClick();await library.settle();assert.ok(text(library.tree).includes('Storage unavailable'));assert.equal(opened.length,0);assert.ok(library.render().some(n=>n.type==='FocusDialog'));
   failCreate=false;library.button('Create project').props.onClick();await library.settle();assert.equal(created.at(-1).decalImage,'data:image/png;base64,sample','Retry keeps chosen artwork');resolveCreate();await library.settle();assert.equal(opened.length,1);library.unmount();
 
-  // Exercise the actual App gate. ?demo=1 works with or without a member session.
+  // Private beta routing: old sample URLs and guessed app URLs cannot expose an editor.
   let authenticated=0;
   const auth={ready:true,session:null,accessError:null,setSession:()=>authenticated++,clearAccessError:()=>{},signOut:async()=>{}};
   globalThis.__focusAuth=auth;
-  for(const member of [null,session]){
-    auth.session=member;window.location={href:'http://local/?demo=1',search:'?demo=1'};
+  for(const search of ['', '?demo=1', '?app=1', '?studio=1']) {
+    auth.session=null;window.location={href:`http://local/${search}`,search};
     const app=harness(api.App);app.render();await app.settle();
-    assert.ok(app.render().some(n=>n.type==='Lazy1'),'Explicit demo stays public even when a member has a session');
+    assert.equal(app.tree.type,'LandingPage',`${search || '/'} requires approved access`);
+    assert.equal(app.tree.props.onTryDemo,undefined,'Marketing cannot open a public editor');
     assert.ok(!app.render().some(n=>n.type==='Lazy0'));assert.equal(authenticated,0);app.unmount();
   }
-  auth.session=null;window.location={href:'http://local/?app=1',search:'?app=1'};
-  const gate=harness(api.App);gate.render();await gate.settle();assert.equal(gate.tree.type,'LandingPage','A URL cannot bypass the beta gate');
-  gate.tree.props.onTryDemo();await gate.settle();assert.ok(window.location.search.includes('demo=1'));assert.ok(gate.render().some(n=>n.type==='Lazy1'));assert.equal(authenticated,0);gate.unmount();
-  auth.session=session;window.location={href:'http://local/',search:''};const member=harness(api.App);member.render();await member.settle();assert.ok(member.render().some(n=>n.type==='Lazy0'));member.unmount();
+  // Existing invite acceptance and operator paths remain available, not the workspace.
+  for(const [search,expected] of [['?invite=ABC123','InvitePage'], ['?admin=1','BetaAdminPage']]) {
+    window.location={href:`http://local/${search}`,search};const gate=harness(api.App);gate.render();await gate.settle();assert.equal(gate.tree.type,expected);assert.ok(!gate.render().some(n=>n.type==='Lazy0'));gate.unmount();
+  }
+  // An approved session opens the full workspace; session loss closes it again.
+  auth.session=session;window.location={href:'http://local/',search:''};
+  const member=harness(api.App);member.render();await member.settle();assert.ok(member.render().some(n=>n.type==='Lazy0'));
+  auth.session=null;await member.settle();assert.equal(member.tree.type,'LandingPage','Revoked/signed-out session cannot retain the studio');member.unmount();
+  // A rejected OAuth session returns to sign-in with its existing access reason.
+  auth.accessError='You are on the waitlist';const pending=harness(api.App);pending.render();await pending.settle();assert.equal(pending.tree.type,'LoginPage');assert.equal(pending.tree.props.notice,auth.accessError);pending.unmount();auth.accessError=null;
 
   // A local waitlist entry must not turn a failed remote delivery into success.
   let deliveries=0, deliveryFails=true;
@@ -131,11 +138,18 @@ try {
   globalThis.__focusMode='supabase';globalThis.__focusRequests.endpoint=true;
   const hostedForm=harness(api.RequestAccessForm,{source:'test',buttonLabel:'Request invite'});await hostedForm.render().find(n=>n.type==='form').props.onSubmit({preventDefault(){}});assert.equal(deliveries,2,'Hosted waitlist does not submit to a second endpoint');hostedForm.unmount();delete globalThis.__focusMode;
 
-  // Audit the public demo dependency graph, not just the displayed button labels.
-  const demoBuild=await build({entryPoints:['src/PublicDemo.tsx'],outdir:'/tmp/focus-dependency-audit',bundle:true,write:false,metafile:true,format:'esm',platform:'browser',logLevel:'silent'});
-  for(const name of Object.keys(demoBuild.metafile.inputs))assert.doesNotMatch(name,/src\/(auth\/|storage\/|sceneStorage|renderHistoryStorage|services\/cloudRenderService|services\/runpodRenderService)/,`Public demo must not depend on private account/output services: ${name}`);
+  // A misconfigured deployment cannot say it received a request in localStorage.
+  globalThis.__focusMode='unconfigured';globalThis.__focusRequests.endpoint=false;
+  let recordedUnconfigured=0;const previousRecord=globalThis.__focusRequests.record;globalThis.__focusRequests.record=async()=>{recordedUnconfigured++;return {already:false,status:'waitlisted'};};
+  const unavailable=harness(api.RequestAccessForm,{source:'test',buttonLabel:'Request invite'});await unavailable.render().find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
+  unavailable.render();assert.equal(recordedUnconfigured,0);assert.ok(text(unavailable.tree).includes('temporarily unavailable'));unavailable.unmount();globalThis.__focusRequests.record=previousRecord;delete globalThis.__focusMode;
+
+  // The public marketing page must not download an interactive/sample studio.
+  const landingBuild=await build({entryPoints:['src/LandingPage.tsx'],outdir:'/tmp/focus-landing-audit',bundle:true,write:false,metafile:true,format:'esm',platform:'browser',logLevel:'silent'});
+  for(const name of Object.keys(landingBuild.metafile.inputs))assert.doesNotMatch(name,/src\/(PublicDemo|Workspace|ModelWithUVTattoo|landing\/HeroPreview)|node_modules\/(three|@react-three)\//,`Public marketing must not include the editor or 3D engine: ${name}`);
+  assert.doesNotMatch(await fs.readFile('src/App.tsx','utf8'),/import\(['"]\.\/PublicDemo['"]\)/,'The old sample editor is absent from the app entry graph');
   const css=await fs.readFile('src/focus-studio.css','utf8');assert.ok(css.includes('[hidden] { display: none !important; }'),'Hidden advanced/tab panels must win against flex rules');
-  console.log('Focus UI passed: dark/light and storage failure, cross-tab theme, persistent disclosure/value retention, rail navigation, async/double-click project creation, library-to-project/retry, authenticated and anonymous public demo routing, invite gate separation, waitlist delivery failure/retry and public demo service isolation.');
+  console.log('Focus UI passed: dark/light and storage failure, cross-tab theme, persistent disclosure/value retention, rail navigation, async/double-click project creation, library-to-project/retry, private routing and legacy URLs, invite/admin gate preservation, rejected/lost sessions, waitlist delivery failure/retry and a static marketing dependency graph.');
 } finally {
   for(const [key,value] of savedGlobals){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}
   for(const key of ['__focusHooks','__focusLazy','__focusStore','__focusAuth','__focusRequests','__focusMode'])delete globalThis[key];

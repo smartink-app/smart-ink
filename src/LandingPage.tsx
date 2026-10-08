@@ -7,53 +7,23 @@ import {
   isWaitlistEndpointConfigured,
   submitWaitlistRequest,
 } from './auth/waitlistSubmit';
-import HeroPreview from './landing/HeroPreview';
-import RenderShowcase from './landing/RenderShowcase';
-import './landing/render-story.css';
+import './landing/phase-one-landing.css';
 
 interface LandingPageProps {
   onNavigateToLogin: () => void;
   signedIn?: boolean;
-  onTryDemo: () => void;
 }
 
-const ARTIST_BENEFITS = [
-  {
-    category: 'Placement',
-    title: 'Get on the same page.',
-    body: 'Show your client the scale and position on a body. Explore the options together, with a clear picture of what each change means.',
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="8.5" />
-        <path d="M12 3.5v4M12 16.5v4M3.5 12h4M16.5 12h4" />
-      </>
-    ),
-  },
-  {
-    category: 'Flow',
-    title: 'See how the design belongs.',
-    body: 'Follow the curve of an arm, check the silhouette, and turn the body to see another angle. Refine the placement while the idea is still taking shape.',
-    icon: (
-      <>
-        <path d="M12 3.5a6 6 0 0 1 3.4 10.9V17a1 1 0 0 1-1 1h-4.8a1 1 0 0 1-1-1v-2.6A6 6 0 0 1 12 3.5Z" />
-        <path d="M10 20.5h4" />
-      </>
-    ),
-  },
-  {
-    category: 'Presentation',
-    title: 'Give your work the right light.',
-    body: 'Choose the lighting, frame the details, and render an image to share. Bring the same considered look to client proposals and portfolio concepts.',
-    icon: (
-      <>
-        <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
-        <path d="M3.5 15l4.2-3.6 3.4 2.9 3.2-4.1 6.2 6" />
-      </>
-    ),
-  },
+const WORKFLOW = [
+  { number: '01', title: 'Place your artwork.', copy: 'Upload a design and project it onto the skin. Turn the body, find the right angle, and adjust the scale until the placement feels right.' },
+  { number: '02', title: 'Make the body theirs.', copy: 'Start with a body preset, adjust its proportions, or follow the measurement guide. See your idea on a body that better represents your client.' },
+  { number: '03', title: 'Give it a studio finish.', copy: 'Choose a considered shot, set the light, and create an image for your client presentation. Keep the tattoo at the centre of the frame.' },
 ];
-
-const FACTS = ['Runs in the browser', 'Blender Cycles output', 'Invites approved by hand'];
+const SHOTS = [
+  { src: '/renders/presets/editorial.jpg', label: 'Editorial', copy: 'The design in context.' },
+  { src: '/renders/presets/detail.jpg', label: 'Close detail', copy: 'A closer look at the placement.' },
+  { src: '/renders/presets/sculpted.jpg', label: 'Sculpted light', copy: 'Shape, contrast, and atmosphere.' },
+];
 
 type SubmitState = 'idle' | 'sending' | 'joined' | 'already' | 'undelivered' | 'error';
 
@@ -72,6 +42,12 @@ const RequestAccessForm: React.FC<{ source: string; buttonLabel: string }> = ({
 
     setState('sending');
     setMessage('');
+    // A published page must never claim a browser-only request reached us.
+    if (authMode() === 'unconfigured' && !isWaitlistEndpointConfigured()) {
+      setState('error');
+      setMessage(CONTACT_EMAIL ? `Requests are temporarily unavailable. Email ${CONTACT_EMAIL} to request access.` : 'Access requests are temporarily unavailable. Please try again later.');
+      return;
+    }
 
     let recorded: RequestAccessResult;
     try {
@@ -163,134 +139,65 @@ const RequestAccessForm: React.FC<{ source: string; buttonLabel: string }> = ({
   );
 };
 
-const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, onTryDemo, signedIn = false }) => {
-  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, signedIn = false }) => {
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 
   return (
-    <div className="landing">
-      <div className="landing-atmosphere" aria-hidden />
-
+    <div className="landing phase-one-landing">
+      <a className="phase-skip" href="#main-content">Skip to content</a>
       <header className="landing-nav">
-        <a
-          className="landing-brand"
-          href="#top"
-          onClick={(e) => {
-            e.preventDefault();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        >
-          <span className="landing-mark" aria-hidden />
-          Smart Ink
-        </a>
-        <nav className="landing-nav-links">
-          <a
-            href="#render"
-            onClick={(e) => {
-              e.preventDefault();
-              scrollTo('render');
-            }}
-          >
-            The finished image
-          </a>
-          <a
-            href="#why"
-            onClick={(e) => {
-              e.preventDefault();
-              scrollTo('why');
-            }}
-          >
-            Why artists use it
-          </a>
+        <a className="landing-brand" href="#top"><span className="landing-mark" aria-hidden />Smart Ink</a>
+        <nav className="landing-nav-links" aria-label="Discover Smart Ink">
+          <a href="#workflow">How it works</a>
+          <a href="#render">The studio</a>
         </nav>
         <div className="landing-nav-actions">
           <ThemeToggle />
-          <button type="button" className="btn-quiet" onClick={onNavigateToLogin}>
-            {signedIn ? 'My Projects' : 'Log in'}
-          </button>
-          <button type="button" className="btn-primary btn-primary--sm" onClick={() => scrollTo('request')}>
-            Request access
-          </button>
+          <button type="button" className="btn-quiet" onClick={onNavigateToLogin}>{signedIn ? 'Open studio' : 'Log in'}</button>
+          {!signedIn && <button type="button" className="btn-primary btn-primary--sm" onClick={() => scrollTo('request')}>Request access</button>}
         </div>
       </header>
 
-      <section className="hero" id="top">
-        <div className="hero-copy">
-          <p className="hero-badge">Private beta · invite only</p>
-          <h1>
-            Show the tattoo
-            <br />
-            before you ink it.
-          </h1>
-          <p className="hero-lead">
-            Smart Ink wraps your artwork onto a 3D body, so you and your client agree on placement,
-            scale and flow before the first line goes in. Turn it into a finished image to share.
-          </p>
-          <div className="focus-hero-actions"><button type="button" className="btn-primary" onClick={onTryDemo}>Try the live demo <span aria-hidden>↗</span></button><button type="button" className="btn-quiet" onClick={() => scrollTo('request')}>Request beta access</button></div>
-          <p className="focus-demo-caption">Explore a sample in your browser. No account needed.</p>
-          <ul className="hero-facts">
-            {FACTS.map((fact) => (
-              <li key={fact}>{fact}</li>
-            ))}
-          </ul>
-        </div>
-        <div className="hero-figure">
-          <HeroPreview />
-        </div>
-      </section>
+      <main id="main-content">
+        <section className="phase-hero" id="top" aria-labelledby="hero-title">
+          <div className="phase-hero-copy">
+            <p className="phase-eyebrow"><span aria-hidden />A studio for tattoo artists</p>
+            <h1 id="hero-title">Your art.<br />Their body.<br /><em>Before the ink.</em></h1>
+            <p className="phase-hero-lead">A tattoo belongs on a body. Project your design onto skin, explore its placement with your client, and turn the idea into a studio image.</p>
+            <div className="phase-hero-actions">
+              <button type="button" className="btn-primary" onClick={signedIn ? onNavigateToLogin : () => scrollTo('request')}>{signedIn ? 'Open your studio' : 'Request beta access'}<span aria-hidden>↗</span></button>
+              <a href="#workflow" className="phase-text-link">See how it works <span aria-hidden>↓</span></a>
+            </div>
+            <p className="phase-access-note">Private beta. Approved artists get the full studio.</p>
+          </div>
+          <figure className="phase-hero-art">
+            <span className="phase-image-tag">PLACEMENT / FOREARM</span>
+            <img src="/renders/hero-arm.webp" alt="An ornamental eye tattoo projected onto a curved forearm, rendered in Smart Ink." width="1400" height="1300" fetchPriority="high" decoding="async" />
+            <figcaption><span>Created with Smart Ink</span><span>3D tattoo visualisation</span></figcaption>
+          </figure>
+        </section>
 
-      <RenderShowcase />
+        <section className="phase-workflow" id="workflow" aria-labelledby="workflow-title">
+          <header className="phase-section-heading"><p className="phase-eyebrow">From the first idea to the final presentation</p><h2 id="workflow-title">Keep the tattoo in focus.</h2><p>One place to shape the body, explore your artwork, and frame the result.</p></header>
+          <ol className="phase-step-grid">{WORKFLOW.map(step => <li key={step.number}><span className="phase-step-number">{step.number}</span><h3>{step.title}</h3><p>{step.copy}</p></li>)}</ol>
+        </section>
 
-      <section className="section section--why" id="why" aria-labelledby="artists-title">
-        <header className="section-head">
-          <p className="section-eyebrow">Why artists use it</p>
-          <h2 id="artists-title">Make the next decision a visual one.</h2>
-          <p className="section-lead">
-            More room to explore your ideas. A clearer way to share them.
-          </p>
-        </header>
-        <div className="value-grid">
-          {ARTIST_BENEFITS.map((item) => (
-            <article key={item.category} className="value-card">
-              <svg
-                className="value-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                {item.icon}
-              </svg>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+        <section className="phase-render-section" id="render" aria-labelledby="render-title">
+          <header className="phase-section-heading"><p className="phase-eyebrow">Your own photo studio</p><h2 id="render-title">The right light.<br />The right point of view.</h2><p>Start with a composed shot. Explore soft studio light, a close crop, or a stronger contrast without building a scene from scratch.</p></header>
+          <div className="phase-shot-grid">{SHOTS.map(shot => <figure key={shot.label}><img src={shot.src} alt={`${shot.label} view of a rose tattoo on a 3D torso, rendered in Blender.`} width="384" height="480" loading="lazy" decoding="async" /><figcaption><strong>{shot.label}</strong><span>{shot.copy}</span></figcaption></figure>)}</div>
+          <p className="phase-render-note">Actual Smart Ink Blender studies. These are digital visualisations, not photographs of completed tattoos.</p>
+        </section>
 
-      <section className="section section--request" id="request">
-        <div className="request-panel">
-          <p className="section-eyebrow">Request access</p>
-          <h2>A few studios. A shared next step.</h2>
-          <p className="section-lead">
-            Request a place in the exclusive beta. We’ll send a personal invite when a seat opens, so you can save projects, use your own artwork, and create finished renders.
-          </p>
-          <RequestAccessForm source="request-section" buttonLabel="Request an invite" />
-          <p className="request-login">
-            Already invited?{' '}
-            <button type="button" className="link-button" onClick={onNavigateToLogin}>
-              {signedIn ? 'My Projects' : 'Log in'}
-            </button>
-          </p>
-        </div>
-      </section>
-
-      <footer className="landing-footer">
-        <span className="landing-mark landing-mark--sm" aria-hidden />
-        <p>© {new Date().getFullYear()} Smart Ink · Private beta</p>
-      </footer>
+        <section className="phase-request" id="request" aria-labelledby="request-title">
+          <div className="phase-request-copy"><p className="phase-eyebrow">Private beta · for working artists</p><h2 id="request-title">Bring your next<br />idea to the studio.</h2><p>Leave your email to request access. We review requests personally and invite artists into the full studio to work with their own designs.</p></div>
+          <div className="phase-request-form">
+            <RequestAccessForm source="phase-one-landing" buttonLabel="Request beta access" />
+            <ol className="phase-access-steps"><li>Request with your email</li><li>Receive an invitation after approval</li><li>Verify your email and open the studio</li></ol>
+            <p className="request-login">Already invited? <button type="button" className="link-button" onClick={onNavigateToLogin}>{signedIn ? 'Open studio' : 'Log in'}</button></p>
+          </div>
+        </section>
+      </main>
+      <footer className="landing-footer"><span className="landing-mark landing-mark--sm" aria-hidden /><p>© {new Date().getFullYear()} Smart Ink</p><span>Made for the work before the ink.</span></footer>
     </div>
   );
 };
