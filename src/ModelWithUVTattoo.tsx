@@ -1,3 +1,4 @@
+import { skinDetailSettings, SKIN_DETAIL_GLSL } from './render/skinDetailTest';
 import { deformFit, heightWarp, type BodyFit } from './measurements/fitter';
 import { loadFitAsset } from './measurements/service';
 import { measurementGuide, type MeasurementGuide } from './measurements/geometry';
@@ -72,6 +73,10 @@ const DRACO_DECODER_PATH = '/draco/';
 const vertexShader = `
   #include <common>
 
+  attribute vec3 aSkinRest;
+  attribute vec3 aSkinNormal;
+  varying vec3 vSkinRest;
+  varying vec3 vSkinNormal;
   attribute float aRegion;
   attribute float aFocusMask;
   attribute float aClothingMask;
@@ -93,6 +98,8 @@ const vertexShader = `
   uniform float uHighlightRegion2;
 
   void main() {
+    vSkinRest = aSkinRest;
+    vSkinNormal = aSkinNormal;
     vUv = uv;
     vTattooUv = aTattooUv;
     vTattooMask = aTattooMask;
@@ -146,6 +153,8 @@ const fragmentShader = `
   varying float vClothingMask;
   varying float vHighlightMask;
 
+  ${SKIN_DETAIL_GLSL}
+
   /**
    * Surface normal with the baked sculpt detail folded in. The base cage is
    * only 10.5k faces; everything that reads as muscle definition lives here.
@@ -162,19 +171,16 @@ const fragmentShader = `
     return normalize(mat3(T, B, N) * sampled);
   }
 
-  vec3 shadeSkin(vec3 albedo) {
-    vec3 N = surfaceNormal();
-    return albedo * studioLighting(N, vWorldPosition);
-  }
-
   void main() {
+    // Evaluate derivatives before divergent mask/ink branches, once per pixel.
+    vec3 skinLighting = studioLighting(skinDetailNormal(surfaceNormal()), vWorldPosition);
     // Cutting a region out is a fragment reject, so UVs, the placed tattoo
     // and the shape maths all still refer to the whole figure.
     if (uIsolateRegion >= 0.0 && vFocusMask < 0.0) discard;
     if (vClothingMask >= 0.0) discard;
 
     vec4 skin = texture2D(skinTexture, vUv);
-    vec3 litRgb = shadeSkin(skin.rgb);
+    vec3 litRgb = skin.rgb * skinLighting;
     skin.rgb = litRgb;
 
     if (tattooVisible > 0.5) {
@@ -183,7 +189,7 @@ const fragmentShader = `
         tattooAspect, tattooRotation, tattooColor, tattooOpacity
       );
       if (tattooLayer.a > 0.0) {
-        skin.rgb = mix(skin.rgb, shadeSkin(tattooLayer.rgb * 0.85), tattooLayer.a);
+        skin.rgb = mix(skin.rgb, tattooLayer.rgb * 0.85 * skinLighting, tattooLayer.a);
       }
     }
 
@@ -395,6 +401,15 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       (loader as GLTFLoader).setDRACOLoader(draco);
     });
     const normalMap = useLoader(TextureLoader, bodyDef.normalMapUrl);
+    const detailMap = useLoader(TextureLoader, '/textures/soft-cells-height.png');
+    useEffect(() => {
+      detailMap.colorSpace = THREE.NoColorSpace;
+      detailMap.wrapS = detailMap.wrapT = THREE.RepeatWrapping;
+      detailMap.minFilter = THREE.LinearMipmapLinearFilter;
+      detailMap.magFilter = THREE.LinearFilter;
+      detailMap.anisotropy = 4;
+      detailMap.needsUpdate = true;
+    }, [detailMap]);
     useEffect(() => {
       // A normal map is vector data, not colour: sampling it through sRGB
       // would bend every normal it encodes.
@@ -438,6 +453,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       () => new THREE.ShaderMaterial({
         vertexShader, fragmentShader,
         uniforms: {
+          skinDetailMap: { value: null }, skinDetailStrength: { value: 0 }, skinDetailScale: { value: 1 },
           skinTexture: { value: null }, normalMap: { value: null }, normalMapStrength: { value: 1 },
           tattooTexture: { value: null }, tattooAspect: { value: 1 },
           tattooColor: { value: new THREE.Color('#ffffff') }, tattooOpacity: { value: 1 },
@@ -449,10 +465,11 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       }), []
     );
     useEffect(() => {
+      shaderMaterial.uniforms.skinDetailMap.value = detailMap;
       shaderMaterial.uniforms.skinTexture.value = skinTexture;
       shaderMaterial.uniforms.normalMap.value = normalMap;
       shaderMaterial.uniforms.tattooTexture.value = tattooTexture;
-    }, [shaderMaterial, skinTexture, normalMap, tattooTexture]);
+    }, [shaderMaterial, skinTexture, normalMap, tattooTexture, detailMap]);
     useEffect(() => () => shaderMaterial.dispose(), [shaderMaterial]);
     const shadowMaterials = useMemo(() => createBodyShadowMaterials(shaderMaterial.uniforms.uIsolateRegion), [shaderMaterial]);
     useEffect(() => () => { shadowMaterials.depth.dispose(); shadowMaterials.distance.dispose(); }, [shadowMaterials]);
@@ -488,6 +505,8 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     }, [size, requestedSize, safeSize, chartVersion, onPlacementStatus]);
 
     useFrame(() => {
+      shaderMaterial.uniforms.skinDetailStrength.value = skinDetailSettings.enabled ? skinDetailSettings.strength : 0;
+      shaderMaterial.uniforms.skinDetailScale.value = skinDetailSettings.scale;
       shaderMaterial.uniforms.tattooScale.value = size;
       shaderMaterial.uniforms.tattooRotation.value = rotationRad;
       shaderMaterial.uniforms.tattooAspect.value = imageAspect;
@@ -547,6 +566,19 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       const source = mesh.geometry as THREE.BufferGeometry;
       const geo = source.index ? source.toNonIndexed() : source.clone();
       ensureUVs(geo);
+      // Bind the detail to the undeformed body, in nominal metres (1.75 m figure).
+      // The chart stays attached during pose and measurement deformation.
+      group.updateMatrixWorld(true);
+      const rest = new Float32Array(geo.attributes.position.count * 3);
+      const normals = new Float32Array(rest.length);
+      const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+      const point = new THREE.Vector3();
+      for (let i = 0; i < geo.attributes.position.count; i++) {
+        point.fromBufferAttribute(geo.attributes.position, i).applyMatrix4(mesh.matrixWorld).multiplyScalar(1.75 / TARGET_BODY_HEIGHT).toArray(rest, i * 3);
+        point.fromBufferAttribute(geo.attributes.normal, i).applyNormalMatrix(normalMatrix).toArray(normals, i * 3);
+      }
+      geo.setAttribute('aSkinRest', new THREE.BufferAttribute(rest, 3));
+      geo.setAttribute('aSkinNormal', new THREE.BufferAttribute(normals, 3));
       geo.setAttribute('aTattooUv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
       geo.setAttribute('aTattooMask', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count), 1));
       geo.setAttribute('aFocusMask', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(1), 1));

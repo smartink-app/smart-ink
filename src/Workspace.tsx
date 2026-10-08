@@ -1,3 +1,4 @@
+import { SkinDetailTestControls } from './render/SkinDetailTestControls';
 import MeasurementOverlay from './measurements/MeasurementOverlay'
 import MeasurementScene from './measurements/MeasurementScene'
 import { loadFitAsset, fitBody } from './measurements/service'
@@ -1024,6 +1025,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             onFit={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}
             onCleanView={() => handlePhotoModeChange(true)} performanceMode={performanceMode} onPerformanceChange={setPerformanceMode} />}
           <div className="editor-canvas-stage">
+          {!snapshot.open && !measureOpen && !photoMode && <SkinDetailTestControls />}
           <div
             className="editor-canvas-bg"
             style={{
