@@ -1,3 +1,4 @@
+import { ThemeToggle } from './Theme';
 import { useState, type FormEvent } from 'react';
 import {
   authMode,
@@ -88,7 +89,7 @@ export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvi
   };
 
   return (
-    <div className="login-page">
+    <div className="login-page"><ThemeToggle className="auth-theme-toggle" />
       <div className="login-left">
         <div className="login-card">
           {onBackToLanding && (

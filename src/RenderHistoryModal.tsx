@@ -1,3 +1,4 @@
+import FocusDialog from './FocusDialog';
 import { useCallback, useEffect, useState } from 'react';
 import { REGISTRY, findById } from './render/registry';
 import {
@@ -155,14 +156,8 @@ export default function RenderHistoryModal({ onClose }: RenderHistoryModalProps)
   };
 
   return (
-    <div className="modal-overlay render-history-overlay" role="dialog" aria-modal="true" aria-labelledby="render-history-title">
+    <FocusDialog title="Renders" wide onClose={onClose}>
       <div className="modal-card render-history-card">
-        <div className="render-history-header">
-          <h2 id="render-history-title">Render history</h2>
-          <button type="button" className="btn-modal-cancel" onClick={onClose}>
-            Close
-          </button>
-        </div>
         <p className="render-history-desc">
           {shareable
             ? 'Cycles renders and canvas exports are saved to your account (up to 100). Share gives you a read-only link for a client.'
@@ -257,6 +252,6 @@ export default function RenderHistoryModal({ onClose }: RenderHistoryModalProps)
           </>
         )}
       </div>
-    </div>
+    </FocusDialog>
   );
 }

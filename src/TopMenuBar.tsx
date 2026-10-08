@@ -1,3 +1,4 @@
+import MoreControls from './MoreControls';
 import { rememberTattoo } from './storage/tattooLibrary';
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { FaUpload, FaUndo, FaRegImage } from 'react-icons/fa';
@@ -16,6 +17,7 @@ import { resolveTattooSource } from './render/tattooSource';
 import AdjustmentControl from './AdjustmentControl';
 
 interface TopMenuBarProps extends PoseControlsProps, AppearanceControlsProps, StudioControlsProps {
+  onBrowseArtwork?: () => void;
   disabled?: boolean;
   onMeasureBody?: () => void;
   measuringLoading?: boolean;
@@ -81,13 +83,14 @@ const TATTOO_COLORS = [
 
 const INSPECTOR_TABS = [
   { id: 'tattoo', label: 'Tattoo' },
-  { id: 'figure', label: 'Figure' },
-  { id: 'studio', label: 'Studio' },
+  { id: 'figure', label: 'Body' },
+  { id: 'studio', label: 'Lighting' },
 ] as const;
 export type InspectorTab = typeof INSPECTOR_TABS[number]['id'];
 
 export default function TopMenuBar({
   disabled = false,
+  onBrowseArtwork,
   onMeasureBody, measuringLoading, hasBodyFit, onClearBodyFit,
   activeTab: controlledTab,
   onTabChange,
@@ -223,8 +226,8 @@ export default function TopMenuBar({
   return (
     <aside className="editor-right-panel ep-sidebar ep-inspector" aria-label="Inspector" inert={disabled}>
       <header className="ep-header ep-inspector-header">
-        <span className="ep-title">Inspector</span>
-        <span className="ep-hint">Design your tattoo, figure and studio.</span>
+        <span className="ep-title">Your studio</span>
+        <span className="ep-hint">Place. Adjust. Make it yours.</span>
         <div className="ep-inspector-tabs" role="tablist" aria-label="Inspector sections">
           {INSPECTOR_TABS.map((tab) => <button key={tab.id} type="button" role="tab"
             className="ep-inspector-tab" id={`${inspectorId}-${tab.id}-tab`}
@@ -247,6 +250,7 @@ export default function TopMenuBar({
             <img src={resolveTattooSource(uploadedImage)} alt={uploadedImage === null ? 'Example tattoo preview' : 'Your tattoo preview'} />
           </div>
           <div className="ep-stack ep-tattoo-actions">
+            {onBrowseArtwork && <button type="button" className="ep-btn ep-btn--block" onClick={onBrowseArtwork}><FaRegImage aria-hidden /> Browse artwork</button>}
             <button type="button" className="ep-btn ep-btn--block" onClick={chooseFile}>
               <FaUpload aria-hidden /> {uploading ? 'Reading tattoo…' : 'Replace image'}
             </button>
@@ -276,6 +280,7 @@ export default function TopMenuBar({
             onChange={(value) => onDecalScaleChange(value / 100)} />
           <AdjustmentControl label="Rotation" ariaLabel="Tattoo rotation" value={decalRotation}
             min={-180} max={180} step={1} unit="°" resetValue={0} onChange={onDecalRotationChange} />
+          <MoreControls id="tattoo" summary={[decalOpacity !== 1 ? `${Math.round(decalOpacity * 100)}% opacity` : '', decalColor.toLowerCase() !== '#ffffff' ? 'Tint applied' : ''].filter(Boolean).join(' · ')}>
           <AdjustmentControl label="Opacity" ariaLabel="Tattoo opacity" value={decalOpacity * 100}
             min={0} max={100} step={1} unit="%" resetValue={100}
             onChange={(value) => onDecalOpacityChange(value / 100)} />
@@ -297,6 +302,7 @@ export default function TopMenuBar({
             </div>
             <p className="ep-hint">Tint changes existing colors. Black ink stays black.</p>
           </div>
+          </MoreControls>
           <button type="button" className="ep-btn ep-btn--block ep-btn--ghost" onClick={onDecalReset}
             disabled={decalScale === 1 && decalRotation === 0 && decalColor.toLowerCase() === '#ffffff' && decalOpacity === 1}>
             <FaUndo aria-hidden /> Reset tattoo adjustments
@@ -305,12 +311,6 @@ export default function TopMenuBar({
       </>)}
 
       {panel('figure', <>
-        <section className="ep-section" aria-label="Body measurements">
-          <p className="ep-section-label">Your proportions</p>
-          <button type="button" className="ep-btn ep-btn--primary ep-btn--block" onClick={onMeasureBody} disabled={measuringLoading}>{measuringLoading ? 'Loading guide…' : hasBodyFit ? 'Edit measurements' : 'Measure body'}</button>
-          <p className="ep-hint">{hasBodyFit ? 'Fitted to your measurements. Your proportions carry through to snapshots and exports.' : 'Follow the guide to fit this figure to your measurements.'}</p>
-          {hasBodyFit && <button type="button" className="ep-btn ep-btn--ghost" onClick={onClearBodyFit}>Remove measurement fit</button>}
-        </section>
         <section className="ep-section">
           <label className="ep-field-label" htmlFor={`${inspectorId}-body-model`}>Body model</label>
           <select id={`${inspectorId}-body-model`} className="ep-select" value={bodyMeshId}
@@ -322,16 +322,24 @@ export default function TopMenuBar({
           onLookChange={onLookChange} bodyShape={bodyShape} onBodyShapeChange={onBodyShapeChange}
           isolateRegion={isolateRegion} onIsolateRegionChange={onIsolateRegionChange}
           onFrameFocus={onFramePose} onHighlightRegions={onHighlightRegions} />
+        <section className="ep-section" aria-label="Body measurements">
+          <p className="ep-section-label">Optional · Your proportions</p>
+          <button type="button" className="ep-btn ep-btn--block" onClick={onMeasureBody} disabled={measuringLoading}>{measuringLoading ? 'Loading guide…' : hasBodyFit ? 'Edit measurements' : 'Fit to measurements'}</button>
+          <p className="ep-hint">{hasBodyFit ? 'Fitted to your measurements. Your proportions carry through to snapshots and exports.' : 'Follow the guide to fit this figure to your measurements.'}</p>
+          {hasBodyFit && <button type="button" className="ep-btn ep-btn--ghost" onClick={onClearBodyFit}>Remove measurement fit</button>}
+        </section>
+        <MoreControls id="body" summary={[poseId !== 'neutral' ? 'Pose adjusted' : '', bodyAppearance.top !== 'none' || bodyAppearance.bottom !== 'none' ? 'Clothing applied' : '', bodyAppearance.hairStyle !== 'none' ? 'Hair applied' : ''].filter(Boolean).join(' · ') || 'Pose, clothing & hair'}>
         <PoseControls poseId={poseId} bodyPose={bodyPose} onPosePresetChange={onPosePresetChange}
           onBodyPoseChange={onBodyPoseChange} onFramePose={onFramePose} onHighlightRegions={onHighlightRegions} />
         <AppearanceControls bodyAppearance={bodyAppearance} onAppearanceChange={onAppearanceChange} isolateRegion={isolateRegion} />
+        </MoreControls>
       </>)}
 
       {panel('studio', <>
-        <StudioControls studio={studio} onStudioChange={onStudioChange} isolateRegion={isolateRegion}
+        <StudioControls compact studio={studio} onStudioChange={onStudioChange} isolateRegion={isolateRegion}
           background={background} onBackgroundChange={onBackgroundChange} />
         <section className="ep-section" aria-label="Studio lighting">
-          <LightingControls lights={lights} selectedIndex={selectedLight} onSelectLight={onSelectLight}
+          <LightingControls compact lights={lights} selectedIndex={selectedLight} onSelectLight={onSelectLight}
             onChange={onLightsChange} onReset={() => onLightsChange(resolveRig(lightingPreset))}
             preset={lightingPreset} onPresetChange={onLightingPresetChange} showGuides={studio.showGuides}
             onShowGuidesChange={(showGuides) => onStudioChange({ ...studio, showGuides })} />

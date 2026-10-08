@@ -3,7 +3,13 @@ import { loadScenes, addScene, deleteScene, updateScene } from './sceneStorage';
 import { FINAL_SAMPLES } from './render/registry';
 import type { SceneData } from './types';
 import type { BetaSession } from './auth/types';
+import { authMode } from './auth/betaAuthService';
 import AccountSettings from './AccountSettings';
+import StudioRail, { type StudioSection } from './StudioRail';
+import FocusDialog from './FocusDialog';
+import TattooLibrary from './TattooLibrary';
+import RenderHistoryModal from './RenderHistoryModal';
+import { FiSearch, FiPlus, FiArrowUpRight, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import './dashboard.css';
 import TemplatePreviewRenderer from './TemplatePreviewRenderer';
 import { SCENE_TEMPLATES, templatePreviewCache, type TemplatePreview } from './sceneTemplates';
@@ -13,10 +19,15 @@ interface Props {
   onOpenLanding?: () => void;
   session: BetaSession;
   onSignOut: () => void;
+  onResume?: () => void;
 }
 
-export default function ScenesDashboard({ onSelectScene, onOpenLanding, session, onSignOut }: Props) {
-  const [settingsOpen, setSettingsOpen] = useState(false);
+export default function ScenesDashboard({ onSelectScene, onOpenLanding, session, onSignOut, onResume }: Props) {
+  const [section, setSection] = useState<StudioSection>('projects');
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [rendersOpen, setRendersOpen] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [draftArtwork, setDraftArtwork] = useState<string | null>(null);
   const [template, setTemplate] = useState('blank');
   const templates = SCENE_TEMPLATES;
   const [previews, setPreviews] = useState<Record<string, TemplatePreview>>(() => ({ ...templatePreviewCache }));
@@ -97,19 +108,20 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
     if (mutating.current || loadingRef.current || loadError) return;
     const newScene: SceneData = {
       id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      name: template === 'blank' ? 'Untitled project' : `${templates.find((item) => item.id === template)?.label} preview`,
+      name: projectName.trim() || (template === 'blank' ? 'Untitled project' : `${templates.find((item) => item.id === template)?.label} preview`),
       bodyRegion: templates.find((item) => item.id === template)?.region ?? null,
       model: 'FinalBaseMesh',
-      decalImage: null,
+      decalImage: draftArtwork,
       decalRotation: 0,
       decalScale: 1,
       decalColor: '#ffffff',
       decalOpacity: 1,
-      decalVisible: false,
+      decalVisible: draftArtwork !== null,
       decalPosition: null,
       decalNormal: null,
       lightingPreset: 'studio',
-      background: 'white',
+      background: 'dark',
+      studio: { mode: 'sweep', color: '#30343c', shadow: .4, showGuides: false },
       thumbnail: previews[template]?.image ?? null,
       camera: previews[template]?.camera ?? {
         position: [6, 4, 6],
@@ -192,53 +204,29 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
 
   return (
     <div className="dashboard">
-      <aside className="sidebar">
-        <button type="button" className="sidebar-header dashboard-brand" onClick={onOpenLanding} aria-label="Smart Ink — front page" title="Go to front page">
-          <span className="nav-logo nav-logo--sm" aria-hidden />
-          <span className="sidebar-workspace">Smart Ink</span>
-        </button>
-        <nav className="sidebar-nav" aria-label="Workspace">
-          <a href="#projects" className={!settingsOpen ? 'active' : ''} onClick={(event) => { event.preventDefault(); setSettingsOpen(false); }}>
-            <span className="nav-icon" aria-hidden>◻</span> My Projects
-          </a>
-        </nav>
-        <div className="dashboard-account">
-          <button type="button" aria-pressed={settingsOpen} onClick={() => setSettingsOpen(true)}>⚙ Account settings</button>
-          <span>{session.email}</span>
-        </div>
-      </aside>
-
-      <div className="main-content">
-        {settingsOpen ? <AccountSettings session={session} onSignOut={onSignOut} /> : <>
-        <div className="top-bar">
-          <div className="top-bar-left">
-            <h1>My Projects</h1>
-
-          </div>
-        </div>
-        <div className="dashboard-actions">
-            <button type="button" className="new-project-card dashboard-create" onClick={handleNewScene} disabled={unavailable}>
-              <span className="new-project-icon icon-3d" aria-hidden="true">+</span>
-              {busy === 'create' ? 'Creating…' : 'Create tattoo preview'}
-            </button>
-          <div className="top-bar-right">
-            <div className="search-box">
-              <span className="search-icon" aria-hidden>
-                🔍
-              </span>
-              <input
-                type="search"
-                placeholder="Search projects"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Search projects"
-              />
-            </div>
-          </div>
+      <StudioRail active={rendersOpen ? 'renders' : section} studioAvailable={!!onResume} onHome={() => onOpenLanding?.()}
+        onNavigate={next => {
+          if (next === 'studio') { onResume?.(); return; }
+          if (next === 'renders') { setRendersOpen(true); return; }
+          setSection(next);
+        }} />
+      <div className="main-content focus-dashboard-content">
+        {authMode() === 'demo' && <p className="focus-local-note">Local preview · Projects and uploads are saved in this browser.</p>}
+        {section === 'account' ? <AccountSettings session={session} onSignOut={onSignOut} /> : section === 'artwork' ? <>
+          <header className="focus-page-heading"><div><p className="focus-eyebrow">Your collection</p><h1>Artwork</h1><p>Keep your designs close. Choose one to start a project.</p></div></header>
+          <div className="focus-library-page"><TattooLibrary currentImage={draftArtwork} onChoose={source => { setDraftArtwork(source); setNewProjectOpen(true); }} /></div>
+        </> : <>
+        <header className="focus-page-heading">
+          <div><p className="focus-eyebrow">Your workspace</p><h1>Projects</h1><p>A space for every idea. Pick up where you left off.</p></div>
+          <button type="button" className="focus-primary" onClick={() => { setDraftArtwork(null); setProjectName(''); setNewProjectOpen(true); }} disabled={unavailable}><FiPlus aria-hidden />New project</button>
+        </header>
+        <div className="focus-project-tools">
+          <span>{loading ? 'Loading projects…' : `${scenes.length} ${scenes.length === 1 ? 'project' : 'projects'}`}</span>
+          <label className="search-box"><FiSearch aria-hidden /><input type="search" placeholder="Search projects" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} aria-label="Search projects" /></label>
         </div>
 
         {error && (
-          <div role="alert" style={{ marginBottom: 16, padding: 14, border: '1px solid #a94e59', borderRadius: 10, color: '#ffc0c8' }}>
+          <div role="alert" style={{ marginBottom: 16, padding: 14, border: '1px solid #a94e59', borderRadius: 10, color: 'var(--focus-error)' }}>
             {error}
             {loadError && <button type="button" className="btn-open" style={{ marginLeft: 12 }} onClick={() => void refreshScenes()} disabled={loading || busy !== null}>Retry</button>}
           </div>
@@ -246,28 +234,15 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
         {loading && <p role="status">Loading scenes…</p>}
         {busy && <p role="status">{busy === 'create' ? 'Creating scene…' : busy.startsWith('delete:') ? 'Deleting scene…' : 'Saving scene name…'}</p>}
 
-        <section className="template-section" aria-labelledby="templates-title">
-          <h2 id="templates-title">Start from a template</h2>
-          <p>Choose your starting point, then create your tattoo preview.</p>
-          <div className="template-grid" role="group" aria-label="Scene template">
-            {templates.map((item) => <button key={item.id} type="button" className="template-card" aria-pressed={template === item.id} disabled={unavailable} onClick={() => setTemplate(item.id)}>
-              <span className="template-art">
-                {previews[item.id] ? <img src={previews[item.id].image} alt={`${item.label} scene preview`} /> : <span className="template-loading">{previewError ? 'Preview unavailable' : 'Preparing scene preview…'}</span>}
-              </span>
-              <span className="template-label">{item.label}<span aria-hidden>{template === item.id ? '✓' : ''}</span></span>
-              <span className="template-detail">{item.detail}</span>
-            </button>)}
-          </div>
-          {!previewError && <TemplatePreviewRenderer onPreview={receivePreview} onError={failPreview} />}
-          {previewError && <p className="template-preview-error">Some previews could not load. <button type="button" onClick={() => setPreviewError(false)}>Retry previews</button></p>}
-        </section>
         <section aria-labelledby="recent-title" className="recent-section">
-        <h2 id="recent-title">Recent projects</h2>
+        <h2 id="recent-title" className="focus-sr-only">Recent projects</h2>
         {loading || loadError ? null : filteredScenes.length === 0 ? (
           <div className="empty-scenes">
             {scenes.length === 0 ? (
               <>
-                Your projects will appear here once you create your first tattoo preview.
+                <span className="focus-empty-icon" aria-hidden><FiEdit2 /></span>
+                <h3>Start with an idea.</h3><p>Choose a body, place your artwork, and explore how it feels.</p>
+                <button type="button" className="focus-primary" onClick={() => setNewProjectOpen(true)}><FiPlus aria-hidden />Create your first project</button>
               </>
             ) : (
               <>No projects match your search.</>
@@ -310,25 +285,25 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
                       autoFocus
                     />
                   ) : (
-                    <div
+                    <button type="button"
                       className="file-name"
                       style={{ cursor: 'pointer' }}
                       onClick={() => handleNameClick(scene)}
                       title="Click to rename"
                     >
-                      {scene.name}
-                    </div>
+                      {scene.name} <FiEdit2 aria-hidden />
+                    </button>
                   )}
                   <div className="file-edited">
-                    {scene.model} · Updated {formatUpdated(scene.updatedAt)}
+                    Updated {formatUpdated(scene.updatedAt)}
                   </div>
                 </div>
                 <div className="file-card-actions">
                   <button type="button" className="btn-open" onClick={() => openScene(scene)} disabled={unavailable}>
-                    Open
+                    Open studio <FiArrowUpRight aria-hidden />
                   </button>
                   <button type="button" className="btn-delete" onClick={() => handleDelete(scene.id)} disabled={unavailable}>
-                    Delete
+                    <FiTrash2 aria-hidden /><span>Delete</span>
                   </button>
                 </div>
               </div>
@@ -338,6 +313,29 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
         </section>
         </>}
       </div>
+      {newProjectOpen && <FocusDialog title="New project" wide onClose={() => { if (!busy) setNewProjectOpen(false); }}>
+        <p className="focus-muted">Choose a starting view. Every body and setting stays editable.</p>
+        <label className="focus-name-label">Project name<input value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="e.g. Rose sleeve exploration" maxLength={100} disabled={!!busy} /></label>
+        <section className="template-section" aria-labelledby="templates-title">
+          <h2 id="templates-title">Start with a view</h2>
+          <p>The full body is always available in the studio.</p>
+          <div className="template-grid" role="group" aria-label="Scene template">
+            {templates.map((item) => <button key={item.id} type="button" className="template-card" aria-pressed={template === item.id} disabled={unavailable} onClick={() => setTemplate(item.id)}>
+              <span className="template-art">
+                {previews[item.id] ? <img src={previews[item.id].image} alt={`${item.label} scene preview`} /> : <span className="template-loading">{previewError ? 'Preview unavailable' : 'Preparing scene preview…'}</span>}
+              </span>
+              <span className="template-label">{item.label}<span aria-hidden>{template === item.id ? '✓' : ''}</span></span>
+              <span className="template-detail">{item.detail}</span>
+            </button>)}
+          </div>
+          {!previewError && <TemplatePreviewRenderer onPreview={receivePreview} onError={failPreview} />}
+          {previewError && <p className="template-preview-error">Some previews could not load. <button type="button" onClick={() => setPreviewError(false)}>Retry previews</button></p>}
+        </section>
+
+        {error && <p role="alert" className="focus-error">{error}</p>}
+        <footer className="focus-dialog-actions"><button type="button" className="ep-btn" onClick={() => setNewProjectOpen(false)} disabled={!!busy}>Cancel</button><button type="button" className="focus-primary" onClick={handleNewScene} disabled={unavailable}>{busy === 'create' ? 'Creating…' : 'Create project'}</button></footer>
+      </FocusDialog>}
+      {rendersOpen && <RenderHistoryModal onClose={() => setRendersOpen(false)} />}
     </div>
   );
 }

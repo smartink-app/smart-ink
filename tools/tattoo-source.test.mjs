@@ -10,7 +10,7 @@ const { outputFiles } = await build({ stdin: { contents: "export * from './src/r
       : 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";' }));
     b.onResolve({ filter: /^react-icons\/fa$/ }, () => ({ path: 'icons', namespace: 'stub' }));
     b.onResolve({ filter: /\/utils\/tattooUpload$/ }, () => ({ path: 'upload', namespace: 'stub' }));
-    b.onResolve({ filter: /^\.\/(PoseControls|AppearanceControls|StudioControls|CharacterBuilderSections|LightingControls|AdjustmentControl)$/ }, a => ({ path: a.path, namespace: 'stub' }));
+    b.onResolve({ filter: /^\.\/(PoseControls|AppearanceControls|StudioControls|CharacterBuilderSections|LightingControls|AdjustmentControl|MoreControls)$/ }, a => ({ path: a.path, namespace: 'stub' }));
     b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.path === 'icons'
       ? 'export const FaUpload="upload",FaUndo="undo",FaRegImage="image";'
       : a.path === 'upload' ? 'export const readTattooPng=(...args)=>globalThis.__readTattoo(...args);' : 'export default ()=>null;' }));
@@ -26,7 +26,7 @@ globalThis.__tattooHooks = { ref(value) { return slots[cursor++] ??= { current: 
 globalThis.__readTattoo = (file, currentSignal) => { signal = currentSignal; return new Promise(resolve => { deferred = resolve; }); };
 function nodes(node, result = []) { if (Array.isArray(node)) node.forEach(child => nodes(child, result)); else if (node && typeof node === 'object') { result.push(node); nodes(node.props?.children, result); } return result; }
 function render() { cursor = 0; return nodes(m.TopMenuBar({ uploadedImage: uploaded, setUploadedImage(value) { uploaded = value; changes.push(value); },
-  hasPlacement: true, decalVisible: true, decalColor: '#ffffff', decalScale: 1, decalRotation: 0, decalOpacity: 1, onDecalReset() { reset++; }, lights: [], studio: { showGuides: false },
+  hasPlacement: true, decalVisible: true, decalColor: '#ffffff', decalScale: 1, decalRotation: 0, decalOpacity: 1, onDecalReset() { reset++; }, lights: [], studio: { showGuides: false }, bodyAppearance: { top: 'none', bottom: 'none', hairStyle: 'none' },
   CAMERA_PRESETS: Object.fromEntries(['front', 'profile', 'closeup'].map(key => [key, { name: key }])), cameraPreset: 'front' })); }
 const example = () => render().find(n => n.type === 'button' && JSON.stringify(n.props.children).includes('Use example tattoo'));
 assert.equal(render().find(n => n.type === 'img').props.src, uploaded);

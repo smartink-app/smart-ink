@@ -14,8 +14,9 @@ import type { BetaSession } from './auth/types'
  * landing hero still needs three.js itself, which Vite keeps in a shared chunk.
  */
 const Workspace = lazy(() => import('./Workspace'))
+const PublicDemo = lazy(() => import('./PublicDemo'))
 
-type GateView = 'landing' | 'login' | 'invite' | 'invite-code' | 'admin' | 'app'
+type GateView = 'landing' | 'login' | 'invite' | 'invite-code' | 'admin' | 'app' | 'demo'
 
 function initialGateView(): { view: GateView; inviteCode: string | null } {
   if (typeof window === 'undefined') return { view: 'landing', inviteCode: null }
@@ -23,6 +24,7 @@ function initialGateView(): { view: GateView; inviteCode: string | null } {
   if (params.get('admin') === '1') return { view: 'admin', inviteCode: null }
   const invite = params.get('invite')?.trim().toUpperCase() ?? null
   if (invite) return { view: 'invite', inviteCode: invite }
+  if (params.get('demo') === '1') return { view: 'demo', inviteCode: null }
   return { view: 'landing', inviteCode: null }
 }
 
@@ -39,7 +41,7 @@ function App() {
     if (!betaAuth.ready || bootedRef.current) return
     bootedRef.current = true
     const boot = initialGateView()
-    if (boot.view === 'invite' || boot.view === 'admin') return
+    if (boot.view === 'invite' || boot.view === 'admin' || boot.view === 'demo') return
     if (betaAuth.session) setGateView('app')
     else if (betaAuth.accessError) setGateView('login')
   }, [betaAuth.ready, betaAuth.session, betaAuth.accessError])
@@ -51,12 +53,20 @@ function App() {
 
   const clearInviteQuery = useCallback(() => {
     const url = new URL(window.location.href)
-    if (url.searchParams.has('invite') || url.searchParams.has('admin')) {
+    if (url.searchParams.has('invite') || url.searchParams.has('admin') || url.searchParams.has('demo')) {
       url.searchParams.delete('invite')
       url.searchParams.delete('admin')
+      url.searchParams.delete('demo')
       window.history.replaceState({}, '', url.pathname + url.search + url.hash)
     }
   }, [])
+
+  const openDemo = () => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('demo', '1')
+    window.history.replaceState({}, '', url.pathname + url.search)
+    setGateView('demo')
+  }
 
   const setBetaSession = betaAuth.setSession
   const enterApp = useCallback(
@@ -88,8 +98,17 @@ function App() {
     return <div className="app-loading">Checking access…</div>
   }
 
+  if (gateView === 'demo') {
+    return <Suspense fallback={<div className="app-loading">Opening the live demo…</div>}>
+      <PublicDemo onHome={goHome} onRequestAccess={() => {
+        goHome()
+        window.setTimeout(() => document.getElementById('request')?.scrollIntoView({ behavior: 'smooth' }), 0)
+      }} />
+    </Suspense>
+  }
+
   if (gateView === 'landing') {
-    return <LandingPage signedIn={!!betaAuth.session} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
+    return <LandingPage onTryDemo={openDemo} signedIn={!!betaAuth.session} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
   }
 
   if (gateView === 'admin') {
@@ -141,7 +160,7 @@ function App() {
 
   const session = betaAuth.session
   if (!session) {
-    return <LandingPage signedIn={!!betaAuth.session} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
+    return <LandingPage onTryDemo={openDemo} signedIn={!!betaAuth.session} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
   }
 
   return (

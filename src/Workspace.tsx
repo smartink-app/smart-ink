@@ -34,6 +34,10 @@ import { createSnapshotSession } from './services/snapshotSession'
 import { snapshotOutput, type SnapshotQuality } from './render/snapshot'
 import ScenesDashboard from './ScenesDashboard'
 import EditorLeftPanel from './EditorLeftPanel'
+import StudioRail from './StudioRail'
+import FocusDialog from './FocusDialog'
+import AccountSettings from './AccountSettings'
+import { FiSidebar } from 'react-icons/fi'
 import type { SceneData } from './types'
 import { updateScene } from './sceneStorage'
 import { downloadFiles, downloadBlob } from './utils/sceneExporter'
@@ -143,6 +147,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   const [currentScene, setCurrentScene] = useState<SceneData | null>(null)
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('tattoo')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [artworkOpen, setArtworkOpen] = useState(false)
   const [showDashboard, setShowDashboard] = useState(true)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [sceneSaves] = useState(() => createSceneSaveQueue<SceneData>(updateScene))
@@ -418,7 +423,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   }, [])
   const editHistory = useEditorHistory({ value: editValue, onRestore: restoreEdits,
     scopeId: currentScene?.id, enabled: Boolean(currentScene) && !showDashboard })
-  const historyBlocked = measureOpen || showDashboard || snapshot.open || showExportModal || showRenderHistory || modelLoading
+  const historyBlocked = accountMenuOpen || measureOpen || showDashboard || snapshot.open || showExportModal || showRenderHistory || modelLoading
   const historyCommands = useRef({ ...editHistory, blocked: historyBlocked, gesturesBlocked: measureOpen || showDashboard || modelLoading })
   historyCommands.current = { ...editHistory, blocked: historyBlocked, gesturesBlocked: measureOpen || showDashboard || modelLoading }
   useEffect(() => {
@@ -490,6 +495,8 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   const loadScene = (scene: SceneData) => afterSaving(() => {
     const migrated = migrateScene(scene)
     setInspectorTab('tattoo')
+    setArtworkOpen(false)
+    setSidebarCollapsed(false)
     setCurrentScene(migrated)
     setUploadedImage(migrated.decalImage)
     setBodyMeshId(migrated.bodyMeshId!)
@@ -928,6 +935,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
           session={session}
           onSignOut={() => onSignOut()}
           onSelectScene={loadScene}
+          onResume={currentScene ? () => setShowDashboard(false) : undefined}
           onOpenLanding={() => afterSaving(onHome)}
         />
       </div>
@@ -936,11 +944,17 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
 
   return (
     <div className={`editor-app-root${measureOpen ? ' editor-app-root--measuring' : ''}${photoMode ? ' editor-app-root--photo' : ''}`} ref={canvasContainerRef}>
+      <StudioRail active={accountMenuOpen ? 'account' : artworkOpen ? 'artwork' : 'studio'}
+        onHome={() => afterSaving(onHome)} disabled={snapshot.open || measureOpen || measureLoading}
+        onNavigate={section => {
+          if (section === 'projects') afterSaving(() => setShowDashboard(true))
+          if (section === 'studio') { setArtworkOpen(false); setSidebarCollapsed(false) }
+          if (section === 'artwork') { setArtworkOpen(true); setSidebarCollapsed(false) }
+          if (section === 'renders') setShowRenderHistory(true)
+          if (section === 'account') afterSaving(() => setAccountMenuOpen(true))
+        }} />
       <header className="editor-toolbar editor-toolbar--main" inert={snapshot.open || measureOpen || measureLoading}>
-        <button type="button" className="editor-toolbar-brand editor-home-link" onClick={() => afterSaving(onHome)} aria-label="Smart Ink home">
-          <span className="nav-logo nav-logo--sm" aria-hidden />
-          Smart Ink
-        </button>
+        <button type="button" className="focus-panel-toggle" onClick={() => setSidebarCollapsed(value => !value)} aria-expanded={!sidebarCollapsed} title={sidebarCollapsed ? 'Show editing controls' : 'Hide editing controls'}><FiSidebar aria-hidden /><span>Controls</span></button>
         <div className="editor-toolbar-center editor-scene-heading">
           <input key={currentScene?.id} className="editor-scene-name" aria-label="Scene name"
             defaultValue={currentScene?.name ?? 'Untitled Scene'} maxLength={100}
@@ -966,38 +980,9 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             <button type="button" className="tool-btn tool-btn--ghost" aria-label="Undo edit" title="Undo · ⌘ / Ctrl Z" disabled={historyBlocked || !editHistory.canUndo} onClick={editHistory.undo}><FaUndo aria-hidden="true" /><span>Undo</span></button>
             <button type="button" className="tool-btn tool-btn--ghost" aria-label="Redo edit" title="Redo · ⌘ / Ctrl Shift Z" disabled={historyBlocked || !editHistory.canRedo} onClick={editHistory.redo}><FaRedo aria-hidden="true" /><span>Redo</span></button>
           </div>
-          <button type="button" className="tool-btn tool-btn--primary" onClick={openSnapshot} disabled={modelLoading || !canvasHostSized || renderBusy} title="Frame the tattoo and set up a Blender snapshot">Snapshot</button>
+          <button type="button" className="tool-btn tool-btn--primary" onClick={openSnapshot} disabled={modelLoading || !canvasHostSized || renderBusy} title="Frame the tattoo and set up a Blender snapshot">Render image</button>
           <EditorOutputMenu onExport={() => setShowExportModal(true)} onShare={() => setShowRenderHistory(true)} />
-          <button type="button" className="tool-btn-nav tool-btn-nav--muted" onClick={() => afterSaving(() => setShowDashboard(true))}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
-            </svg>
-            Scenes
-          </button>
-          <div className="editor-toolbar-account">
-            <button
-              type="button"
-              className="editor-toolbar-avatar"
-              title={session.email}
-              aria-haspopup="menu"
-              aria-expanded={accountMenuOpen}
-              aria-label="Account menu"
-              onClick={() => setAccountMenuOpen((v) => !v)}
-            >
-              {(session.displayName?.[0] ?? 'S').toUpperCase()}
-            </button>
-            {accountMenuOpen && (
-              <div className="account-menu" role="menu">
-                <div className="account-menu-email">{session.email}</div>
-                <button type="button" role="menuitem" onClick={() => afterSaving(() => onSignOut())}>
-                  Sign out
-                </button>
-                <button type="button" role="menuitem" onClick={() => afterSaving(() => onSignOut({ everywhere: true }))}>
-                  Sign out everywhere
-                </button>
-              </div>
-            )}
-          </div>
+
         </div>
       </header>
 
@@ -1005,15 +990,77 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
       {saveState.status === 'error' && <div className="editor-notice" role="alert">Your latest changes are still here. Saving failed; retry before leaving this page.</div>}
       {photoMode && <div className="photo-mode-actions" inert={snapshot.open || measureOpen || measureLoading} style={snapshot.open ? { visibility: 'hidden' } : undefined}>
         <button type="button" className="ep-btn" onClick={() => setPhotoMode(false)}>Exit Clean view · Esc</button>
-        <button type="button" className="ep-btn ep-btn--primary" onClick={openSnapshot} disabled={modelLoading || !canvasHostSized || renderBusy}>Snapshot</button>
+        <button type="button" className="ep-btn ep-btn--primary" onClick={openSnapshot} disabled={modelLoading || !canvasHostSized || renderBusy}>Render image</button>
         <button type="button" className="ep-btn" onClick={() => setShowExportModal(true)}>Export</button>
       </div>}
       <div className="editor-body-row">
-        <EditorLeftPanel currentImage={uploadedImage}
-          onChooseArtwork={(source) => { setUploadedImage(source); setDecalVisible(true); setInspectorTab('tattoo'); setPanelRegions([]); uvPlacementRef.current?.placeInView() }}
-          disabled={snapshot.open || measureOpen || measureLoading || modelLoading}
-          collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed(value => !value)}
-          />
+        <div className="focus-control-panel" hidden={sidebarCollapsed}>
+          <div className="focus-panel-slot" hidden={!artworkOpen}>
+            <EditorLeftPanel backToEditing currentImage={uploadedImage}
+              onChooseArtwork={(source) => { setUploadedImage(source); setDecalVisible(true); setInspectorTab('tattoo'); setArtworkOpen(false); setPanelRegions([]); uvPlacementRef.current?.placeInView() }}
+              disabled={snapshot.open || measureOpen || measureLoading || modelLoading}
+              collapsed={false} onToggleCollapsed={() => setArtworkOpen(false)} />
+          </div>
+          <div className="focus-panel-slot" hidden={artworkOpen}>
+            <TopMenuBar
+              onBrowseArtwork={() => setArtworkOpen(true)}
+              onMeasureBody={() => void openMeasurement()} measuringLoading={measureLoading || modelLoading}
+              hasBodyFit={!!bodyFit} onClearBodyFit={() => setBodyFit(null)}
+              activeTab={inspectorTab} onTabChange={setInspectorTab}
+              disabled={snapshot.open || measureOpen || measureLoading}
+              key={currentScene?.id}
+              bodyMeshId={bodyMeshId}
+              onBodyMeshChange={handleBodyMeshChange}
+              skinToneId={skinToneId}
+              lookId={lookId}
+              lights={lights}
+              selectedLight={selectedLight}
+              lightingPreset={lightingPreset}
+              onLightingPresetChange={(preset) => { setLightingPreset(preset); setLights(resolveRig(preset)); setSelectedLight(1) }}
+              studio={studio}
+              background={background} onBackgroundChange={setBackground}
+              onStudioChange={(value) => setStudio(normalizeStudio(value))}
+              onSelectLight={setSelectedLight}
+              onLightsChange={setLights}
+              onSkinChange={setSkinToneId}
+              onLookChange={handleLookChange}
+              bodyShape={bodyShape}
+              poseId={poseId}
+              bodyPose={bodyPose}
+              bodyAppearance={bodyAppearance}
+              onAppearanceChange={(appearance) => setBodyAppearance(normalizeAppearance(appearance))}
+              onFramePose={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}
+              onPosePresetChange={handlePosePreset}
+              onBodyPoseChange={handleBodyPoseChange}
+              onBodyShapeChange={(shape) => setBodyShape(normalizeShape(shape))}
+              isolateRegion={isolateRegion}
+              onIsolateRegionChange={setIsolateRegion}
+              onHighlightRegions={setPanelRegions}
+              setUploadedImage={setUploadedImage}
+              uploadedImage={uploadedImage}
+              decalVisible={decalVisible}
+              hasPlacement={surfacePlacement !== null}
+              decalRotation={decalRotation}
+              decalScale={decalScale}
+              decalColor={decalColor}
+              decalOpacity={decalOpacity}
+              onDecalRotationChange={setDecalRotation}
+              onDecalScaleChange={setDecalScale}
+              onDecalColorChange={setDecalColor}
+              onDecalOpacityChange={setDecalOpacity}
+              onDecalVisibleChange={setDecalVisible}
+              onDecalReset={handleResetDecal}
+              photoMode={photoMode}
+              setPhotoMode={handlePhotoModeChange}
+              cameraPreset={cameraPreset}
+              onCameraPresetChange={(preset) => handleCameraPresetChange(preset as CameraPresetKey)}
+              CAMERA_PRESETS={CAMERA_PRESETS}
+              performanceMode={performanceMode}
+              setPerformanceMode={setPerformanceMode}
+              onExport={() => setShowExportModal(true)}
+            />
+          </div>
+        </div>
 
         <div className="editor-canvas-host">
           {!photoMode && <ViewportControls disabled={snapshot.open || measureOpen || measureLoading || modelLoading}
@@ -1160,67 +1207,17 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
           </div>
         </div>
 
-        <TopMenuBar
-          onMeasureBody={() => void openMeasurement()} measuringLoading={measureLoading || modelLoading}
-          hasBodyFit={!!bodyFit} onClearBodyFit={() => setBodyFit(null)}
-          activeTab={inspectorTab} onTabChange={setInspectorTab}
-          disabled={snapshot.open || measureOpen || measureLoading}
-          key={currentScene?.id}
-          bodyMeshId={bodyMeshId}
-          onBodyMeshChange={handleBodyMeshChange}
-          skinToneId={skinToneId}
-          lookId={lookId}
-          lights={lights}
-          selectedLight={selectedLight}
-          lightingPreset={lightingPreset}
-          onLightingPresetChange={(preset) => { setLightingPreset(preset); setLights(resolveRig(preset)); setSelectedLight(1) }}
-          studio={studio}
-          background={background} onBackgroundChange={setBackground}
-          onStudioChange={(value) => setStudio(normalizeStudio(value))}
-          onSelectLight={setSelectedLight}
-          onLightsChange={setLights}
-          onSkinChange={setSkinToneId}
-          onLookChange={handleLookChange}
-          bodyShape={bodyShape}
-          poseId={poseId}
-          bodyPose={bodyPose}
-          bodyAppearance={bodyAppearance}
-          onAppearanceChange={(appearance) => setBodyAppearance(normalizeAppearance(appearance))}
-          onFramePose={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}
-          onPosePresetChange={handlePosePreset}
-          onBodyPoseChange={handleBodyPoseChange}
-          onBodyShapeChange={(shape) => setBodyShape(normalizeShape(shape))}
-          isolateRegion={isolateRegion}
-          onIsolateRegionChange={setIsolateRegion}
-          onHighlightRegions={setPanelRegions}
-          setUploadedImage={setUploadedImage}
-          uploadedImage={uploadedImage}
-          decalVisible={decalVisible}
-          hasPlacement={surfacePlacement !== null}
-          decalRotation={decalRotation}
-          decalScale={decalScale}
-          decalColor={decalColor}
-          decalOpacity={decalOpacity}
-          onDecalRotationChange={setDecalRotation}
-          onDecalScaleChange={setDecalScale}
-          onDecalColorChange={setDecalColor}
-          onDecalOpacityChange={setDecalOpacity}
-          onDecalVisibleChange={setDecalVisible}
-          onDecalReset={handleResetDecal}
-          photoMode={photoMode}
-          setPhotoMode={handlePhotoModeChange}
-          cameraPreset={cameraPreset}
-          onCameraPresetChange={(preset) => handleCameraPresetChange(preset as CameraPresetKey)}
-          CAMERA_PRESETS={CAMERA_PRESETS}
-          performanceMode={performanceMode}
-          setPerformanceMode={setPerformanceMode}
-          onExport={() => setShowExportModal(true)}
-        />
+
       </div>
+
+      {accountMenuOpen && <FocusDialog title="Your account" onClose={() => setAccountMenuOpen(false)}>
+        <AccountSettings session={session} onSignOut={() => afterSaving(() => onSignOut())} />
+        <button type="button" className="ep-btn" onClick={() => afterSaving(() => onSignOut({ everywhere: true }))}>Sign out everywhere</button>
+      </FocusDialog>}
 
       {/* Export Modal */}
       {showExportModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="export-title">
+        <FocusDialog title="Export options" onClose={() => setShowExportModal(false)}>
           <div className="modal-card">
             <div className="render-history-header">
               <h2 id="export-title">Export image</h2>
@@ -1498,7 +1495,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
               </div>
             )}
           </div>
-        </div>
+        </FocusDialog>
       )}
 
       {shapeMenu && !photoMode && (

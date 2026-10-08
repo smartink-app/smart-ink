@@ -91,7 +91,7 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
   };
   return <section ref={containerRef} role="dialog" aria-modal="true" tabIndex={-1} onKeyDown={handleKeyDown} className={`snapshot-overlay ${showLive || composing ? 'snapshot-overlay--live' : ''} ${composing ? 'snapshot-overlay--compose' : ''}`} aria-labelledby={`${id}-title`} onPointerDown={event => event.stopPropagation()} onWheel={event => event.stopPropagation()}>
     <header className="snapshot-toolbar">
-      <div className="snapshot-title"><span className="snapshot-title-icon" aria-hidden="true">▣</span><div><h2 id={`${id}-title`}>Snapshot</h2><p>{composing ? 'Compose · live view' : showLive ? 'Live view · comparison' : hasImage ? 'Rendered studio image' : 'Studio render'}</p></div></div>
+      <div className="snapshot-title"><span className="snapshot-title-icon" aria-hidden="true">▣</span><div><h2 id={`${id}-title`}>Render image</h2><p>{composing ? 'Compose · live view' : showLive ? 'Live view · comparison' : hasImage ? 'Rendered studio image' : 'Studio render'}</p></div></div>
       <button ref={closeRef} type="button" className="snapshot-button snapshot-button--back" onClick={onClose}>Back to editing <span aria-hidden="true">↗</span></button>
     </header>
 

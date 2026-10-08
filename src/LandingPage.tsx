@@ -1,3 +1,4 @@
+import { ThemeToggle } from './Theme';
 import React, { useId, useState, type FormEvent } from 'react';
 import { authMode, requestBetaAccess } from './auth/betaAuthService';
 import type { RequestAccessResult } from './auth/types';
@@ -13,6 +14,7 @@ import './landing/render-story.css';
 interface LandingPageProps {
   onNavigateToLogin: () => void;
   signedIn?: boolean;
+  onTryDemo: () => void;
 }
 
 const ARTIST_BENEFITS = [
@@ -80,13 +82,15 @@ const RequestAccessForm: React.FC<{ source: string; buttonLabel: string }> = ({
       return;
     }
 
-    if (recorded.already) {
+    // A browser-local entry is not proof that the hosted form received it.
+    // After a delivery failure, submitting again must actually retry delivery.
+    if (recorded.already && (authMode() === 'supabase' || !isWaitlistEndpointConfigured() || recorded.status === 'active' || recorded.status === 'invited')) {
       const hasAccess = recorded.status === 'active' || recorded.status === 'invited';
       setState('already');
       setMessage(
         hasAccess
           ? 'You already have access — log in with that email.'
-          : 'You’re already on the list. We’ll be in touch when a seat opens.'
+          : authMode() === 'demo' && !isWaitlistEndpointConfigured() ? 'This request is stored in this browser only. No email was sent.' : 'You’re already on the list. We’ll be in touch when a seat opens.'
       );
       return;
     }
@@ -104,7 +108,7 @@ const RequestAccessForm: React.FC<{ source: string; buttonLabel: string }> = ({
         '[Smart Ink] VITE_WAITLIST_ENDPOINT is not set — this beta request was only stored in this browser and will not reach you. See .env.example.'
       );
       setState('joined');
-      setMessage('You’re on the list. We’ll email an invite when a seat opens.');
+      setMessage('Saved for this local preview only. No email was sent.');
       setEmail('');
       return;
     }
@@ -159,7 +163,7 @@ const RequestAccessForm: React.FC<{ source: string; buttonLabel: string }> = ({
   );
 };
 
-const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, signedIn = false }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, onTryDemo, signedIn = false }) => {
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 
   return (
@@ -199,6 +203,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, signedIn =
           </a>
         </nav>
         <div className="landing-nav-actions">
+          <ThemeToggle />
           <button type="button" className="btn-quiet" onClick={onNavigateToLogin}>
             {signedIn ? 'My Projects' : 'Log in'}
           </button>
@@ -218,10 +223,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, signedIn =
           </h1>
           <p className="hero-lead">
             Smart Ink wraps your artwork onto a 3D body, so you and your client agree on placement,
-            scale and flow before the first line goes in — then renders the result properly in
-            Blender Cycles.
+            scale and flow before the first line goes in. Turn it into a finished image to share.
           </p>
-          <RequestAccessForm source="hero" buttonLabel="Request an invite" />
+          <div className="focus-hero-actions"><button type="button" className="btn-primary" onClick={onTryDemo}>Try the live demo <span aria-hidden>↗</span></button><button type="button" className="btn-quiet" onClick={() => scrollTo('request')}>Request beta access</button></div>
+          <p className="focus-demo-caption">Explore a sample in your browser. No account needed.</p>
           <ul className="hero-facts">
             {FACTS.map((fact) => (
               <li key={fact}>{fact}</li>
@@ -268,11 +273,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, signedIn =
       <section className="section section--request" id="request">
         <div className="request-panel">
           <p className="section-eyebrow">Request access</p>
-          <h2>We’re letting studios in a few at a time</h2>
+          <h2>A few studios. A shared next step.</h2>
           <p className="section-lead">
-            Leave your email and we’ll send a personal invite link when a seat opens. There’s no open
-            signup — we read every request, and we’d rather have a handful of artists telling us what
-            breaks than a queue we can’t support.
+            Request a place in the exclusive beta. We’ll send a personal invite when a seat opens, so you can save projects, use your own artwork, and create finished renders.
           </p>
           <RequestAccessForm source="request-section" buttonLabel="Request an invite" />
           <p className="request-login">

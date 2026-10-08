@@ -16,7 +16,7 @@ const { outputFiles } = await build({
       : 'export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="fragment";' }));
     builder.onResolve({ filter: /^react-icons\/fa$/ }, () => ({ path: 'icons', namespace: 'stub' }));
     builder.onResolve({ filter: /\/utils\/tattooUpload$/ }, () => ({ path: 'upload', namespace: 'stub' }));
-    builder.onResolve({ filter: /^\.\/(PoseControls|AppearanceControls|StudioControls|CharacterBuilderSections|LightingControls|AdjustmentControl)$/ }, args => ({ path: args.path.slice(2), namespace: 'stub' }));
+    builder.onResolve({ filter: /^\.\/(PoseControls|AppearanceControls|StudioControls|CharacterBuilderSections|LightingControls|AdjustmentControl|MoreControls)$/ }, args => ({ path: args.path.slice(2), namespace: 'stub' }));
     builder.onLoad({ filter: /.*/, namespace: 'stub' }, args => ({ contents: args.path === 'icons'
       ? 'export const FaUpload="upload",FaUndo="undo",FaRegImage="image";'
       : args.path === 'upload' ? 'export const readTattooPng=(...args)=>globalThis.__inspectorRead(...args);'
@@ -80,7 +80,7 @@ const button = label => render().find(node => node.type === 'button' && text(des
 const text = all => all.flatMap(node => Array.isArray(node.props?.children) ? node.props.children : [node.props?.children]).filter(value => typeof value === 'string');
 
 assert.equal(active(), 'Tattoo', 'Tattoo is the initial editing task');
-assert.deepEqual(byRole('tab').map(node => node.props.children), ['Tattoo', 'Figure', 'Studio']);
+assert.deepEqual(byRole('tab').map(node => node.props.children), ['Tattoo', 'Body', 'Lighting']);
 assert.equal(byRole('tabpanel').length, 3, 'All panels stay mounted to retain child state and open disclosures');
 assert.equal(byRole('tabpanel').filter(node => !node.props.hidden).length, 1);
 for (const node of byRole('tab')) {
@@ -100,32 +100,32 @@ assert.ok(!text(render()).some(value => /^(Camera|Decal|Export|Performance|Photo
 const tattooPanel = panelFor('Tattoo');
 dom.get(tattooPanel.props.id).scrollTop = 142;
 tattooPanel.props.onScroll({ currentTarget: dom.get(tattooPanel.props.id) });
-tab('Figure').props.onClick();
-assert.equal(active(), 'Figure');
-const figurePanel = panelFor('Figure');
+tab('Body').props.onClick();
+assert.equal(active(), 'Body');
+const figurePanel = panelFor('Body');
 assert.equal(dom.get(figurePanel.props.id).scrollTop, 0);
 dom.get(figurePanel.props.id).scrollTop = 673;
 figurePanel.props.onScroll({ currentTarget: dom.get(figurePanel.props.id) });
 let prevented = 0;
-tab('Figure').props.onKeyDown({ key: 'ArrowRight', preventDefault() { prevented++; } });
-assert.equal(active(), 'Studio');
-assert.equal(focus, tab('Studio').props.id);
-const studioPanel = panelFor('Studio');
+tab('Body').props.onKeyDown({ key: 'ArrowRight', preventDefault() { prevented++; } });
+assert.equal(active(), 'Lighting');
+assert.equal(focus, tab('Lighting').props.id);
+const studioPanel = panelFor('Lighting');
 dom.get(studioPanel.props.id).scrollTop = 288;
 studioPanel.props.onScroll({ currentTarget: dom.get(studioPanel.props.id) });
-tab('Studio').props.onKeyDown({ key: 'Home', preventDefault() { prevented++; } });
+tab('Lighting').props.onKeyDown({ key: 'Home', preventDefault() { prevented++; } });
 assert.equal(active(), 'Tattoo');
 assert.equal(dom.get(panelFor('Tattoo').props.id).scrollTop, 142);
 assert.equal(focus, tab('Tattoo').props.id);
 tab('Tattoo').props.onKeyDown({ key: 'ArrowLeft', preventDefault() { prevented++; } });
-assert.equal(active(), 'Studio', 'Left arrow wraps to the last task');
-assert.equal(dom.get(panelFor('Studio').props.id).scrollTop, 288);
-tab('Studio').props.onKeyDown({ key: 'ArrowRight', preventDefault() { prevented++; } });
+assert.equal(active(), 'Lighting', 'Left arrow wraps to the last task');
+assert.equal(dom.get(panelFor('Lighting').props.id).scrollTop, 288);
+tab('Lighting').props.onKeyDown({ key: 'ArrowRight', preventDefault() { prevented++; } });
 assert.equal(active(), 'Tattoo', 'Right arrow wraps to the first task');
 tab('Tattoo').props.onKeyDown({ key: 'End', preventDefault() { prevented++; } });
-assert.equal(active(), 'Studio');
-tab('Figure').props.onClick();
-assert.equal(dom.get(panelFor('Figure').props.id).scrollTop, 673);
+assert.equal(active(), 'Lighting');
+tab('Body').props.onClick();
+assert.equal(dom.get(panelFor('Body').props.id).scrollTop, 673);
 assert.equal(prevented, 5);
 assert.ok(calls.filter(call => call[0] === 'highlight').every(call => call[1].length === 0), 'Switching tasks clears transient body highlights');
 
@@ -166,11 +166,11 @@ assert.equal(render()[0].props.inert, true, 'Snapshot disables the inspector as 
 props.activeTab = 'studio';
 props.onTabChange = tab => { props.activeTab = tab; };
 let controlled = render();
-assert.equal(controlled.find(n => n.props?.role === 'tab' && n.props['aria-selected']).props.children, 'Studio');
-controlled.find(n => n.props?.role === 'tab' && n.props.children === 'Figure').props.onClick();
+assert.equal(controlled.find(n => n.props?.role === 'tab' && n.props['aria-selected']).props.children, 'Lighting');
+controlled.find(n => n.props?.role === 'tab' && n.props.children === 'Body').props.onClick();
 assert.equal(props.activeTab, 'figure');
 controlled = render();
-assert.equal(controlled.find(n => n.props?.role === 'tab' && n.props['aria-selected']).props.children, 'Figure');
+assert.equal(controlled.find(n => n.props?.role === 'tab' && n.props['aria-selected']).props.children, 'Body');
 console.log('Controlled sidebar/inspector selection passed.');
 
 for (const name of ['__inspector', '__inspectorRead']) delete globalThis[name];

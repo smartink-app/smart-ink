@@ -31,15 +31,6 @@ export default function ViewportControls({ disabled = false, cameraPreset, camer
   }, []);
   return <div className="viewport-tools" inert={disabled} aria-label="Viewport controls">
     <div className="viewport-tools-row">
-      <label className="viewport-field" htmlFor={`${id}-view`}><span>View</span>
-        <select id={`${id}-view`} className="ep-select viewport-view-select" value={cameraPreset} onChange={event => onCameraChange(event.currentTarget.value)}>
-          {!Object.hasOwn(cameras, cameraPreset) && <option value={cameraPreset}>Custom view</option>}
-          {Object.entries(cameras).map(([key, view]) => <option key={key} value={key}>{view.name}</option>)}
-        </select>
-      </label>
-      <div className="viewport-view-shortcuts" role="group" aria-label="Common views">
-        {['front', 'back', 'left', 'right'].filter(key => Object.hasOwn(cameras, key)).map(key => <button key={key} type="button" className="ep-btn viewport-button" aria-pressed={cameraPreset === key} onClick={() => onCameraChange(key)}>{key[0].toUpperCase() + key.slice(1)}</button>)}
-      </div>
       <label className="viewport-field" htmlFor={`${id}-focus`}><span>Focus</span>
         <select id={`${id}-focus`} className="ep-select" value={region ?? 'full'}
           onChange={event => { onRegionChange(event.currentTarget.value === 'full' ? null : event.currentTarget.value as BodyRegionId); onHighlightRegions([]); }}
@@ -55,8 +46,18 @@ export default function ViewportControls({ disabled = false, cameraPreset, camer
         event.preventDefault(); event.stopPropagation(); settings.current.open = false;
         settings.current.querySelector('summary')?.focus();
       }}>
-        <summary className="ep-btn viewport-button" aria-label="Viewport settings" title="Viewport settings"><FaSlidersH aria-hidden="true" /><span>Settings</span></summary>
+        <summary className="ep-btn viewport-button" aria-label="Viewport settings" title="Viewport settings"><FaSlidersH aria-hidden="true" /><span>View</span></summary>
         <div className="viewport-settings-panel">
+      <label className="viewport-field" htmlFor={`${id}-view`}><span>View</span>
+        <select id={`${id}-view`} className="ep-select viewport-view-select" value={cameraPreset} onChange={event => onCameraChange(event.currentTarget.value)}>
+          {!Object.hasOwn(cameras, cameraPreset) && <option value={cameraPreset}>Custom view</option>}
+          {Object.entries(cameras).map(([key, view]) => <option key={key} value={key}>{view.name}</option>)}
+        </select>
+      </label>
+      <div className="viewport-view-shortcuts" role="group" aria-label="Common views">
+        {['front', 'back', 'left', 'right'].filter(key => Object.hasOwn(cameras, key)).map(key => <button key={key} type="button" className="ep-btn viewport-button" aria-pressed={cameraPreset === key} onClick={() => onCameraChange(key)}>{key[0].toUpperCase() + key.slice(1)}</button>)}
+      </div>
+
           <label><input type="checkbox" checked={performanceMode} onChange={event => onPerformanceChange(event.currentTarget.checked)} /><span>Faster preview</span></label>
           <p>Reduces preview detail and shadows. Blender renders keep their selected quality.</p>
           <label><input type="checkbox" checked={showPlacementTips} onChange={event => onPlacementTipsChange(event.currentTarget.checked)} /><span>Show placement tips</span></label>

@@ -16,7 +16,7 @@ let states=0;
 for(const status of['idle','uploading','rendering','done','error','cancelled'])for(const imageUrl of[null,'blob:previous-snapshot'])for(const quality of['quick','detailed']){
  const html=renderToStaticMarkup(React.createElement(real.SnapshotOverlay,{...base,status,imageUrl,quality,elapsed:75,message:status==='error'?'The render service is unavailable.':'',warning:'This view uses the selected studio setup.'}));
  assert.ok(html.includes('role="dialog"')&&html.includes('aria-modal="true"'));
- assert.ok(html.includes('Back to editing')&&html.includes('Snapshot'));
+ assert.ok(html.includes('Back to editing')&&html.includes('Render image'));
  assert.ok(html.includes('1:15')&&!html.includes('NaN'));
  assert.equal(html.includes('src="blob:previous-snapshot"'),Boolean(imageUrl),'Previous image must survive every status');
  assert.ok(html.includes('This view uses the selected studio setup.'));

@@ -1,3 +1,4 @@
+import { ThemeToggle } from './Theme';
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   approveWaitlistEntry,
@@ -146,7 +147,7 @@ export default function BetaAdminPage({
 
   if (!unlocked) {
     return (
-      <div className="beta-gate-page">
+      <div className="beta-gate-page"><ThemeToggle className="auth-theme-toggle" />
         <div className="beta-gate-card">
           <button type="button" className="beta-link-btn" onClick={onBack}>
             ← Back
@@ -224,7 +225,7 @@ export default function BetaAdminPage({
           <p className="beta-eyebrow">Operator · {mode === 'supabase' ? 'Supabase' : 'Local demo'}</p>
           <h1>Beta console</h1>
         </div>
-        <div className="beta-admin-actions">
+        <div className="beta-admin-actions"><ThemeToggle />
           <button type="button" className="btn-login" onClick={onBack}>
             Back
           </button>
