@@ -1,0 +1,24 @@
+.body-region-card, .tattoo-transform-card { color: var(--text-primary, #f3f3f3); background: var(--bg-card, #202124); border: 1px solid var(--border-color, #454545); box-shadow: 0 12px 38px #0003; border-radius: 14px; font-family: var(--font, sans-serif); }
+.body-region-card { position: fixed; z-index: 100; width: min(288px, calc(100vw - 24px)); max-height: calc(100dvh - 96px); overflow: auto; padding: 18px; box-sizing: border-box; }
+.body-region-card:focus { outline: none; }
+.body-region-card:focus-visible { outline: 2px solid var(--accent-blue, #99b2ff); outline-offset: 3px; }
+.body-region-card header { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.viewport-card-eyebrow { color: var(--text-secondary, #b3b3b3); font-size: 10px; line-height: 1.6; text-transform: uppercase; letter-spacing: .1em; }
+.body-region-card h3 { margin: 3px 0 0; font-size: 19px; font-weight: 500; }
+.viewport-card-close { border: 0; background: transparent; color: var(--text-secondary, #b3b3b3); font-size: 23px; width: 32px; height: 32px; cursor: pointer; }
+.viewport-card-hint, .body-region-card-lock p { color: var(--text-secondary, #b3b3b3); font-size: 12px; line-height: 1.6; margin: 12px 0 16px; }
+.body-region-card-controls { display: grid; gap: 16px; }
+.body-region-card-control > span { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.body-region-card-control output { color: var(--text-secondary, #b3b3b3); font-variant-numeric: tabular-nums; }
+.body-region-card-control input[type=range] { width: 100%; height: 24px; margin: 4px 0 0; accent-color: var(--accent-blue, #98b6ff); cursor: ew-resize; }
+.body-region-card footer { display: flex; justify-content: space-between; margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--border-color, #454545); }
+.body-region-card footer button, .body-region-card-lock button, .tattoo-transform-card button { min-height: 32px; border: 1px solid var(--border-color, #454545); border-radius: 7px; padding: 4px 9px; color: var(--text-primary, #eee); background: var(--bg-input, #17191c); cursor: pointer; font-size: 11px; }
+.body-region-card footer .viewport-card-done { color: var(--bg-primary, #111); background: var(--text-primary, #eee); }
+.body-region-card-lock { padding-top: 14px; font-size: 13px; }
+.tattoo-transform-card { width: 216px; padding: 12px; pointer-events: auto; user-select: none; }
+.tattoo-transform-card header { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 500; margin-bottom: 9px; }
+.tattoo-transform-card p { font-size: 10px; color: var(--text-secondary, #aaa); line-height: 1.5; margin: 0 0 10px; }
+.tattoo-transform-row { display: grid; grid-template-columns: 45px 28px 1fr 28px; gap: 5px; align-items: center; margin-top: 5px; font-size: 11px; }
+.tattoo-transform-row output { text-align: center; font-variant-numeric: tabular-nums; }
+.tattoo-transform-row button { padding: 0; font-size: 15px; min-width: 28px; }
+.tattoo-transform-card .tattoo-transform-toggle { border: 0; background: none; padding: 0 4px; min-height: 22px; font-size: 17px; }
