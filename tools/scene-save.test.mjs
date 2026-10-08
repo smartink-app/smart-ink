@@ -150,8 +150,9 @@ const harnessSource = `export function createComponent(deps) {
  const DEFAULT_BODY_SHAPE={}, DEFAULT_BODY_POSE={}, DEFAULT_BODY_APPEARANCE={}, DEFAULT_STUDIO={}, FINAL_SAMPLES={default:128};
  ${cameraPresets.getText(syntax)}
  return function Component() {
+ const [snapshot,setSnapshot] = useState({open:false});
  ${extracted.join('\n')}
- return {currentScene,showDashboard,saveState,decalScale,lights,surfacePlacement,decalPosition,decalNormal,decalVisible,bodyMeshId,
+ return {snapshot,setSnapshot,cameraState,setCameraState,currentScene,showDashboard,saveState,decalScale,lights,surfacePlacement,decalPosition,decalNormal,decalVisible,bodyMeshId,
  bodyPose,setBodyPose,bodyAppearance,setBodyAppearance,studio,setStudio,setDecalScale,setLights,stageScene,flushPendingSave,afterSaving,loadScene,handleBodyMeshChange,canvasContainerRef,sceneSaves};
  }};`;
 const harnessCode = (await transform(harnessSource, { loader: 'ts', format: 'esm' })).code;
@@ -293,6 +294,19 @@ function sceneFixture(id, overrides = {}) {
   assert.equal(store.writes[2].bodyMeshId, 'body_female', 'production cleanup flushes pending changes');
   store.succeed(); await app.settle();
   assert.equal(app.state.sceneSaves.hasPending(), false);
+}
+
+// Temporary Shoot lighting/cameras and its preview thumbnail never overwrite the editor scene.
+{
+ const writes=[];const app=workspaceHarness(async scene=>{writes.push(structuredClone(scene));});
+ const original=sceneFixture('preserve-editor',{studio:{mode:'plain',color:'#abc123',shadow:.4,showGuides:true},lights:[{type:'ambient',intensity:.25}]});
+ app.state.loadScene(original);await app.settle();await app.advance(2000);
+ const before=writes.length;
+ app.state.setSnapshot({open:true});app.state.setStudio({mode:'sweep',color:'#000000',shadow:.9,showGuides:false});app.state.setLights([{type:'ambient',intensity:9}]);app.state.setCameraState({position:[20,20,20],target:[0,0,0],fov:10});await app.settle();await app.advance(5000);
+ assert.equal(writes.length,before,'Neither autosave nor thumbnails can publish temporary Shoot settings');
+ app.state.setStudio(original.studio);app.state.setLights(original.lights);app.state.setCameraState(original.camera);app.state.setSnapshot({open:false});await app.settle();await app.advance(2000);
+ assert.deepEqual(writes.at(-1).studio,original.studio);assert.deepEqual(writes.at(-1).lights,original.lights);assert.deepEqual(writes.at(-1).camera,original.camera);
+ assert.ok(writes.every(scene=>scene.studio.color!=='#000000'),'Temporary paper must never reach storage');app.unmount();
 }
 
 console.log('Scene save checks passed: production queue and Workspace lifecycle, debounce, navigation/retry, cross-scene serialization, concurrent edits/thumbnails, custom-light reload, model change, beforeunload, unmount flush.');

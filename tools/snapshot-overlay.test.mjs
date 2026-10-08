@@ -16,7 +16,7 @@ let states=0;
 for(const status of['idle','uploading','rendering','done','error','cancelled'])for(const imageUrl of[null,'blob:previous-snapshot'])for(const quality of['quick','detailed']){
  const html=renderToStaticMarkup(React.createElement(real.SnapshotOverlay,{...base,status,imageUrl,quality,elapsed:75,message:status==='error'?'The render service is unavailable.':'',warning:'This view uses the selected studio setup.'}));
  assert.ok(html.includes('role="dialog"')&&html.includes('aria-modal="true"'));
- assert.ok(html.includes('Back to editing')&&html.includes('Render image'));
+ assert.ok(html.includes('Back to editing')&&html.includes('Shoot'));
  assert.ok(html.includes('1:15')&&!html.includes('NaN'));
  assert.equal(html.includes('src="blob:previous-snapshot"'),Boolean(imageUrl),'Previous image must survive every status');
  assert.ok(html.includes('This view uses the selected studio setup.'));
@@ -32,7 +32,7 @@ for(const status of['idle','done','error','cancelled'])for(const imageUrl of[nul
  const html=renderToStaticMarkup(React.createElement(real.SnapshotOverlay,{...base,mode:'compose',status,imageUrl,elapsed:85,framingHint:'Centered on your tattoo.',cameraControls:React.createElement('input',{'aria-label':'Camera slot'}),lightingControls:React.createElement('svg',{'aria-label':'Lighting slot'})}));
  assert.ok(html.includes('snapshot-overlay--compose')&&html.includes('snapshot-overlay--live')&&html.includes('Compose · live view'));
  assert.ok(html.includes('Camera slot')&&html.includes('Lighting slot')&&html.includes('Centered on your tattoo.'));
- assert.ok(html.includes('Render snapshot')&&!html.includes('Compare with live')&&!html.includes('1:25')&&!html.includes('snapshot-empty'));
+ assert.ok(html.includes('Create photo')&&!html.includes('Compare with live')&&!html.includes('1:25')&&!html.includes('snapshot-empty'));
  if(imageUrl)assert.ok(html.includes('snapshot-image--hidden')&&html.includes('Download previous'));
  states++;
 }
@@ -79,9 +79,23 @@ props={...props,status:'uploading',message:'Preparing this view',elapsed:1};asse
 props={...props,status:'error',message:'Blender stopped unexpectedly.'};assert.equal(nodes().find(node=>node.type==='img').props.src,'blob:previous-snapshot');button('Try again').props.onClick();assert.equal(renderCalls,2);assert.ok(nodes().some(node=>node.props.role==='alert'));
 props={...props,status:'cancelled',message:''};button('Try again').props.onClick();assert.equal(renderCalls,3);props={...props,status:'done'};button('Render again').props.onClick();assert.equal(renderCalls,4);
 button('Compare with live').props.onClick();button('Adjust shot').props.onClick();assert.equal(adjustCalls,1);assert.ok(rootNode().props.className.includes('snapshot-overlay--compose'));assert.equal(renderCalls,4,'Composing must never automatically render');assert.equal(document.activeElement,close,'Changing modes must leave focus inside the dialog');assert.equal(button('Download previous').props.disabled,false);assert.ok(nodes().find(node=>node.type==='img').props.className.includes('snapshot-image--hidden'));
-button('Lighting').props.onClick();assert.equal(button('Lighting').props['aria-selected'],true);assert.equal(nodes().find(node=>node.props.id==='snapshot-test-camera-panel').props.hidden,true);
-let tabFocused=false;const panelArrow={...key('ArrowLeft'),currentTarget:{parentElement:{querySelector(selector){assert.equal(selector,'[data-panel="camera"]');return{focus:()=>{tabFocused=true;}};}}}};button('Lighting').props.onKeyDown(panelArrow);assert.ok(panelArrow.prevented&&tabFocused);assert.equal(button('Camera').props['aria-selected'],true);
+button('Lights').props.onClick();assert.equal(button('Lights').props['aria-selected'],true);assert.equal(nodes().find(node=>node.props.id==='snapshot-test-camera-panel').props.hidden,true);
+let tabFocused=false;const panelArrow={...key('ArrowLeft'),currentTarget:{parentElement:{querySelector(selector){assert.equal(selector,'[data-panel="camera"]');return{focus:()=>{tabFocused=true;}};}}}};button('Lights').props.onKeyDown(panelArrow);assert.ok(panelArrow.prevented&&tabFocused);assert.equal(button('Photo').props['aria-selected'],true);
 let toggle=nodes().find(node=>node.props.className==='snapshot-rail-toggle');assert.equal(toggle.props['aria-expanded'],true);toggle.props.onClick();assert.equal(nodes().find(node=>node.props.className==='snapshot-rail-body').props.hidden,true);nodes().find(node=>node.props.className==='snapshot-rail-toggle').props.onClick();assert.equal(nodes().find(node=>node.props.className==='snapshot-rail-body').props.hidden,false);
+// Three shot tabs remain keyboard accessible, and previewing cannot mutate a shot.
+props={...props,motionControls:{type:'div',props:{children:'Motion controls'}},previewing:false};
+button('Video').props.onClick();assert.equal(button('Video').props['aria-selected'],true);
+props={...props,previewing:true};
+assert.equal(button('Photo').props.disabled,true);assert.equal(button('Lights').props.disabled,true);
+assert.equal(nodes().find(node=>node.props.id==='snapshot-test-camera-panel').props.inert,true);
+assert.equal(nodes().find(node=>node.props.id==='snapshot-test-lighting-panel').props.inert,true);
+const lockedArrow={...key('ArrowLeft'),currentTarget:{parentElement:{querySelector(){throw Error('Preview keyboard navigation must not change shot tabs');}}}};
+button('Video').props.onKeyDown(lockedArrow);assert.equal(button('Video').props['aria-selected'],true);
+assert.equal(button('Create photo').props.disabled,true);
+props={...props,previewing:false};
+const motionHome={...key('Home'),currentTarget:{parentElement:{querySelector(selector){assert.equal(selector,'[data-panel="camera"]');return{focus(){}};}}}};
+button('Video').props.onKeyDown(motionHome);assert.equal(button('Photo').props['aria-selected'],true);
+assert.equal(button('Create photo').props.disabled,false);
 props={...props,status:'rendering'};assert.ok(!rootNode().props.className.includes('snapshot-overlay--compose'));assert.ok(!nodes().some(node=>node.props.className?.startsWith('snapshot-compose-rail')),'Camera and lighting controls cannot remain editable while rendering');assert.equal(button('Compare with live').props['aria-pressed'],false,'Adjusting the shot discards stale comparison state');props={...props,mode:'result',status:'done'};
 const tab=key('Tab');document.activeElement=last;rootNode().props.onKeyDown(tab);assert.ok(tab.prevented);assert.equal(document.activeElement,close);
 const reverse=key('Tab',true);rootNode().props.onKeyDown(reverse);assert.ok(reverse.prevented);assert.equal(document.activeElement,last,'Disabled, hidden and inert controls must be skipped');
