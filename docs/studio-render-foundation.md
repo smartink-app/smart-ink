@@ -8,7 +8,7 @@ Coordinates and blend normals bind before fitting/posing; tattoo atlas UVs are
 not modified. The existing colour, roughness, hair, and ink shading remain.
 
 Normal lookup includes public/models and the worker's packaged asset folder.
-The opt-in material fails visibly if its height/rest data is missing. The Docker
+The opt-in material fails visibly if its sculpt normal or height/rest data is missing. The Docker
 recipe packages the new material module and texture but has not been deployed.
 
 Motion is intentionally available only through the local HTTP renderer. Health

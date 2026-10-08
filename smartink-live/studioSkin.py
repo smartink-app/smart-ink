@@ -29,6 +29,8 @@ def apply_studio_skin(body, texture_path, world_scale):
         raise RuntimeError('Studio skin rest coordinates are missing.')
     material = body.data.materials[0]
     nodes, links = material.node_tree.nodes, material.node_tree.links
+    if not any(n.label == 'Sculpt normal bake' and n.type == 'TEX_IMAGE' and n.image for n in nodes):
+        raise RuntimeError('The body sculpt normal is missing; Studio skin requires its packaged body texture.')
     bump = next((n for n in nodes if n.label == 'Skin micro-relief'), None)
     if bump is None:
         raise RuntimeError('Studio skin needs the existing skin bump chain.')
