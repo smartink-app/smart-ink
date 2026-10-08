@@ -23,6 +23,7 @@ interface TopMenuBarProps extends PoseControlsProps, AppearanceControlsProps, St
   tattooBoundsControls?: ReactNode;
   wrapControls?: ReactNode;
   isWrap?: boolean;
+  isSleeve?: boolean;
   onShoot?: (preset?: CinematicPresetId) => void;
   disabled?: boolean;
   onMeasureBody?: () => void;
@@ -96,7 +97,7 @@ export type InspectorTab = typeof INSPECTOR_TABS[number]['id'];
 
 export default function TopMenuBar({
   disabled = false,
-  onBrowseArtwork, onShoot, tattooBoundsControls, wrapControls, isWrap,
+  onBrowseArtwork, onShoot, tattooBoundsControls, wrapControls, isWrap, isSleeve,
   onMeasureBody, measuringLoading, hasBodyFit, onClearBodyFit,
   activeTab: controlledTab,
   onTabChange,
@@ -258,7 +259,7 @@ export default function TopMenuBar({
           <div className="ep-stack ep-tattoo-actions">
             {onBrowseArtwork && <button type="button" className="ep-btn ep-btn--block" onClick={onBrowseArtwork}><FaRegImage aria-hidden /> Browse artwork</button>}
             <button type="button" className="ep-btn ep-btn--block" onClick={chooseFile}>
-              <FaUpload aria-hidden /> {uploading ? 'Reading tattoo…' : 'Replace image'}
+              <FaUpload aria-hidden /> {uploading ? 'Reading tattoo…' : isSleeve ? 'Replace arm artwork' : 'Replace image'}
             </button>
             <button type="button" className="ep-btn ep-btn--block ep-btn--ghost" onClick={useExampleTattoo}
               aria-pressed={uploadedImage === null}>
@@ -269,7 +270,7 @@ export default function TopMenuBar({
           <p className="ep-hint">PNG, up to 20 MB. Transparent backgrounds work best.</p>
           {uploading && <p className="ep-hint" role="status">Checking the new artwork. Your current tattoo stays in place.</p>}
           {uploadError && <p className="ep-hint ep-upload-error" role="alert">{uploadError}</p>}
-          <p className="ep-hint ep-placement-hint" role="status">{isWrap ? '360° band. Use the band controls to position it; drag bare skin to orbit.' : !hasPlacement
+          <p className="ep-hint ep-placement-hint" role="status">{isSleeve ? 'Sleeve test. Choose a section to adjust it; drag bare skin to orbit.' : isWrap ? '360° band. Use the band controls to position it; drag bare skin to orbit.' : !hasPlacement
             ? `Click the skin to place ${uploadedImage === null ? 'the example tattoo' : 'your tattoo'}.`
             : decalVisible ? 'Click another spot on the skin to move the tattoo. Its size stays the same.'
               : 'Tattoo hidden for a before view. Show tattoo to see your design again.'}</p>

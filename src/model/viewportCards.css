@@ -40,3 +40,6 @@
 .wrap-tattoo-controls small { line-height: 1.5; opacity: .7; }
 .wrap-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .wrap-actions a { color: inherit; text-underline-offset: 3px; }
+.sleeve-section-tabs { display: flex; gap: 4px; }
+.sleeve-section-tabs button { flex: 1; border: 1px solid #737c934f; border-radius: 7px; color: inherit; background: #80889918; padding: 7px 3px; font: inherit; }
+.sleeve-section-tabs button[aria-pressed=true] { background: #bcc9ea; color: #151923; }

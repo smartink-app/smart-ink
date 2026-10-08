@@ -23,8 +23,10 @@ interface Ring { center: THREE.Vector3; points: Array<{ angle: number; arc: numb
  * form one closed loop. Never bridge a gap into the torso or invent missing skin.
  * Tattoo coordinates are independent of the body's atlas and remain attached
  * through shape and pose. Only the already split per-face tattoo UVs change. */
-export function buildWrapChart(geometry: THREE.BufferGeometry, masks: BodyRegionMasks, settings: WrapSettings): { chart: SurfaceChart; anchor: Omit<SurfaceAnchor, 'bodyMeshId'>; circumference: number } | null {
-  if (!validWrap(settings) || geometry.index) return null;
+export function buildWrapChart(geometry: THREE.BufferGeometry, masks: BodyRegionMasks, settings: WrapSettings, profile: 'band' | 'sleeve' = 'band'): { chart: SurfaceChart; anchor: Omit<SurfaceAnchor, 'bodyMeshId'>; circumference: number } | null {
+  const valid = profile === 'band' ? validWrap(settings) : settings.region === 'armLeft' && Number.isFinite(settings.position) && settings.position >= .59 && settings.position <= .65
+    && Number.isFinite(settings.height) && settings.height >= .1 && settings.height <= .18 && Number.isFinite(settings.phase) && Math.abs(settings.phase) <= 360;
+  if (!valid || geometry.index) return null;
   const p = geometry.getAttribute('position'), field = masks[settings.region], box = new THREE.Box3().setFromBufferAttribute(p as THREE.BufferAttribute);
   const height = box.max.y - box.min.y, side = settings.region === 'armLeft' ? 1 : -1;
   const points = Array.from({ length: p.count }, (_, i) => new THREE.Vector3().fromBufferAttribute(p, i));
@@ -33,7 +35,7 @@ export function buildWrapChart(geometry: THREE.BufferGeometry, masks: BodyRegion
     for (let i = 0; i < p.count; i++) if (field[i] >= 0 && Math.abs((p.getY(i) - box.min.y) / height - h) < .009) b.expandByPoint(points[i]);
     return b.isEmpty() ? null : b.getCenter(new THREE.Vector3());
   }
-  const low = centerAt(.65), high = centerAt(.705);
+  const low = centerAt(profile === 'band' ? .65 : .52), high = centerAt(.705);
   if (!low || !high) return null;
   const axis = high.clone().sub(low).normalize();
   if (axis.y < .5) return null;
