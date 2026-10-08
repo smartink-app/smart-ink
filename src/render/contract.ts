@@ -1,6 +1,7 @@
 import type { BodyAppearance } from './bodyAppearance';
 import type { StudioSettings } from './studioSettings';
 import type { BodyFit } from '../measurements/fitter';
+import type { RevealSettings } from './reveal';
 export const RENDER_SCHEMA_VERSION = 1;
 
 export type QualityTier = 'preview' | 'final';
@@ -23,6 +24,10 @@ export interface ContractLight {
 export interface RenderContract {
   schemaVersion: number;
   renderStyle?: 'cinematic' | 'preview';
+  /** Opt-in calibrated skin. Missing retains the previous render material. */
+  skinMaterial?: 'legacy' | 'studio';
+  /** Local bounded motion endpoint only; still renders reject this field. */
+  reveal?: RevealSettings;
   bodyMeshId: string;
   skinToneId: string;
   poseId: string;

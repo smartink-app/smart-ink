@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 from server.measurement_fit import validate_fit
+from server.video_jobs import capabilities as video_capabilities, install_video_routes
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LIVE_DIR = Path(os.environ.get("SMARTINK_LIVE_DIR", REPO_ROOT / "smartink-live")).expanduser()
@@ -104,6 +105,7 @@ def readiness() -> dict:
         "live_dir": str(LIVE_DIR), "active_renders": _active_renders,
         "max_concurrent_renders": MAX_CONCURRENT_RENDERS,
         "timeout_seconds": RENDER_TIMEOUT_SEC, "cancellation_supported": True,
+        "capabilities": {"video": video_capabilities()},
     }
 
 
@@ -153,6 +155,7 @@ def validate_contract(data: bytes) -> dict:
         ("hairTone", {"black", "dark_brown", "brown", "auburn", "blond", "grey"}),
         ("bodyHair", {"none", "vellus", "light", "medium", "heavy"}),
         ("renderStyle", {"cinematic", "preview"}),
+        ("skinMaterial", {"legacy", "studio"}),
     ):
         if name in contract and (not isinstance(contract[name], str) or contract[name] not in allowed):
             _invalid(f"Unknown {name}")
@@ -542,6 +545,8 @@ async def sync_live(contract: UploadFile = File(...), ink_layer: UploadFile = Fi
 async def render_v2(request: Request, contract: UploadFile = File(...), ink_layer: UploadFile = File(...)):
     global _active_renders
     contract_bytes, ink_bytes, parsed = await _read_shot_uploads(contract, ink_layer)
+    if 'reveal' in parsed:
+        raise HTTPException(422, 'Submit motion contracts to /video-jobs, not the still renderer.')
     state = readiness()
     if not state["checks"]["blender"] or not state["checks"]["importer"] or not state["checks"]["live_directory"] or not _has_body(parsed["bodyMeshId"]):
         raise HTTPException(503, state["message"] if not state["ready"] else "The selected body asset is unavailable")
@@ -565,3 +570,6 @@ async def render_v2(request: Request, contract: UploadFile = File(...), ink_laye
         _active_renders -= 1
     return FileResponse(output_path, media_type="image/png", filename="render.png",
                         background=BackgroundTask(shutil.rmtree, work_dir, ignore_errors=True))
+
+
+install_video_routes(app, sys.modules[__name__])
