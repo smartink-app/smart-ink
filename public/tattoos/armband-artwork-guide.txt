@@ -1,0 +1,29 @@
+SMART INK — WRAP AROUND ARTWORK
+
+Example: continuous-chevron-band.svg / continuous-chevron-band.png
+An original geometric band supplied as one complete, flat 360-degree strip.
+
+What to deliver
+• A transparent PNG, with only the tattoo artwork. Keep the editable SVG as the master.
+• The left edge must continue directly into the right edge, at the same height.
+• No empty padding on the left or right; those edges are the join.
+• Keep intentional clear space above and below the design inside the image.
+• No skin photograph, perspective, studio light, shadow or background.
+• Outline lettering and include the complete design; do not send a photo of a band already on an arm.
+
+Size and proportions
+The example is 4096 × 640 pixels (6.4:1). That is the same proportion as a band
+32 cm around and 5 cm high. Those numbers illustrate the artwork ratio; they
+are not measurements of every body in the app.
+Prepare your own strip using the intended circumference divided by band height.
+The test wraps one copy of the complete strip around the selected arm. To use a
+repeating motif, repeat it an integer number of times in the file before export.
+Changing the body's proportions or band height can stretch the artwork.
+
+In the studio
+Choose “Try a 360° armband” under Tattoo to load this example.
+Position moves it along the upper arm; Band height changes its height.
+Around the arm turns the design without opening the loop.
+“Inspect join” points the camera at the artwork's meeting edge.
+Use Replace image to test your own matching-edge PNG in the same wrap mode.
+The same band is included in Blender photos.

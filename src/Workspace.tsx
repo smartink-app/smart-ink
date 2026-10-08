@@ -73,6 +73,8 @@ import { DEFAULT_BODY_APPEARANCE, normalizeAppearance, type BodyAppearance } fro
 import { DEFAULT_BODY_SHAPE, normalizeShape, clampShapeValue, type BodyShapeKey, type BodyShape } from './render/bodyShape'
 import { type BodyRegionId } from './render/bodyRegions'
 import type { RegionFraming } from './ModelWithUVTattoo'
+import WrapTattooControls from './model/WrapTattooControls'
+import { DEFAULT_WRAP, WRAP_ARTWORK } from './render/wrapPlacement'
 import type { SurfaceAnchor } from './render/surfacePlacement'
 import * as THREE from 'three'
 import type { BetaSession } from './auth/types'
@@ -692,6 +694,23 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     setCameraRequestId((id) => id + 1)
   }
 
+  const viewWrap = (join: boolean) => {
+    const framing = uvPlacementRef.current?.getTattooFraming(join)
+    if (!framing) return
+    const rect = canvasHostRef.current?.getBoundingClientRect()
+    setCameraState(frameTattoo(isolateRegion === surfacePlacement?.wrap?.region ? { ...framing, bodyTriangles: undefined } : framing, { zoom: .8 }, rect && rect.height ? rect.width / rect.height : 1))
+    setCameraRequestId(id => id + 1)
+    setCameraPreset('custom')
+  }
+  const startWrapSample = () => {
+    if (!uvPlacementRef.current?.setWrap(DEFAULT_WRAP)) return
+    setUploadedImage(WRAP_ARTWORK)
+    setDecalVisible(true)
+    setDecalColor('#ffffff')
+    setDecalOpacity(1)
+    setIsolateRegion('armLeft')
+  }
+
   // Export functionality using Three.js renderer
   const exportImage = async () => {
     if (!threeRenderer || !threeScene || !threeCamera || isExporting) return
@@ -1069,6 +1088,8 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
           </div>
           <div className="focus-panel-slot" hidden={artworkOpen}>
             <TopMenuBar
+              isWrap={!!surfacePlacement?.wrap}
+              wrapControls={<WrapTattooControls value={surfacePlacement?.wrap} onSample={startWrapSample} onChange={value => { if (uvPlacementRef.current?.setWrap(value) && value.region !== surfacePlacement?.wrap?.region) setIsolateRegion(value.region) }} onExit={() => uvPlacementRef.current?.setWrap(null)} onView={viewWrap} />}
               tattooBoundsControls={<TattooBoundsControls status={tattooBounds} onLock={locked => uvPlacementRef.current?.setAreaLock(locked)} onFit={() => uvPlacementRef.current?.fitToArea()} />}
               onBrowseArtwork={() => setArtworkOpen(true)}
               onMeasureBody={() => void openMeasurement()} measuringLoading={measureLoading || modelLoading}
@@ -1208,6 +1229,8 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             visible={decalVisible}
             initialPlacement={surfacePlacement}
             onPlacementChange={setSurfacePlacement}
+            onWrapView={viewWrap}
+            onWrapRegion={setIsolateRegion}
             onPlacementStatus={setPlacementStatus}
             onBoundsStatus={setTattooBounds}
             lights={lights}

@@ -21,6 +21,8 @@ import AdjustmentControl from './AdjustmentControl';
 interface TopMenuBarProps extends PoseControlsProps, AppearanceControlsProps, StudioControlsProps {
   onBrowseArtwork?: () => void;
   tattooBoundsControls?: ReactNode;
+  wrapControls?: ReactNode;
+  isWrap?: boolean;
   onShoot?: (preset?: CinematicPresetId) => void;
   disabled?: boolean;
   onMeasureBody?: () => void;
@@ -94,7 +96,7 @@ export type InspectorTab = typeof INSPECTOR_TABS[number]['id'];
 
 export default function TopMenuBar({
   disabled = false,
-  onBrowseArtwork, onShoot, tattooBoundsControls,
+  onBrowseArtwork, onShoot, tattooBoundsControls, wrapControls, isWrap,
   onMeasureBody, measuringLoading, hasBodyFit, onClearBodyFit,
   activeTab: controlledTab,
   onTabChange,
@@ -267,7 +269,7 @@ export default function TopMenuBar({
           <p className="ep-hint">PNG, up to 20 MB. Transparent backgrounds work best.</p>
           {uploading && <p className="ep-hint" role="status">Checking the new artwork. Your current tattoo stays in place.</p>}
           {uploadError && <p className="ep-hint ep-upload-error" role="alert">{uploadError}</p>}
-          <p className="ep-hint ep-placement-hint" role="status">{!hasPlacement
+          <p className="ep-hint ep-placement-hint" role="status">{isWrap ? '360° band. Use the band controls to position it; drag bare skin to orbit.' : !hasPlacement
             ? `Click the skin to place ${uploadedImage === null ? 'the example tattoo' : 'your tattoo'}.`
             : decalVisible ? 'Click another spot on the skin to move the tattoo. Its size stays the same.'
               : 'Tattoo hidden for a before view. Show tattoo to see your design again.'}</p>
@@ -279,12 +281,13 @@ export default function TopMenuBar({
 
         <section className="ep-section" aria-label="Tattoo adjustments">
           <p className="ep-section-label">Adjust tattoo</p>
-          <AdjustmentControl label="Size" ariaLabel="Tattoo size" value={decalScale * 100}
+          {wrapControls}
+          {!isWrap && <><AdjustmentControl label="Size" ariaLabel="Tattoo size" value={decalScale * 100}
             min={10} max={300} step={1} unit="%" resetValue={100}
             onChange={(value) => onDecalScaleChange(value / 100)} />
           <AdjustmentControl label="Rotation" ariaLabel="Tattoo rotation" value={decalRotation}
             min={-180} max={180} step={1} unit="°" resetValue={0} onChange={onDecalRotationChange} />
-          {tattooBoundsControls}
+          {tattooBoundsControls}</>}
           <MoreControls id="tattoo" summary={[decalOpacity !== 1 ? `${Math.round(decalOpacity * 100)}% opacity` : '', decalColor.toLowerCase() !== '#ffffff' ? 'Tint applied' : ''].filter(Boolean).join(' · ')}>
           <AdjustmentControl label="Opacity" ariaLabel="Tattoo opacity" value={decalOpacity * 100}
             min={0} max={100} step={1} unit="%" resetValue={100}

@@ -8,7 +8,7 @@ import draco3d from 'draco3d';
 import * as THREE from 'three';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const bundle = await build({ stdin: { contents: "export * from './src/render/placementBounds';export * from './src/render/surfacePlacement';export * from './src/render/bodyRegionMask';export * from './src/render/bodyShape';export * from './src/model/tattooHit';export * from './src/render/tattooCamera';", resolveDir: root, loader: 'ts' }, bundle: true, platform: 'node', format: 'esm', write: false });
+const bundle = await build({ stdin: { contents: "export * from './src/render/wrapPlacement';export * from './src/render/placementBounds';export * from './src/render/surfacePlacement';export * from './src/render/bodyRegionMask';export * from './src/render/bodyShape';export * from './src/model/tattooHit';export * from './src/render/tattooCamera';", resolveDir: root, loader: 'ts' }, bundle: true, platform: 'node', format: 'esm', write: false });
 const api = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const identity = new THREE.Matrix4();
 const pixels = (w, h, ink) => { const data = new Uint8Array(w*h*4); for(let y=0;y<h;y++) for(let x=0;x<w;x++) data[(y*w+x)*4+3] = ink(x,y)?255:0; return data; };

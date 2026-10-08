@@ -11,7 +11,7 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:placement": "node tools/surface-placement.test.mjs && node tools/tattoo-bake.test.mjs && node tools/scene-save.test.mjs && node tools/placement-face-mask.test.mjs && node tools/placement-bounds.test.mjs",
+    "test:placement": "node tools/surface-placement.test.mjs && node tools/tattoo-bake.test.mjs && node tools/scene-save.test.mjs && node tools/placement-face-mask.test.mjs && node tools/placement-bounds.test.mjs && node tools/wrap-placement.test.mjs",
     "test:demo": "npm run test:placement && node tools/tattoo-upload.test.mjs && node tools/export-presentation.test.mjs && node tools/render-service.test.mjs && node tools/render-proxy.test.mjs && node tools/local-storage.test.mjs && npm run test:shape && npm run test:pose && npm run test:focus && npm run test:appearance && npm run test:studio && npm run test:snapshot && npm run test:inspector && npm run test:measurements",
     "test:render-server": "PYTHONDONTWRITEBYTECODE=1 server/.venv/bin/python tools/render-server.test.py",
     "test:shape": "node tools/body-shape.test.mjs && node tools/body-shape-controls.test.mjs && node tools/body-shape-parity.test.mjs",

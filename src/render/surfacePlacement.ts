@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { validWrap, type WrapSettings } from './wrapPlacement';
 import { REGION_BY_INDEX, type BodyRegionId } from './bodyRegions';
 
 /** A persistent point on the skin; independent of its UV atlas and body shape. */
 export interface SurfaceAnchor {
+  wrap?: WrapSettings;
   faceIndex: number;
   barycentric: [number, number, number];
   bodyMeshId: string;
@@ -42,6 +44,7 @@ export function validateSurfaceAnchor(
   if (!value || typeof value !== 'object') return false;
   const a = value as Partial<SurfaceAnchor>;
   if (!Number.isInteger(a.faceIndex) || a.faceIndex! < 0 || typeof a.bodyMeshId !== 'string') return false;
+  if (a.wrap !== undefined && !validWrap(a.wrap)) return false;
   if (a.bounds !== undefined && (!a.bounds || typeof a.bounds !== 'object' || !REGION_BY_INDEX.includes(a.bounds.region) || typeof a.bounds.allowAcrossRegions !== 'boolean')) return false;
   if (!Array.isArray(a.barycentric) || a.barycentric.length !== 3) return false;
   if (a.barycentric.some((n) => !Number.isFinite(n) || n < -0.0001 || n > 1.0001)) return false;

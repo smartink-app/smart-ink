@@ -70,6 +70,12 @@ for (const modifier of [{}, { ctrlKey: true }, { metaKey: true }]) {
   const a = app(); a.scope.editingEnabled = false; a.down({ ctrlKey: true }); a.up();
   assert.equal(a.placed.length, 0); assert.equal(a.selected.length, 0, 'Shoot mode protects all edits');
 }
+{
+  const a = app(); a.scope.anchorRef.current = { ...anchor, wrap: { region: 'armLeft', position: .68, height: .024, phase: 0 } };
+  a.down({ ctrlKey: true }); a.up();
+  assert.equal(a.placed.length, 0, 'Orbiting or modifier clicks never replace a periodic band with a local patch');
+  assert.equal(a.scope.isDragging.current, false);
+}
 assert.equal(production.isTattooHit(geometry, anchor, 1, 1, 0), true);
 const right = { ...anchor, barycentric: [0, .8, .2] };
 assert.equal(production.isTattooHit(geometry, right, 1, .25, 0), false, 'Narrow tattoo leaves adjacent skin available for orbit');

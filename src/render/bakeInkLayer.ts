@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SURFACE_TATTOO_GLSL, TATTOO_LAYER_GLSL } from './tattooLayer';
+import { SURFACE_TATTOO_GLSL, TATTOO_LAYER_GLSL, WRAP_TATTOO_GLSL } from './tattooLayer';
 
 const LEGACY_VERTEX = /* glsl */ `
   varying vec2 vUv;
@@ -53,6 +53,8 @@ const LEGACY_FRAGMENT = /* glsl */ `
 
 const SURFACE_FRAGMENT = /* glsl */ `
   ${SURFACE_TATTOO_GLSL}
+  ${WRAP_TATTOO_GLSL}
+  uniform float tattooWrap;
   ${OUTPUT_COLOR}
   uniform sampler2D tattooTexture;
   uniform float tattooSize;
@@ -68,6 +70,7 @@ const SURFACE_FRAGMENT = /* glsl */ `
       tattooTexture, vTattooUv, vTattooMask * step(0.0, vTattooBoundary), tattooSize, tattooAspect,
       tattooRotation, tattooTint, tattooOpacity
     );
+    if (tattooWrap > .5) ink = sampleWrapTattoo(tattooTexture, vTattooUv, vTattooMask * step(0.0, vTattooBoundary), tattooTint, tattooOpacity);
     gl_FragColor = vec4(inkToSRGB(ink.rgb), ink.a);
   }
 `;
@@ -151,6 +154,7 @@ function loadTexture(src: string, signal?: AbortSignal, timeoutMs = 20_000): Pro
 }
 
 export interface SurfaceBakeParams {
+  wrap?: boolean;
   /** Original body atlas, with continuous aTattooUv and aTattooMask attributes. */
   geometry: THREE.BufferGeometry;
   /** Longest side of the design, in body units. */
@@ -217,6 +221,7 @@ export async function bakeInkLayer(params: BakeParams): Promise<Blob> {
         new THREE.BufferAttribute(new Float32Array(ownedGeometry.getAttribute('position').count).fill(1), 1));
     }
     texture = await loadTexture(params.tattooImage, params.signal, params.textureTimeoutMs);
+    if (surface?.wrap) { texture.wrapS = THREE.RepeatWrapping; texture.needsUpdate = true; }
     params.signal?.throwIfAborted();
     renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
     renderer.debug.onShaderError = () => {
@@ -239,6 +244,7 @@ export async function bakeInkLayer(params: BakeParams): Promise<Blob> {
     };
     if (surface) {
       Object.assign(uniforms, {
+        tattooWrap: { value: surface.wrap ? 1 : 0 },
         tattooSize: { value: surface.size },
         tattooAspect: { value: surface.aspect },
         tattooTint: { value: new THREE.Color(surface.color) },

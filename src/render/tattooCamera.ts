@@ -28,6 +28,7 @@ export interface TattooFraming {
   bodyTriangles?: Float32Array;
 }
 export interface TattooFootprint {
+  wrap?: boolean;
   size: number;
   aspect: number;
   rotationRad: number;
@@ -82,9 +83,9 @@ export function tattooFramingFromGeometry(
   const up = new THREE.Vector3(0, 1, 0).addScaledVector(normal, -normal.y);
   if (up.lengthSq() < 1e-6) up.set(0, 0, -1).addScaledVector(normal, normal.z);
   up.normalize();
-  const c = Math.cos(footprint.rotationRad), s = Math.sin(footprint.rotationRad);
-  const halfWidth = footprint.size * Math.min(footprint.aspect, 1) / 2;
-  const halfHeight = footprint.size * Math.min(1 / footprint.aspect, 1) / 2;
+  const c = footprint.wrap ? 1 : Math.cos(footprint.rotationRad), s = footprint.wrap ? 0 : Math.sin(footprint.rotationRad);
+  const halfWidth = footprint.wrap ? Infinity : footprint.size * Math.min(footprint.aspect, 1) / 2;
+  const halfHeight = footprint.wrap ? .5 : footprint.size * Math.min(1 / footprint.aspect, 1) / 2;
   const output: number[] = [], body: number[] = [];
   const world = new Float32Array(position.count * 3);
   for (let i = 0; i < position.count; i++) point.fromBufferAttribute(position, i).applyMatrix4(matrixWorld).toArray(world, i * 3);
