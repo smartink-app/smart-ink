@@ -1,4 +1,4 @@
-import { useRef, useState, type RefObject } from 'react';
+import { useRef, useState, type RefObject, type ReactNode } from 'react';
 import { Html } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -13,10 +13,11 @@ interface Props {
   rotation: number;
   onScale: (value: number) => void;
   onRotation: (value: number) => void;
+  boundsControls?: ReactNode;
 }
 
 /** HTML keeps the small on-model controls sharp and keyboard-accessible. */
-export default function TattooViewportControls({ mesh, anchor, scale, rotation, onScale, onRotation }: Props) {
+export default function TattooViewportControls({ mesh, anchor, scale, rotation, onScale, onRotation, boundsControls }: Props) {
   const { gl, camera } = useThree(), card = useRef<HTMLDivElement>(null);
   const position = useRef(new THREE.Vector3()), normal = useRef(new THREE.Vector3()), toCamera = useRef(new THREE.Vector3());
   const [collapsed, setCollapsed] = useState(false);
@@ -48,6 +49,7 @@ export default function TattooViewportControls({ mesh, anchor, scale, rotation, 
     {!collapsed && <><p>Drag the design to move it.<br />Drag bare skin to orbit the model.</p>
       <div className="tattoo-transform-row"><span>Size</span><button type="button" aria-label="Make tattoo smaller" onClick={() => onScale(THREE.MathUtils.clamp(scale - .05, .1, 3))}>−</button><output aria-label="Tattoo size">{Math.round(scale * 100)}%</output><button type="button" aria-label="Make tattoo larger" onClick={() => onScale(THREE.MathUtils.clamp(scale + .05, .1, 3))}>+</button></div>
       <div className="tattoo-transform-row"><span>Rotate</span><button type="button" aria-label="Rotate tattoo counterclockwise" onClick={() => onRotation((rotation - 5 + 360) % 360)}>↶</button><output aria-label="Tattoo rotation">{Math.round(rotation)}°</output><button type="button" aria-label="Rotate tattoo clockwise" onClick={() => onRotation((rotation + 5) % 360)}>↷</button></div>
+      {boundsControls}
     </>}
   </div></Html>;
 }

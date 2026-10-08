@@ -70,6 +70,7 @@ try {
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2));
   geometry.setAttribute('aTattooUv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2));
   geometry.setAttribute('aTattooMask', new THREE.Float32BufferAttribute([1, 1, 1], 1));
+  geometry.setAttribute('aTattooBoundary', new THREE.Float32BufferAttribute([.1, -.2, .1], 1));
   let snapshot;
   let disposed = false;
   let originalDisposed = false;
@@ -86,6 +87,8 @@ try {
   });
   assert.ok(snapshot, 'geometry must be cloned before waiting for source image');
   geometry.getAttribute('aTattooUv').setX(0, 42);
+  geometry.getAttribute('aTattooBoundary').setX(0, -42);
+  assert.ok(Math.abs(snapshot.getAttribute('aTattooBoundary').getX(0) - .1) < 1e-7, 'export freezes the same region cutoff before another drag/override');
   assert.equal(snapshot.getAttribute('aTattooUv').getX(0), 0, 'snapshot must not alias live attributes');
   events.error({ type: 'error' });
   await assert.rejects(baking);

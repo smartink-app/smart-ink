@@ -6,14 +6,16 @@ export function isTattooHit(geometry: THREE.BufferGeometry, anchor: SurfaceAncho
   if (!(size > 0) || !(aspect > 0)) return false;
   const uv = geometry.getAttribute('aTattooUv'), mask = geometry.getAttribute('aTattooMask');
   if (!uv || !mask) return false;
-  let x = 0, y = 0, coverage = 0;
+  const boundary = geometry.getAttribute('aTattooBoundary');
+  let x = 0, y = 0, coverage = 0, area = 0;
   for (let k = 0; k < 3; k++) {
     const corner = anchor.faceIndex * 3 + k, index = geometry.index?.getX(corner) ?? corner;
     if (index >= uv.count) return false;
     const weight = anchor.barycentric[k];
     x += uv.getX(index) * weight; y += uv.getY(index) * weight; coverage += mask.getX(index) * weight;
+    area += (boundary?.getX(index) ?? 1) * weight;
   }
-  if (coverage < .9999) return false;
+  if (coverage < .9999 || area < 0) return false;
   const c = Math.cos(rotation), s = Math.sin(rotation);
   return Math.abs(c * x + s * y) <= size * Math.min(aspect, 1) / 2
     && Math.abs(-s * x + c * y) <= size * Math.min(1 / aspect, 1) / 2;

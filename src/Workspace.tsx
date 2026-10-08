@@ -1,6 +1,8 @@
 import RevealPanel from './RevealPanel'
 import { revealCamera, type RevealPreset } from './render/reveal'
 import BodyRegionCard from './model/BodyRegionCard'
+import TattooBoundsControls from './model/TattooBoundsControls'
+import type { PlacementBoundsStatus } from './render/placementBounds'
 import ShotStyleControls from './ShotStyleControls'
 import './phase1-studio.css'
 import MeasurementOverlay from './measurements/MeasurementOverlay'
@@ -294,6 +296,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   const [qualityTier, setQualityTier] = useState<'preview' | 'final'>('preview')
   const [finalSamples, setFinalSamples] = useState<number>(FINAL_SAMPLES.default)
   const uvPlacementRef = useRef<ModelWithUVTattooHandle>(null)
+  const [tattooBounds, setTattooBounds] = useState<PlacementBoundsStatus | null>(null)
   const orbitControlsRef = useRef<OrbitControlsHandle>(null)
 
   // Export state
@@ -488,6 +491,9 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     const placement = uvPlacementRef.current?.getPlacement()
     if (decalVisible && placement?.imageReady === false) {
       throw new Error('Wait for the design to finish loading before rendering.')
+    }
+    if (decalVisible && placement?.visible && placement.bounds && !placement.bounds.valid && !placement.bounds.empty) {
+      throw new Error('The tattoo exceeds its placement area. Return to Tattoo and use Fit to area, reposition it, or allow placement across regions.')
     }
     const snap = (options?.snapshot ? orbitControlsRef.current?.freezeSnapshot(true) : orbitControlsRef.current?.getSnapshot()) ?? {
       position: cameraState.position, target: cameraState.target, fov: cameraState.fov,
@@ -1063,6 +1069,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
           </div>
           <div className="focus-panel-slot" hidden={artworkOpen}>
             <TopMenuBar
+              tattooBoundsControls={<TattooBoundsControls status={tattooBounds} onLock={locked => uvPlacementRef.current?.setAreaLock(locked)} onFit={() => uvPlacementRef.current?.fitToArea()} />}
               onBrowseArtwork={() => setArtworkOpen(true)}
               onMeasureBody={() => void openMeasurement()} measuringLoading={measureLoading || modelLoading}
               hasBodyFit={!!bodyFit} onClearBodyFit={() => setBodyFit(null)}
@@ -1105,8 +1112,8 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
               decalScale={decalScale}
               decalColor={decalColor}
               decalOpacity={decalOpacity}
-              onDecalRotationChange={setDecalRotation}
-              onDecalScaleChange={setDecalScale}
+              onDecalRotationChange={value => setDecalRotation(uvPlacementRef.current?.limitRotation(value) ?? value)}
+              onDecalScaleChange={value => setDecalScale(uvPlacementRef.current?.limitScale(value) ?? value)}
               onDecalColorChange={setDecalColor}
               onDecalOpacityChange={setDecalOpacity}
               onDecalVisibleChange={setDecalVisible}
@@ -1202,6 +1209,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             initialPlacement={surfacePlacement}
             onPlacementChange={setSurfacePlacement}
             onPlacementStatus={setPlacementStatus}
+            onBoundsStatus={setTattooBounds}
             lights={lights}
             intensityScale={LIGHTING_PRESETS[lightingPreset].threeIntensityScale}
             performanceMode={performanceMode}

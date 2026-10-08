@@ -112,13 +112,14 @@ for (const hidden of ['show-before', 'placement-hidden']) {
   assert.equal(f.calls.baked.length, 0); assert.equal(f.calls.blank, 1);
   assert.equal(await shot.inkBlob.text(), 'transparent'); f.dispose();
 }
-for (const reason of ['model-loading', 'body-unavailable', 'image-loading', 'pre-aborted']) {
+for (const reason of ['model-loading', 'body-unavailable', 'image-loading', 'pre-aborted', 'out-of-bounds']) {
   const f = fixture(), controller = new AbortController();
   if (reason === 'model-loading') f.scope.modelLoading = true;
   if (reason === 'body-unavailable') f.scope.uvPlacementRef.current.getRegionFraming = () => null;
   if (reason === 'image-loading') f.placement.imageReady = false;
+  if (reason === 'out-of-bounds') f.placement.bounds = { valid: false, empty: false, outside: .2, distorted: 0 };
   if (reason === 'pre-aborted') controller.abort();
-  await assert.rejects(f.build()({ snapshot: 'quick', signal: controller.signal }), /loading|load|place|aborted/i, reason);
+  await assert.rejects(f.build()({ snapshot: 'quick', signal: controller.signal }), /loading|load|place|aborted|placement area/i, reason);
   assert.equal(f.calls.freeze, 0, `${reason} cannot freeze an unready shot`); assert.equal(f.calls.baked.length, 0); f.dispose();
 }
 

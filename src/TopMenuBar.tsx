@@ -20,6 +20,7 @@ import AdjustmentControl from './AdjustmentControl';
 
 interface TopMenuBarProps extends PoseControlsProps, AppearanceControlsProps, StudioControlsProps {
   onBrowseArtwork?: () => void;
+  tattooBoundsControls?: ReactNode;
   onShoot?: (preset?: CinematicPresetId) => void;
   disabled?: boolean;
   onMeasureBody?: () => void;
@@ -93,7 +94,7 @@ export type InspectorTab = typeof INSPECTOR_TABS[number]['id'];
 
 export default function TopMenuBar({
   disabled = false,
-  onBrowseArtwork, onShoot,
+  onBrowseArtwork, onShoot, tattooBoundsControls,
   onMeasureBody, measuringLoading, hasBodyFit, onClearBodyFit,
   activeTab: controlledTab,
   onTabChange,
@@ -283,6 +284,7 @@ export default function TopMenuBar({
             onChange={(value) => onDecalScaleChange(value / 100)} />
           <AdjustmentControl label="Rotation" ariaLabel="Tattoo rotation" value={decalRotation}
             min={-180} max={180} step={1} unit="°" resetValue={0} onChange={onDecalRotationChange} />
+          {tattooBoundsControls}
           <MoreControls id="tattoo" summary={[decalOpacity !== 1 ? `${Math.round(decalOpacity * 100)}% opacity` : '', decalColor.toLowerCase() !== '#ffffff' ? 'Tint applied' : ''].filter(Boolean).join(' · ')}>
           <AdjustmentControl label="Opacity" ariaLabel="Tattoo opacity" value={decalOpacity * 100}
             min={0} max={100} step={1} unit="%" resetValue={100}

@@ -12,11 +12,14 @@ const LEGACY_VERTEX = /* glsl */ `
 const SURFACE_VERTEX = /* glsl */ `
   attribute vec2 aTattooUv;
   attribute float aTattooMask;
+  attribute float aTattooBoundary;
   varying vec2 vTattooUv;
   varying float vTattooMask;
+  varying float vTattooBoundary;
   void main() {
     vTattooUv = aTattooUv;
     vTattooMask = aTattooMask;
+    vTattooBoundary = aTattooBoundary;
     // GLTFLoader keeps glTF's downward V axis; Blender converts it back to
     // upward V during import. Bake into the UV coordinates Blender will use.
     vec2 atlasUv = vec2(uv.x, 1.0 - uv.y);
@@ -59,9 +62,10 @@ const SURFACE_FRAGMENT = /* glsl */ `
   uniform float tattooOpacity;
   varying vec2 vTattooUv;
   varying float vTattooMask;
+  varying float vTattooBoundary;
   void main() {
     vec4 ink = sampleSurfaceTattoo(
-      tattooTexture, vTattooUv, vTattooMask, tattooSize, tattooAspect,
+      tattooTexture, vTattooUv, vTattooMask * step(0.0, vTattooBoundary), tattooSize, tattooAspect,
       tattooRotation, tattooTint, tattooOpacity
     );
     gl_FragColor = vec4(inkToSRGB(ink.rgb), ink.a);
@@ -205,7 +209,13 @@ export async function bakeInkLayer(params: BakeParams): Promise<Blob> {
   try {
     // Snapshot before the asynchronous image load: dragging in the editor can
     // replace the live surface coordinates while an export is in progress.
-    if (surface) ownedGeometry = surface.geometry.clone();
+    if (surface) {
+      ownedGeometry = surface.geometry.clone();
+      // Legacy callers have no region restriction. New placements snapshot the
+      // exact same signed boundary used by the viewport before any async work.
+      if (!ownedGeometry.getAttribute('aTattooBoundary')) ownedGeometry.setAttribute('aTattooBoundary',
+        new THREE.BufferAttribute(new Float32Array(ownedGeometry.getAttribute('position').count).fill(1), 1));
+    }
     texture = await loadTexture(params.tattooImage, params.signal, params.textureTimeoutMs);
     params.signal?.throwIfAborted();
     renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });

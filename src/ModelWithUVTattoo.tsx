@@ -2,6 +2,8 @@ import { deformFit, heightWarp, type BodyFit } from './measurements/fitter';
 import { bindSkinRestCoordinates, SKIN_DETAIL, SKIN_DETAIL_GLSL } from './render/skinDetail';
 import { isTattooHit, tattooAnchorPoint } from './model/tattooHit';
 import TattooViewportControls from './model/TattooViewportControls';
+import TattooBoundsControls from './model/TattooBoundsControls';
+import { areaAtAnchor, createPlacementDomain, assessPlacement, footprintFromImage, fitPlacement, limitPlacement, type InkFootprint, type PlacementDomain, type PlacementBoundsStatus, type BoundsAssessment } from './render/placementBounds';
 import { loadFitAsset } from './measurements/service';
 import { measurementGuide, type MeasurementGuide } from './measurements/geometry';
 import { createPreviewEyes } from './render/previewEyes';
@@ -67,8 +69,6 @@ function recenterGroup(group: THREE.Object3D, body: THREE.Mesh): void {
 /** Normalized figure height and palm-sized design in world units. */
 const TARGET_BODY_HEIGHT = 4.2;
 const TATTOO_BASE_SIZE = 0.42;
-/** Experiment: preserve the chosen size everywhere; keep safe fitting available. */
-const AUTO_FIT_TATTOO_SIZE = false;
 
 const DRACO_DECODER_PATH = '/draco/';
 
@@ -80,6 +80,7 @@ const vertexShader = `
   attribute float aClothingMask;
   attribute vec2 aTattooUv;
   attribute float aTattooMask;
+  attribute float aTattooBoundary;
   attribute vec4 tangent;
   attribute vec3 aSkinRest;
   attribute vec3 aSkinNormal;
@@ -89,6 +90,7 @@ const vertexShader = `
   varying vec2 vUv;
   varying vec2 vTattooUv;
   varying float vTattooMask;
+  varying float vTattooBoundary;
   varying vec3 vWorldNormal;
   varying vec3 vWorldTangent;
   varying vec3 vWorldBitangent;
@@ -105,6 +107,7 @@ const vertexShader = `
     vSkinNormal = aSkinNormal;
     vTattooUv = aTattooUv;
     vTattooMask = aTattooMask;
+    vTattooBoundary = aTattooBoundary;
     vFocusMask = aFocusMask;
     vClothingMask = aClothingMask;
     vHighlightMask = max(1.0 - step(0.5, abs(aRegion - uHighlightRegion)),
@@ -147,6 +150,7 @@ const fragmentShader = `
   varying vec2 vUv;
   varying vec2 vTattooUv;
   varying float vTattooMask;
+  varying float vTattooBoundary;
   varying vec3 vWorldNormal;
   varying vec3 vWorldTangent;
   varying vec3 vWorldBitangent;
@@ -190,7 +194,7 @@ const fragmentShader = `
 
     if (tattooVisible > 0.5) {
       vec4 tattooLayer = sampleSurfaceTattoo(
-        tattooTexture, vTattooUv, vTattooMask, tattooScale,
+        tattooTexture, vTattooUv, vTattooMask * step(0.0, vTattooBoundary), tattooScale,
         tattooAspect, tattooRotation, tattooColor, tattooOpacity
       );
       if (tattooLayer.a > 0.0) {
@@ -276,6 +280,7 @@ export interface UVTattooPlacementSnapshot {
   imageReady: boolean;
   /** Effective visibility, including before/after mode and image readiness. */
   visible: boolean;
+  bounds?: BoundsAssessment;
   surface?: { geometry: THREE.BufferGeometry; size: number; aspect: number; color: string; opacity: number };
 }
 
@@ -285,6 +290,10 @@ export interface ModelWithUVTattooHandle {
   getRegionFraming: () => RegionFraming | null;
   getMeasurementGuide: (key: string) => MeasurementGuide | null;
   getTattooFraming: () => TattooFraming | null;
+  limitScale: (value: number) => number;
+  limitRotation: (value: number) => number;
+  setAreaLock: (locked: boolean) => void;
+  fitToArea: () => void;
 }
 
 interface ModelWithUVTattooProps {
@@ -304,6 +313,7 @@ interface ModelWithUVTattooProps {
   interactionMode?: 'tattoo' | 'model';
   onDecalScaleChange?: (value: number) => void;
   onDecalRotationChange?: (value: number) => void;
+  onBoundsStatus?: (status: PlacementBoundsStatus | null) => void;
   initialPlacement?: SurfaceAnchor | null;
   onPlacementChange?: (anchor: SurfaceAnchor | null) => void;
   onPlacementStatus?: (message: string) => void;
@@ -349,6 +359,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       interactionMode = 'tattoo',
       onDecalScaleChange,
       onDecalRotationChange,
+      onBoundsStatus,
       initialPlacement = null,
       onPlacementChange,
       onPlacementStatus,
@@ -383,6 +394,9 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     const referenceGeoRef = useRef<THREE.BufferGeometry | null>(null);
     const topologyRef = useRef<ReturnType<typeof createSurfaceTopology> | null>(null);
     const chartRef = useRef<SurfaceChart | null>(null);
+    const domainRef = useRef<PlacementDomain | null>(null);
+    const [inkFootprint, setInkFootprint] = useState<InkFootprint | null>(null);
+    const [boundsLimitMessage, setBoundsLimitMessage] = useState('');
     const anchorRef = useRef<SurfaceAnchor | null>(initialPlacement);
     const [chartVersion, setChartVersion] = useState(0);
     const [imageAspect, setImageAspect] = useState(1);
@@ -453,6 +467,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     useEffect(() => {
       let cancelled = false;
       loadedImageRef.current = null;
+      setInkFootprint(null);
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
@@ -462,6 +477,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         tattooTexture.colorSpace = THREE.SRGBColorSpace;
         tattooTexture.needsUpdate = true;
         setImageAspect(img.naturalWidth / Math.max(1, img.naturalHeight));
+        setInkFootprint(footprintFromImage(img));
       };
       img.onerror = () => { if (!cancelled) onPlacementStatus?.('The design could not be loaded. Please upload it again.'); };
       img.src = resolveTattooSource(uploadedImage);
@@ -513,18 +529,53 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     }, [shaderMaterial, highlightA, highlightB]);
 
     const requestedSize = TATTOO_BASE_SIZE * THREE.MathUtils.clamp(Number.isFinite(decalScale) ? decalScale : 1, 0.1, 3);
-    const aspectRatio = Math.min(imageAspect, 1 / imageAspect);
-    const safeSize = chartRef.current ? chartRef.current.maxSize * Math.SQRT2 / Math.hypot(1, aspectRatio) : requestedSize;
-    const size = AUTO_FIT_TATTOO_SIZE ? Math.min(requestedSize, safeSize) : requestedSize;
+    // Saved designs keep their explicit size; only interactive changes are
+    // constrained. Invalid old placements offer an explicit Fit action.
+    const size = requestedSize;
     const rotationRad = THREE.MathUtils.degToRad(Number.isFinite(decalRotation) ? decalRotation % 360 : 0);
+    const placementInput = useRef({ inkFootprint, size, imageAspect, rotationRad });
+    placementInput.current = { inkFootprint, size, imageAspect, rotationRad };
+    const assessment = useMemo(() => domainRef.current && inkFootprint
+      ? assessPlacement(domainRef.current, inkFootprint, size, imageAspect, rotationRad) : null,
+      // chartVersion invalidates the spatial index stored in domainRef.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [inkFootprint, size, imageAspect, rotationRad, chartVersion]);
+    const fittedScale = useMemo(() => assessment && !assessment.valid && domainRef.current && inkFootprint
+      ? fitPlacement(value => assessPlacement(domainRef.current!, inkFootprint, value * TATTOO_BASE_SIZE, imageAspect, rotationRad), decalScale) : null,
+      [assessment, inkFootprint, imageAspect, rotationRad, decalScale]);
+    const boundsStatus = useMemo<PlacementBoundsStatus | null>(() => {
+      const bounds = anchorRef.current?.bounds;
+      if (!hasPlaced || !bounds) return null;
+      return { ...(assessment ?? { outside: 0, distorted: 0, valid: false, empty: false }), region: bounds.region,
+        locked: !bounds.allowAcrossRegions, ready: !!assessment, canFit: fittedScale !== null, conservative: !!inkFootprint?.conservative, limitMessage: boundsLimitMessage };
+    // The selected anchor's region is updated with its chart revision.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [assessment, fittedScale, hasPlaced, inkFootprint, chartVersion, boundsLimitMessage]);
+    useEffect(() => { onBoundsStatus?.(boundsStatus); }, [boundsStatus, onBoundsStatus]);
     useEffect(() => {
-      if (!hasPlacedRef.current) return;
-      onPlacementStatus?.(size < requestedSize - 0.001
-        ? 'Size limited here to keep the design smooth. Move to a broader area for a larger tattoo.'
-        : requestedSize > safeSize + 0.001
-          ? 'This size exceeds the recommended area. Edges may be clipped near folds. Move the design or reduce its size.'
-          : 'Drag the tattoo to move it. Drag bare skin to orbit.');
-    }, [size, requestedSize, safeSize, chartVersion, onPlacementStatus]);
+      if (!assessment) return;
+      onPlacementStatus?.(boundsLimitMessage || (!assessment.valid ? 'The design exceeds this area. Use Fit to area, move it, or allow placement across regions.'
+        : 'Drag the tattoo to move it. Drag bare skin to orbit.'));
+    }, [assessment, onPlacementStatus, boundsLimitMessage]);
+
+    const limitScale = useCallback((value: number) => {
+      const next = THREE.MathUtils.clamp(Number.isFinite(value) ? value : decalScale, .1, 3);
+      if (!domainRef.current || !hasPlacedRef.current) return next;
+      if (!inkFootprint) return decalScale;
+      const result = limitPlacement(v => assessPlacement(domainRef.current!, inkFootprint, v * TATTOO_BASE_SIZE, imageAspect, rotationRad), decalScale, next, .05);
+      setBoundsLimitMessage(Math.abs(result - next) > .001 ? 'Size limited here. Move to a broader spot, or allow across regions.' : '');
+      return result;
+    }, [decalScale, inkFootprint, imageAspect, rotationRad]);
+    const limitRotation = useCallback((value: number) => {
+      if (!Number.isFinite(value)) return decalRotation;
+      if (!domainRef.current || !hasPlacedRef.current) return value;
+      if (!inkFootprint) return decalRotation;
+      const delta = ((value - decalRotation + 540) % 360 + 360) % 360 - 180;
+      const result = limitPlacement(v => assessPlacement(domainRef.current!, inkFootprint, size, imageAspect, THREE.MathUtils.degToRad(v)), decalRotation, decalRotation + delta, 5);
+      setBoundsLimitMessage(Math.abs(result - decalRotation - delta) > .001 ? 'Rotation limited to keep the design inside this area.' : '');
+      return result === decalRotation + delta ? value : result;
+    }, [decalRotation, inkFootprint, size, imageAspect]);
+    const fitToArea = useCallback(() => { if (fittedScale !== null) { setBoundsLimitMessage(''); onDecalScaleChange?.(fittedScale); } }, [fittedScale, onDecalScaleChange]);
 
     useFrame(() => {
       shaderMaterial.uniforms.tattooScale.value = size;
@@ -590,6 +641,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       bindSkinRestCoordinates(geo, mesh.matrixWorld);
       geo.setAttribute('aTattooUv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
       geo.setAttribute('aTattooMask', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count), 1));
+      geo.setAttribute('aTattooBoundary', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(1), 1));
       geo.setAttribute('aFocusMask', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(1), 1));
       geo.setAttribute('aClothingMask', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(-1), 1));
       referenceGeoRef.current = geo.clone();
@@ -727,7 +779,8 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       onFrameRegion(regionFraming(isolateRegion));
     }, [cloneGroup, isolateRegion, regionFraming, onFrameRegion]);
 
-    const applyAnchor = useCallback((anchor: SurfaceAnchor, notify = true): boolean => {
+    const applyAnchor = useCallback((anchor: SurfaceAnchor, notify = true, changingBoundary = false): boolean => {
+      const { inkFootprint, size, imageAspect, rotationRad } = placementInput.current;
       const mesh = bodyMeshRef.current;
       const reference = referenceGeoRef.current;
       const topology = topologyRef.current;
@@ -738,6 +791,27 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         onPlacementStatus?.('This area is too folded for a clean placement. Try a flatter spot nearby.');
         return false;
       }
+      const masks = regionMasksRef.current;
+      if (!masks) return false;
+      // Dragging retains the original area. An explicit click may target a new
+      // area; restored scenes retain the area/override saved with their anchor.
+      const bounds = anchor.bounds ?? (notify && isDragging.current ? anchorRef.current?.bounds : undefined)
+        ?? { region: isolateRef.current ?? areaAtAnchor(masks, anchor, mesh.geometry), allowAcrossRegions: anchorRef.current?.bounds?.allowAcrossRegions ?? false };
+      const boundary = bounds.allowAcrossRegions ? undefined : masks[bounds.region];
+      const domain = createPlacementDomain(reference, mesh.matrixWorld, chart, boundary);
+      if (notify && !changingBoundary && hasPlacedRef.current && inkFootprint) {
+        const next = assessPlacement(domain, inkFootprint, size, imageAspect, rotationRad);
+        const before = domainRef.current ? assessPlacement(domainRef.current, inkFootprint, size, imageAspect, rotationRad) : null;
+        if (!next.valid && (before?.valid || !before || next.outside + next.distorted >= before.outside + before.distorted)) {
+          onPlacementStatus?.('This placement would lose or stretch part of the design. Reduce its size or use Fit to area first.');
+          setBoundsLimitMessage('Move limited here. Reduce the size or move to a broader spot.');
+          return false;
+        }
+      }
+      mesh.geometry.setAttribute('aTattooBoundary', new THREE.BufferAttribute(boundary?.slice() ?? new Float32Array(chart.mask.length).fill(1), 1));
+      domainRef.current = domain;
+      setBoundsLimitMessage('');
+      const placed = { ...anchor, bounds };
       mesh.geometry.setAttribute('aTattooUv', new THREE.BufferAttribute(chart.uv, 2));
       const mask = chart.mask.slice();
       for (let face = 0; face < chart.faceMask.length; face++) {
@@ -745,16 +819,21 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       }
       mesh.geometry.setAttribute('aTattooMask', new THREE.BufferAttribute(mask, 1));
       chartRef.current = chart;
-      anchorRef.current = anchor;
+      anchorRef.current = placed;
       hasPlacedRef.current = true;
       setHasPlaced(true);
       setChartVersion((v) => v + 1);
       if (notify) {
         setDecalVisible(true);
-        onPlacementChange?.(anchor);
+        onPlacementChange?.(placed);
       }
       return true;
     }, [bodyDef.id, onPlacementStatus, onPlacementChange, setDecalVisible]);
+
+    const setAreaLock = useCallback((locked: boolean) => {
+      const anchor = anchorRef.current;
+      if (anchor?.bounds) applyAnchor({ ...anchor, bounds: { ...anchor.bounds, allowAcrossRegions: !locked } }, true, true);
+    }, [applyAnchor]);
 
     useEffect(() => {
       if (!cloneGroup) return;
@@ -766,6 +845,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       if (desired && applyAnchor(desired, false)) return;
       anchorRef.current = null;
       chartRef.current = null;
+      domainRef.current = null;
       hasPlacedRef.current = false;
       setHasPlaced(false);
       const mask = bodyMeshRef.current?.geometry.getAttribute('aTattooMask') as THREE.BufferAttribute | undefined;
@@ -849,11 +929,13 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
 
     useImperativeHandle(ref, () => ({
       placeInView,
+      limitScale, limitRotation, setAreaLock, fitToArea,
       getPlacement: () => ({
         imageSource: resolveTattooSource(uploadedImage),
         imageReady: loadedImageRef.current === resolveTattooSource(uploadedImage),
         center: [0, 0], scaleUV: 0, rotationRad, hasPlaced: hasPlacedRef.current && loadedImageRef.current === (resolveTattooSource(uploadedImage)),
         visible: hasPlacedRef.current && visible && loadedImageRef.current === (resolveTattooSource(uploadedImage)),
+        bounds: assessment ?? undefined,
         surface: bodyMeshRef.current && chartRef.current ? {
           geometry: bodyMeshRef.current.geometry, size, aspect: imageAspect,
           color: decalColor, opacity: decalOpacity,
@@ -869,7 +951,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
           size, aspect: imageAspect, rotationRad, hairCoverage: hairCoverageRef.current,
         });
       },
-    }), [placeInView, size, imageAspect, decalColor, decalOpacity, rotationRad, uploadedImage, visible, regionFraming, isolateRegion]);
+    }), [placeInView, size, imageAspect, decalColor, decalOpacity, rotationRad, uploadedImage, visible, regionFraming, isolateRegion, assessment, limitScale, limitRotation, setAreaLock, fitToArea]);
 
     const setOrbitEnabled = useCallback(
       (enabled: boolean) => {
@@ -1000,7 +1082,8 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       <primitive object={cloneGroup} />
       {editingEnabled && interactionMode === 'tattoo' && hasPlaced && visible && onDecalScaleChange && onDecalRotationChange && <TattooViewportControls
         mesh={bodyMeshRef} anchor={anchorRef} scale={decalScale} rotation={decalRotation}
-        onScale={onDecalScaleChange} onRotation={onDecalRotationChange}
+        onScale={value => onDecalScaleChange(limitScale(value))} onRotation={value => onDecalRotationChange(limitRotation(value))}
+        boundsControls={<TattooBoundsControls status={boundsStatus} onLock={setAreaLock} onFit={fitToArea} />}
       />}
     </>;
   }

@@ -22,3 +22,11 @@
 .tattoo-transform-row output { text-align: center; font-variant-numeric: tabular-nums; }
 .tattoo-transform-row button { padding: 0; font-size: 15px; min-width: 28px; }
 .tattoo-transform-card .tattoo-transform-toggle { border: 0; background: none; padding: 0 4px; min-height: 22px; font-size: 17px; }
+.tattoo-bounds-controls { border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px; font-size: 11px; }
+.tattoo-bounds-controls label { display: flex; gap: 7px; align-items: center; line-height: 1.5; }
+.tattoo-bounds-controls input { accent-color: var(--accent-blue); }
+.tattoo-bounds-controls p, .tattoo-bounds-controls small { display: block; margin: 7px 0; line-height: 1.5; color: var(--text-secondary); }
+.tattoo-bounds-controls .tattoo-bounds-warning { color: var(--text-primary); font-weight: 600; }
+.tattoo-bounds-controls button { width: 100%; padding: 7px; color: var(--text-primary); background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 7px; cursor: pointer; }
+.tattoo-bounds-controls button:disabled { opacity: .5; cursor: default; }
+.tattoo-transform-card { max-height: calc(100vh - 170px); overflow-y: auto; }

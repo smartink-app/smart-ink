@@ -70,11 +70,12 @@ function find(node) {
   ts.forEachChild(node, find);
 }
 find(modelAst); assert.ok(effect, 'Model must replay changed parent placements');
-const names = ['cloneGroup','initialPlacement','anchorRef','chartRef','applyAnchor','hasPlacedRef','setHasPlaced','bodyMeshRef','shaderMaterial','setChartVersion','onPlacementStatus'];
+const names = ['cloneGroup','initialPlacement','anchorRef','chartRef','domainRef','applyAnchor','hasPlacedRef','setHasPlaced','bodyMeshRef','shaderMaterial','setChartVersion','onPlacementStatus'];
 const replay = await factory(effect.getText(modelAst), names);
 const geometry = new THREE.BufferGeometry(); geometry.setAttribute('aTattooMask', new THREE.Float32BufferAttribute([1,1,1], 1));
 let chartBuilds = 0, version = 0, status = '', hasPlaced = true;
 const env = { cloneGroup: {}, initialPlacement: anchor(40), anchorRef: { current: null }, chartRef: { current: null }, hasPlacedRef: { current: true },
+  domainRef: { current: null },
   bodyMeshRef: { current: { geometry } }, shaderMaterial: { uniforms: { tattooVisible: { value: 1 } } },
   setHasPlaced: value => hasPlaced = value, setChartVersion: fn => version = fn(version), onPlacementStatus: value => status = value,
   applyAnchor: (value, notify) => { assert.equal(notify, false, 'Replay must not notify/force visibility'); if (value.bodyMeshId !== 'body_full') return false; chartBuilds++; env.anchorRef.current = value; env.chartRef.current = {}; env.hasPlacedRef.current = hasPlaced = true; return true; },
