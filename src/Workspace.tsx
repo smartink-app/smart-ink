@@ -1,3 +1,8 @@
+import RevealPanel from './RevealPanel'
+import { revealCamera, type RevealPreset } from './render/reveal'
+import BodyRegionCard from './model/BodyRegionCard'
+import ShotStyleControls from './ShotStyleControls'
+import './phase1-studio.css'
 import MeasurementOverlay from './measurements/MeasurementOverlay'
 import MeasurementScene from './measurements/MeasurementScene'
 import { loadFitAsset, fitBody } from './measurements/service'
@@ -65,7 +70,6 @@ import { levelFocusDirection } from './render/focusCamera'
 import { DEFAULT_BODY_APPEARANCE, normalizeAppearance, type BodyAppearance } from './render/bodyAppearance'
 import { DEFAULT_BODY_SHAPE, normalizeShape, clampShapeValue, type BodyShapeKey, type BodyShape } from './render/bodyShape'
 import { type BodyRegionId } from './render/bodyRegions'
-import RadialShapeMenu from './RadialShapeMenu'
 import type { RegionFraming } from './ModelWithUVTattoo'
 import type { SurfaceAnchor } from './render/surfacePlacement'
 import * as THREE from 'three'
@@ -192,7 +196,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   const [decalOpacity, setDecalOpacity] = useState(1) // Default full opacity
   const [decalVisible, setDecalVisible] = useState(false)
   const [surfacePlacement, setSurfacePlacement] = useState<SurfaceAnchor | null>(null)
-  const [placementStatus, setPlacementStatus] = useState('Click the skin to place. Drag to orbit. Hold ⌘ / Ctrl and drag to move the tattoo.')
+  const [placementStatus, setPlacementStatus] = useState('Click the skin to place. Drag the tattoo to move it; drag bare skin to orbit.')
   const [photoMode, setPhotoMode] = useState(false)
   const [background, setBackground] = useState<BgKey>('white')
   const [studio, setStudio] = useState<StudioSettings>(() => ({ ...DEFAULT_STUDIO }))
@@ -328,12 +332,25 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   const [snapshotHasTattoo, setSnapshotHasTattoo] = useState(false)
   const [snapshotFramingHint, setSnapshotFramingHint] = useState('')
   const [snapshotCamera, setSnapshotCamera] = useState<TattooCameraAdjustment>(() => ({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT }))
+  const [revealPreview, setRevealPreview] = useState<RevealPreset | null>(null)
+  const [shotBlur, setShotBlur] = useState(0)
+  const [shotBrightness, setShotBrightness] = useState(1)
+  const [shotFormat, setShotFormat] = useState<'view' | 'portrait' | 'square' | 'landscape'>('view')
+  const [shotFrame, setShotFrame] = useState<{ width: number; height: number } | null>(null)
   const [snapshotLook, setSnapshotLook] = useState<CinematicPresetId | null>(null)
   const snapshotReturnCamera = useRef<{ position: [number, number, number]; target: [number, number, number]; fov: number } | null>(null)
+  const snapshotReturnStudio = useRef<{ studio: StudioSettings; lights: LightDefinition[]; preset: LightingPresetKey; selected: number | null } | null>(null)
   const closeSnapshot = useCallback(() => {
     const restore = snapshotReturnCamera.current
     snapshotReturnCamera.current = null
+    setRevealPreview(null)
     snapshotSession.close()
+    const appearance = snapshotReturnStudio.current
+    snapshotReturnStudio.current = null
+    if (appearance) {
+      setStudio(appearance.studio); setLights(appearance.lights)
+      setLightingPreset(appearance.preset); setSelectedLight(appearance.selected)
+    }
     if (restore) {
       setCameraState(restore)
       setCameraRequestId((value) => value + 1)
@@ -348,6 +365,28 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     setCameraRequestId((value) => value + 1)
     setCameraPreset('custom')
   }, [snapshot.open, snapshot.mode, tattooFraming, snapshotCamera, viewportAspect, snapshotLook])
+  useEffect(() => {
+    if (!revealPreview || !snapshot.open || !threeCamera) return
+    const base = orbitControlsRef.current?.freezeSnapshot(true) ?? cameraState
+    let frame = 0; const start = performance.now()
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / 4000)
+      const view = revealCamera(base, revealPreview, progress)
+      threeCamera.position.set(...view.position); threeCamera.lookAt(...view.target); threeCamera.updateMatrixWorld()
+      if (progress < 1) frame = requestAnimationFrame(tick)
+      else setRevealPreview(null)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(frame)
+      if (snapshotSession.getState().open) {
+        threeCamera.position.set(...base.position); threeCamera.lookAt(...base.target); threeCamera.updateMatrixWorld()
+        setCameraState(base); setCameraRequestId(value => value + 1)
+      }
+    }
+    // Camera feedback is deliberately excluded: this preview never edits the saved shot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealPreview, snapshot.open, threeCamera])
   const snapshotBusy = snapshot.status === 'uploading' || snapshot.status === 'rendering'
   useEffect(() => {
     if (!snapshotBusy) { if (snapshot.mode === 'compose') setSnapshotElapsed(0); return }
@@ -419,7 +458,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     setBodyAppearance(value.bodyAppearance); setStudio(value.studio); setBackground(value.background)
     setLightingPreset(value.lightingPreset); setLights(value.lights); setLookId(value.lookId)
     setShapeMenu(null); setPanelRegions([]); setSelectedLight(null)
-    setPlacementStatus(value.surfacePlacement ? 'Placement restored. Click the skin to move it, or hold ⌘ / Ctrl and drag.' : 'Click the skin to place. Drag to orbit. Hold ⌘ / Ctrl and drag to move the tattoo.')
+    setPlacementStatus(value.surfacePlacement ? 'Placement restored. Drag the tattoo to move it; drag bare skin to orbit.' : 'Click the skin to place. Drag the tattoo to move it; drag bare skin to orbit.')
   }, [])
   const editHistory = useEditorHistory({ value: editValue, onRestore: restoreEdits,
     scopeId: currentScene?.id, enabled: Boolean(currentScene) && !showDashboard })
@@ -456,15 +495,16 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     }
     const dims = options?.snapshot ? snapshotOutput(snap.aspect, options.snapshot) : exportDimensions(exportPreset, qualityTier)
     const contract = buildRenderContract(
-      { bodyMeshId, skinToneId, poseId, lookId, qualityTier: options?.snapshot ? 'final' : qualityTier, finalSamples: options?.snapshot ? snapshotOutput(snap.aspect, options.snapshot).samples : finalSamples, bodyShape, bodyFit, bodyPose, bodyAppearance, studio: studioForExport(studio, BACKGROUNDS[background].stops[0], BACKGROUNDS[background].stops), bodyRegion: isolateRegion },
+      { bodyMeshId, skinToneId, poseId, lookId, qualityTier: options?.snapshot ? 'final' : qualityTier, finalSamples: options?.snapshot ? snapshotOutput(snap.aspect, options.snapshot).samples : finalSamples, bodyShape, bodyFit, bodyPose, bodyAppearance, studio: options?.snapshot ? { ...studio, gradient: undefined, showGuides: false } : studioForExport(studio, BACKGROUNDS[background].stops[0], BACKGROUNDS[background].stops), bodyRegion: isolateRegion },
       { position: snap.position, target: snap.target, fov: snap.fov, aspect: options?.snapshot ? snap.aspect : dims.width / dims.height },
       'ink.png', dims,
       { presetName: lightingPreset, intensityScale: LIGHTING_PRESETS[lightingPreset].threeIntensityScale, lights: structuredClone(lights) },
     )
+    if (options?.snapshot) contract.skinMaterial = 'studio'
     const cinematic = options?.snapshot ? cinematicPreset(snapshotLook) : undefined
     if (cinematic) {
-      contract.camera.aperture = cinematic.aperture
-      contract.camera.depthOfField = true
+      contract.camera.aperture = cinematic.aperture / (1 + shotBlur * (cinematic.id === 'detail' ? 2 : .8))
+      contract.camera.depthOfField = shotBlur > 0
       contract.bodyHair = 'vellus'
     }
     // Freeze scene metadata before the asynchronous image bake.
@@ -472,11 +512,12 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     const inkBlob = decalVisible && placement?.hasPlaced && placement.visible
       ? await bakeInkLayer({ tattooImage: placement.imageSource ?? resolveTattooSource(uploadedImage), center: placement.center,
           scaleUV: placement.scaleUV, rotationRad: placement.rotationRad, surface: placement.surface,
+          // Both qualities retain the same source within the renderer's 16 MP upload limit.
           size: options?.snapshot || qualityTier === 'final' ? 4096 : 2048, signal: options?.signal })
       : await blankInkLayer()
     options?.signal?.throwIfAborted()
     return { contract: frozenContract, inkBlob }
-  }, [snapshotLook, bodyFit, uploadedImage, decalVisible, exportPreset, bodyMeshId, skinToneId, poseId, lookId, qualityTier, finalSamples, bodyShape, bodyPose, bodyAppearance, isolateRegion, cameraState, lightingPreset, lights, studio, background, modelLoading])
+  }, [snapshotLook, shotBlur, bodyFit, uploadedImage, decalVisible, exportPreset, bodyMeshId, skinToneId, poseId, lookId, qualityTier, finalSamples, bodyShape, bodyPose, bodyAppearance, isolateRegion, cameraState, lightingPreset, lights, studio, background, modelLoading])
 
   const handleLookChange = useCallback((id: string) => {
     setLookId(id)
@@ -523,7 +564,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     setPanelRegions([])
     setSurfacePlacement(migrated.surfacePlacement ?? null)
     setDecalVisible(migrated.decalVisible)
-    setPlacementStatus(migrated.surfacePlacement ? 'Placed on the skin. Click to move, or hold ⌘ / Ctrl and drag.' : 'Click the skin to place. Drag to orbit. Hold ⌘ / Ctrl and drag to move the tattoo.')
+    setPlacementStatus(migrated.surfacePlacement ? 'Drag the tattoo to move it. Drag bare skin to orbit.' : 'Click the skin to place. Drag the tattoo to move it; drag bare skin to orbit.')
     setDecalRotation(migrated.decalRotation)
     setDecalScale(migrated.decalScale)
     setDecalColor(migrated.decalColor ?? '#ffffff')
@@ -537,7 +578,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
 
   // Save editor state to current scene (except thumbnail)
   useEffect(() => {
-    if (!currentScene || showDashboard || measureOpen) return
+    if (!currentScene || showDashboard || measureOpen || snapshot.open) return
     const updated: SceneData = {
       ...currentScene,
       decalImage: uploadedImage,
@@ -575,13 +616,13 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     // currentScene is deliberately not a dependency: this effect writes it, so
     // including it would re-run on every save and loop forever.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentScene?.id, showDashboard, measureOpen, bodyFit, stageScene, flushPendingSave, uploadedImage, decalVisible, surfacePlacement, decalRotation, decalScale, decalColor, decalOpacity, decalPosition, decalNormal, background, studio, lightingPreset, lights, cameraState, bodyMeshId, skinToneId, poseId, lookId, qualityTier, finalSamples, bodyShape, bodyPose, bodyAppearance, isolateRegion])
+  }, [currentScene?.id, showDashboard, measureOpen, snapshot.open, bodyFit, stageScene, flushPendingSave, uploadedImage, decalVisible, surfacePlacement, decalRotation, decalScale, decalColor, decalOpacity, decalPosition, decalNormal, background, studio, lightingPreset, lights, cameraState, bodyMeshId, skinToneId, poseId, lookId, qualityTier, finalSamples, bodyShape, bodyPose, bodyAppearance, isolateRegion])
 
   // Capture a dashboard thumbnail once the user pauses. Encoding the full
   // canvas on every change produced multi-megabyte data URLs and a save per
   // slider tick; this waits for 1.5 s of quiet and shrinks to 512 px.
   useEffect(() => {
-    if (!currentScene || showDashboard || measureOpen || !canvasContainerRef.current) return
+    if (!currentScene || showDashboard || measureOpen || snapshot.open || !canvasContainerRef.current) return
     const timeout = setTimeout(() => {
       if (document.hidden) return
       const canvas = canvasContainerRef.current?.querySelector('canvas') as HTMLCanvasElement | null
@@ -601,7 +642,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
       void flushPendingSave().catch(() => {})
     }, 1500)
     return () => clearTimeout(timeout)
-  }, [currentScene, showDashboard, measureOpen, bodyFit, sceneSaves, stageScene, flushPendingSave, uploadedImage, surfacePlacement, decalRotation, decalScale, decalColor, decalOpacity, decalPosition, decalNormal, background, studio, lightingPreset, lights, cameraState, bodyShape, bodyPose, bodyAppearance, isolateRegion])
+  }, [currentScene, showDashboard, measureOpen, snapshot.open, bodyFit, sceneSaves, stageScene, flushPendingSave, uploadedImage, surfacePlacement, decalRotation, decalScale, decalColor, decalOpacity, decalPosition, decalNormal, background, studio, lightingPreset, lights, cameraState, bodyShape, bodyPose, bodyAppearance, isolateRegion])
 
   const handleBodyMeshChange = (id: string) => {
     if (id === bodyMeshId || !findById(REGISTRY.bodyMeshes, id)) return
@@ -844,23 +885,33 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     }
   }
 
-  const openSnapshot = () => {
+  const openSnapshot = (initialLook: CinematicPresetId = 'editorial') => {
     if (renderBusy || modelLoading || !canvasHostSized || snapshotSession.getState().open) return
     setShapeMenu(null)
     setPanelRegions([])
     setAccountMenuOpen(false)
     snapshotReturnCamera.current = orbitControlsRef.current?.freezeSnapshot() ?? structuredClone(cameraState)
+    snapshotReturnStudio.current = { studio: structuredClone(studio), lights: structuredClone(lights), preset: lightingPreset, selected: selectedLight }
     const tattoo = uvPlacementRef.current?.getTattooFraming() ?? null
     const region = uvPlacementRef.current?.getRegionFraming()
     const view = snapshotReturnCamera.current
     const direction = view.position.map((value, i) => value - view.target[i]) as [number, number, number]
-    setTattooFraming(tattoo ?? (region ? regionSnapshotFraming(region, direction) : null))
+    const framing = tattoo ?? (region ? regionSnapshotFraming(region, direction) : null)
+    setTattooFraming(framing)
     setSnapshotHasTattoo(Boolean(tattoo))
     setSnapshotFramingHint(tattoo ? '' : uvPlacementRef.current?.getPlacement().hasPlaced
       ? 'The tattoo is covered or outside this Focus view. The camera is centered on the visible figure.'
       : 'Camera centered on the figure. Return to editing and click the skin to place the example tattoo, or render without ink.')
-    setSnapshotCamera({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT })
-    setSnapshotLook(null)
+    const preset = cinematicPreset(initialLook)!
+    setSnapshotCamera({ ...preset.adjustment })
+    setSnapshotLook(initialLook)
+    setShotBrightness(1); setShotBlur(initialLook === 'detail' ? .3 : 0)
+    if (framing) {
+      const camera = frameTattoo(framing, preset.adjustment, viewportAspect, preset.fov)
+      setLightingPreset('studio')
+      setLights(cinematicLights(preset, camera, LIGHTING_PRESETS.studio.threeIntensityScale))
+      setStudio(previous => ({ ...previous, mode: 'sweep', color: preset.background, gradient: undefined, showGuides: false }))
+    }
     snapshotSession.open(async (signal) => ({
       ...await currentShotBuilder.current({ snapshot: snapshotSession.getState().quality, signal }), sceneName: currentScene?.name,
     }))
@@ -869,11 +920,12 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     const preset = cinematicPreset(id)
     if (!preset || !tattooFraming) return
     const camera = frameTattoo(tattooFraming, preset.adjustment, viewportAspect, preset.fov)
+    setShotBrightness(1); setShotBlur(id === 'detail' ? .3 : 0)
     setSnapshotLook(id)
     setSnapshotCamera({ ...preset.adjustment })
     setLightingPreset('studio')
     setLights(cinematicLights(preset, camera, LIGHTING_PRESETS.studio.threeIntensityScale))
-    setStudio(previous => ({ ...previous, mode: 'plain', color: preset.background, gradient: undefined, showGuides: false }))
+    setStudio(previous => ({ ...previous, mode: 'sweep', color: preset.background, gradient: undefined, showGuides: false }))
     setSelectedLight(1)
   }
   const aimSnapshotLights = () => {
@@ -907,8 +959,16 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(el)
-    return () => observer.disconnect()
-  }, [showDashboard])
+    const parent = el.parentElement!
+    const fitFrame = () => {
+      if (!snapshot.open || shotFormat === 'view') { setShotFrame(null); return }
+      const ratio = shotFormat === 'portrait' ? .8 : shotFormat === 'square' ? 1 : 1.5
+      const width = Math.min(parent.clientWidth, parent.clientHeight * ratio)
+      setShotFrame({ width, height: width / ratio })
+    }
+    const parentObserver = new ResizeObserver(fitFrame); parentObserver.observe(parent); fitFrame()
+    return () => { observer.disconnect(); parentObserver.disconnect() }
+  }, [showDashboard, snapshot.open, shotFormat])
 
   // Exit photo mode / modals on Escape
   useEffect(() => {
@@ -943,7 +1003,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   }
 
   return (
-    <div className={`editor-app-root${measureOpen ? ' editor-app-root--measuring' : ''}${photoMode ? ' editor-app-root--photo' : ''}`} ref={canvasContainerRef}>
+    <div className={`editor-app-root${measureOpen ? ' editor-app-root--measuring' : ''}${photoMode ? ' editor-app-root--photo' : ''}${snapshot.open ? ' editor-app-root--shooting' : ''}`} ref={canvasContainerRef}>
       <StudioRail active={accountMenuOpen ? 'account' : artworkOpen ? 'artwork' : 'studio'}
         onHome={() => afterSaving(onHome)} disabled={snapshot.open || measureOpen || measureLoading}
         onNavigate={section => {
@@ -980,7 +1040,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             <button type="button" className="tool-btn tool-btn--ghost" aria-label="Undo edit" title="Undo · ⌘ / Ctrl Z" disabled={historyBlocked || !editHistory.canUndo} onClick={editHistory.undo}><FaUndo aria-hidden="true" /><span>Undo</span></button>
             <button type="button" className="tool-btn tool-btn--ghost" aria-label="Redo edit" title="Redo · ⌘ / Ctrl Shift Z" disabled={historyBlocked || !editHistory.canRedo} onClick={editHistory.redo}><FaRedo aria-hidden="true" /><span>Redo</span></button>
           </div>
-          <button type="button" className="tool-btn tool-btn--primary" onClick={openSnapshot} disabled={modelLoading || !canvasHostSized || renderBusy} title="Frame the tattoo and set up a Blender snapshot">Render image</button>
+          <button type="button" className="tool-btn tool-btn--primary" onClick={() => openSnapshot()} disabled={modelLoading || !canvasHostSized || renderBusy} title="Frame the tattoo and set up a Blender snapshot">Shoot</button>
           <EditorOutputMenu onExport={() => setShowExportModal(true)} onShare={() => setShowRenderHistory(true)} />
 
         </div>
@@ -990,7 +1050,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
       {saveState.status === 'error' && <div className="editor-notice" role="alert">Your latest changes are still here. Saving failed; retry before leaving this page.</div>}
       {photoMode && <div className="photo-mode-actions" inert={snapshot.open || measureOpen || measureLoading} style={snapshot.open ? { visibility: 'hidden' } : undefined}>
         <button type="button" className="ep-btn" onClick={() => setPhotoMode(false)}>Exit Clean view · Esc</button>
-        <button type="button" className="ep-btn ep-btn--primary" onClick={openSnapshot} disabled={modelLoading || !canvasHostSized || renderBusy}>Render image</button>
+        <button type="button" className="ep-btn ep-btn--primary" onClick={() => openSnapshot()} disabled={modelLoading || !canvasHostSized || renderBusy}>Shoot</button>
         <button type="button" className="ep-btn" onClick={() => setShowExportModal(true)}>Export</button>
       </div>}
       <div className="editor-body-row">
@@ -1006,7 +1066,8 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
               onBrowseArtwork={() => setArtworkOpen(true)}
               onMeasureBody={() => void openMeasurement()} measuringLoading={measureLoading || modelLoading}
               hasBodyFit={!!bodyFit} onClearBodyFit={() => setBodyFit(null)}
-              activeTab={inspectorTab} onTabChange={setInspectorTab}
+              activeTab={inspectorTab} onTabChange={tab => { setInspectorTab(tab); setShapeMenu(null); setPanelRegions([]) }}
+              onShoot={openSnapshot}
               disabled={snapshot.open || measureOpen || measureLoading}
               key={currentScene?.id}
               bodyMeshId={bodyMeshId}
@@ -1078,7 +1139,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
               transition: 'background 0.4s',
             }}
           />
-          <div className="editor-canvas-inner" ref={canvasHostRef}>
+          <div className="editor-canvas-inner" ref={canvasHostRef} style={shotFrame ? { width: shotFrame.width, height: shotFrame.height, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' } : undefined}>
             {canvasHostSized && (
             <>
             {/*
@@ -1150,8 +1211,11 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             bodyAppearance={measureOpen ? DEFAULT_BODY_APPEARANCE : bodyAppearance}
             isolateRegion={measureOpen ? null : isolateRegion}
             highlightRegions={photoMode || snapshot.open || measureOpen ? [] : highlightRegions}
-            editingEnabled={!photoMode && !snapshot.open && !measureOpen}
-            onRegionPress={bodyFit ? undefined : handleRegionPress}
+            editingEnabled={!photoMode && !snapshot.open && !measureOpen && inspectorTab !== 'studio'}
+            interactionMode={inspectorTab === 'figure' ? 'model' : 'tattoo'}
+            onDecalScaleChange={setDecalScale}
+            onDecalRotationChange={setDecalRotation}
+            onRegionPress={inspectorTab === 'figure' ? handleRegionPress : undefined}
             onFrameRegion={measureOpen ? undefined : handleFrameRegion}
           />
         </Suspense>
@@ -1171,8 +1235,8 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             )}
             {showPlacementTips && !modelLoading && !photoMode && !snapshot.open && !measureOpen && (
               <div className="placement-help" role="status" aria-live="polite">
-                <strong>Surface placement</strong>
-                <span>{placementStatus}</span>
+                <strong>{inspectorTab === 'figure' ? 'Personalize the model' : inspectorTab === 'studio' ? 'Set the scene' : 'Place your tattoo'}</strong>
+                <span>{inspectorTab === 'figure' ? 'Click a body region to adjust it. Drag the background to orbit.' : inspectorTab === 'studio' ? 'Choose a shot on the left to open your photo studio.' : placementStatus}</span>
               </div>
             )}
             {modelLoading && (
@@ -1185,10 +1249,11 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             onFocus={setMeasureStep} onClose={closeMeasurement} completeLabel="Fit my body"
             onComplete={async values => { const result = await fitBody(bodyMeshId, values); setBodyFit(result.fit); closeMeasurement() }} />}
           {snapshot.open && <SnapshotOverlay
-            mode={snapshot.mode} onAdjust={snapshotSession.adjust}
+            mode={snapshot.mode} onAdjust={snapshotSession.adjust} previewing={!!revealPreview}
+            motionControls={<RevealPanel key={`${session.email}:${currentScene?.id}`} sceneKey={`${session.email}:${currentScene?.id}`} buildShot={() => currentShotBuilder.current({ snapshot: 'quick' })} hasTattoo={snapshotHasTattoo && decalVisible} previewing={!!revealPreview} onPreview={setRevealPreview} />}
             presetControls={<SnapshotPresets selected={snapshotLook} onSelect={applySnapshotPreset} />}
-            cameraControls={<SnapshotCameraControls adjustment={snapshotCamera} onChange={setSnapshotCamera}
-              onReset={() => setSnapshotCamera({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT })} hasTattoo={snapshotHasTattoo} />}
+            cameraControls={<><ShotStyleControls format={shotFormat} onFormatChange={setShotFormat} blur={shotBlur} onBlurChange={setShotBlur} brightness={shotBrightness} onBrightnessChange={value => { setLights(previous => previous.map(light => ({ ...light, intensity: light.intensity * value / shotBrightness }))); setShotBrightness(value) }} studio={studio} onStudioChange={setStudio} /><SnapshotCameraControls adjustment={snapshotCamera} onChange={setSnapshotCamera}
+              onReset={() => setSnapshotCamera({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT })} hasTattoo={snapshotHasTattoo} /></>}
             lightingControls={<>
               <button type="button" className="snapshot-button" onClick={aimSnapshotLights} disabled={!snapshotHasTattoo}>Aim lights at tattoo</button>
               <LightingControls lights={lights} selectedIndex={selectedLight} onSelectLight={setSelectedLight}
@@ -1499,12 +1564,12 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
       )}
 
       {shapeMenu && !photoMode && (
-        <RadialShapeMenu
+        <BodyRegionCard
           region={shapeMenu.region}
           x={shapeMenu.x}
           y={shapeMenu.y}
-          pointerId={shapeMenu.pointerId}
           shape={bodyShape}
+          fitted={!!bodyFit} onMeasure={() => void openMeasurement()}
           onChange={handleShapeValueChange}
           onClose={() => setShapeMenu(null)}
         />

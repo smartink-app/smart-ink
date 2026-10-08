@@ -20,6 +20,7 @@ export default defineConfig({
     // Honor PORT so a second dev server (e.g. a tool-driven preview) can coexist.
     port: Number(process.env.PORT) || 5173,
     proxy: {
+      '/video-jobs': 'http://127.0.0.1:4321',
       '/health': 'http://127.0.0.1:8000',
       '/sync-live': 'http://127.0.0.1:8000',
       '/render-v2': {

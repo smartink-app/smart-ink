@@ -1,3 +1,5 @@
+import SnapshotPresets from './SnapshotPresets';
+import type { CinematicPresetId } from './render/cinematicPresets';
 import MoreControls from './MoreControls';
 import { rememberTattoo } from './storage/tattooLibrary';
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
@@ -18,6 +20,7 @@ import AdjustmentControl from './AdjustmentControl';
 
 interface TopMenuBarProps extends PoseControlsProps, AppearanceControlsProps, StudioControlsProps {
   onBrowseArtwork?: () => void;
+  onShoot?: (preset?: CinematicPresetId) => void;
   disabled?: boolean;
   onMeasureBody?: () => void;
   measuringLoading?: boolean;
@@ -83,14 +86,14 @@ const TATTOO_COLORS = [
 
 const INSPECTOR_TABS = [
   { id: 'tattoo', label: 'Tattoo' },
-  { id: 'figure', label: 'Body' },
-  { id: 'studio', label: 'Lighting' },
+  { id: 'figure', label: 'Model' },
+  { id: 'studio', label: 'Shoot' },
 ] as const;
 export type InspectorTab = typeof INSPECTOR_TABS[number]['id'];
 
 export default function TopMenuBar({
   disabled = false,
-  onBrowseArtwork,
+  onBrowseArtwork, onShoot,
   onMeasureBody, measuringLoading, hasBodyFit, onClearBodyFit,
   activeTab: controlledTab,
   onTabChange,
@@ -227,7 +230,7 @@ export default function TopMenuBar({
     <aside className="editor-right-panel ep-sidebar ep-inspector" aria-label="Inspector" inert={disabled}>
       <header className="ep-header ep-inspector-header">
         <span className="ep-title">Your studio</span>
-        <span className="ep-hint">Place. Adjust. Make it yours.</span>
+        <span className="ep-hint">Your artwork. On a body. In the right light.</span>
         <div className="ep-inspector-tabs" role="tablist" aria-label="Inspector sections">
           {INSPECTOR_TABS.map((tab) => <button key={tab.id} type="button" role="tab"
             className="ep-inspector-tab" id={`${inspectorId}-${tab.id}-tab`}
@@ -311,6 +314,7 @@ export default function TopMenuBar({
       </>)}
 
       {panel('figure', <>
+        <p className="phase1-model-intro">Click a part of the body to shape it. Start with a preset, or match your client’s measurements.</p>
         <section className="ep-section">
           <label className="ep-field-label" htmlFor={`${inspectorId}-body-model`}>Body model</label>
           <select id={`${inspectorId}-body-model`} className="ep-select" value={bodyMeshId}
@@ -336,6 +340,15 @@ export default function TopMenuBar({
       </>)}
 
       {panel('studio', <>
+        <section className="ep-section phase1-shoot-intro">
+          <p className="ep-section-label">Your photo studio</p>
+          <h3>Give the tattoo its moment.</h3>
+          <p className="ep-hint">Choose a shot. We’ll frame the tattoo and arrange the lights around it.</p>
+          <SnapshotPresets selected={null} onSelect={id => onShoot?.(id)} />
+          <button type="button" className="ep-btn ep-btn--primary ep-btn--block" onClick={() => onShoot?.('editorial')}>Open photo studio</button>
+          <p className="ep-hint">Create a photo or a short camera reveal from the same placement.</p>
+        </section>
+        <MoreControls id="studio" summary="Backdrop and individual lights">
         <StudioControls compact studio={studio} onStudioChange={onStudioChange} isolateRegion={isolateRegion}
           background={background} onBackgroundChange={onBackgroundChange} />
         <section className="ep-section" aria-label="Studio lighting">
@@ -344,6 +357,7 @@ export default function TopMenuBar({
             preset={lightingPreset} onPresetChange={onLightingPresetChange} showGuides={studio.showGuides}
             onShowGuidesChange={(showGuides) => onStudioChange({ ...studio, showGuides })} />
         </section>
+        </MoreControls>
       </>)}
     </aside>
   );

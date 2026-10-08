@@ -523,7 +523,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         ? 'Size limited here to keep the design smooth. Move to a broader area for a larger tattoo.'
         : requestedSize > safeSize + 0.001
           ? 'This size exceeds the recommended area. Edges may be clipped near folds. Move the design or reduce its size.'
-          : 'Placed on the skin. Click to move, or hold ⌘ / Ctrl and drag.');
+          : 'Drag the tattoo to move it. Drag bare skin to orbit.');
     }, [size, requestedSize, safeSize, chartVersion, onPlacementStatus]);
 
     useFrame(() => {
@@ -838,7 +838,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         for (const x of positions) {
           const hit = pick({ clientX: rect.left + rect.width * x, clientY: rect.top + rect.height * y });
           if (hit && applyAnchor(hit.anchor)) {
-            onPlacementStatus?.('Placed on the skin. Click to reposition, or hold ⌘ / Ctrl and drag.');
+            onPlacementStatus?.('Drag the tattoo to move it. Drag bare skin to orbit.');
             return true;
           }
         }
