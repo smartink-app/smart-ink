@@ -5,7 +5,10 @@
   --ui-control-shadow: inset 0 1px 0 var(--ui-top-edge), 0 1px 2px #0002;
   --ui-panel-shadow: inset 0 1px 0 var(--ui-top-edge), var(--shadow-glow);
   --ui-ring: color-mix(in srgb, var(--accent-blue) 24%, transparent);
-  --ui-radius: 9px;
+  --ui-radius: 14px;
+  --ui-radius-card: 20px;
+  --ui-radius-panel: 24px;
+  --ui-radius-pill: 999px;
   --ui-motion: 150ms ease;
 }
 :root[data-theme="light"] { --ui-top-edge: #ffffffd9; }
@@ -14,7 +17,7 @@ html[data-theme] ::selection { background: var(--selection-border); color: var(-
 
 /* Quiet chrome, with one accent for the current place and primary action. */
 html[data-theme] .studio-rail { box-shadow: inset -1px 0 0 var(--ui-top-edge); }
-html[data-theme] .studio-rail nav button { transition: background var(--ui-motion), color var(--ui-motion), border-color var(--ui-motion); }
+html[data-theme] .studio-rail nav button { border-radius: 18px; transition: background var(--ui-motion), color var(--ui-motion), border-color var(--ui-motion); }
 html[data-theme] .studio-rail nav button[aria-current="page"] {
   background: linear-gradient(145deg, var(--selection), transparent);
   box-shadow: inset 0 1px 0 var(--ui-top-edge);
@@ -37,7 +40,7 @@ html[data-theme] :is(.ep-btn,.ep-pill,.tool-btn--ghost,.tool-btn--export,.focus-
   .btn-open,.btn-modal-cancel,.snapshot-button,.snapshot-camera-nudges > :where(button),
   .wrap-actions :where(button),.sleeve-section-tabs :where(button),.tattoo-transform-row :where(button),
   .body-region-card :where(footer button),.body-region-card-lock :where(button),.tattoo-bounds-controls :where(button)) {
-  border-radius: var(--ui-radius);
+  border-radius: var(--ui-radius-pill);
   border-color: var(--border-color);
   background: var(--bg-input);
   color: var(--text-secondary);
@@ -53,7 +56,7 @@ html[data-theme] :is(.ep-btn,.ep-pill,.tool-btn--ghost,.tool-btn--export,.focus-
   border-color: color-mix(in srgb, var(--border-color) 55%, var(--text-secondary));
 }
 html[data-theme] :is(.focus-primary,.tool-btn--primary,.ep-btn.ep-btn--primary,.btn-create,.btn-continue,.btn-modal-primary,.snapshot-button.snapshot-button--primary) {
-  border-radius: var(--ui-radius); font-weight: 650; letter-spacing: -.01em;
+  border-radius: var(--ui-radius-pill); font-weight: 650; letter-spacing: -.01em;
   background: var(--accent-blue); border-color: var(--accent-blue); color: var(--on-accent);
   box-shadow: inset 0 1px 0 #ffffff26, 0 2px 5px #0002;
 }
@@ -95,12 +98,12 @@ html[data-theme] .ep-reset-control:hover:not(:disabled) { border-color: var(--bo
 
 /* Segment groups use the same inset track, including the new sleeve controls. */
 html[data-theme] :is(.ep-inspector-tabs,.sleeve-section-tabs,.snapshot-quality,.snapshot-panel-tabs) {
-  background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: 11px;
+  background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--ui-radius-pill);
   padding: 3px; gap: 3px;
 }
 html[data-theme] .ep-inspector-tabs { margin-bottom: 14px; }
 html[data-theme] :is(.ep-inspector-tab,.sleeve-section-tabs :where(button),.snapshot-quality button,.snapshot-panel-tabs > button) {
-  border: 1px solid transparent; border-radius: 8px; background: transparent; box-shadow: none;
+  border: 1px solid transparent; border-radius: var(--ui-radius-pill); background: transparent; box-shadow: none;
   color: var(--text-secondary); font-weight: 500;
 }
 html[data-theme] :is(.ep-inspector-tab[aria-selected="true"],.sleeve-section-tabs :where(button)[aria-pressed="true"],
@@ -137,11 +140,11 @@ html[data-theme] .ep-adjustment-range::-moz-range-thumb { border-color: var(--bg
 /* Floating tools, menus and dialogs share a crisp edge and soft elevation. */
 html[data-theme] :is(.body-region-card,.tattoo-transform-card,.measure-card,.snapshot-compose-rail,
   .focus-dialog,.editor-output-popover,.viewport-settings-panel,.account-menu) {
-  background: var(--bg-card); border-color: var(--border-color); border-radius: 14px;
+  background: var(--bg-card); border-color: var(--border-color); border-radius: var(--ui-radius-panel);
   box-shadow: var(--ui-panel-shadow);
 }
 html[data-theme] .tattoo-transform-card header { font-size: 12px; font-weight: 600; letter-spacing: -.01em; }
-html[data-theme] :is(.tattoo-transform-toggle,.viewport-card-close) { color: var(--text-muted); border-radius: 6px; }
+html[data-theme] :is(.tattoo-transform-toggle,.viewport-card-close) { color: var(--text-muted); border-radius: var(--ui-radius-pill); }
 html[data-theme] :is(.tattoo-transform-toggle,.viewport-card-close):hover { background: var(--bg-card-hover); color: var(--text-primary); }
 html[data-theme] .wrap-tattoo-controls { row-gap: 11px; }
 html[data-theme] .wrap-tattoo-controls label { color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
@@ -161,7 +164,7 @@ html[data-theme] .account-settings + .ep-btn { margin-top: 10px; }
 
 /* Collections, template tiles and render presets: calmer framing, clear states. */
 html[data-theme] :is(.file-card,.template-card,.snapshot-preset) {
-  background: var(--bg-card); border-color: var(--border-subtle); border-radius: 12px;
+  background: var(--bg-card); border-color: var(--border-subtle); border-radius: var(--ui-radius-card);
   box-shadow: inset 0 1px 0 var(--ui-top-edge), 0 3px 10px #0000000c;
   transition: border-color var(--ui-motion), box-shadow var(--ui-motion), background var(--ui-motion);
 }
@@ -182,18 +185,27 @@ html[data-theme] .tattoo-asset-select:is(:hover,[aria-pressed="true"]) .tattoo-a
 html[data-theme] .tattoo-library-upload { background: var(--selection); color: var(--accent-blue); border-color: var(--selection-border); }
 html[data-theme] .tattoo-library-upload:hover:not(:disabled) { background: var(--bg-card-hover); border-color: var(--accent-blue); }
 html[data-theme] .tattoo-library-search:focus-within { border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--ui-ring); }
-html[data-theme] .tattoo-library-filters { border: 1px solid var(--border-subtle); border-radius: 9px; padding: 3px; background: var(--bg-primary); }
+html[data-theme] .tattoo-library-filters { border: 1px solid var(--border-subtle); border-radius: var(--ui-radius-pill); padding: 3px; background: var(--bg-primary); }
+html[data-theme] .tattoo-library-filters button { border-radius: var(--ui-radius-pill); }
 html[data-theme] .tattoo-library-filters button[aria-pressed="true"] { background: var(--bg-card); color: var(--text-primary); border-color: var(--border-color); box-shadow: var(--ui-control-shadow); }
 html[data-theme] .tattoo-asset-check { background: var(--accent-blue); color: var(--on-accent); }
 html[data-theme] .render-history-thumb--active { border-color: var(--accent-blue); box-shadow: 0 0 0 1px var(--selection-border); }
 html[data-theme] .file-card-actions .btn-delete:hover:not(:disabled) { color: var(--focus-error); border-color: var(--focus-error); background: color-mix(in srgb, var(--focus-error) 8%, transparent); }
 
 /* Subtle front-door refinements, using the existing composition and assets. */
-html[data-theme] .phase-one-landing :is(.phase-hero-art,.phase-shot-grid img) { border-radius: 10px; border-color: var(--border-subtle); }
-html[data-theme] .phase-one-landing .btn-quiet { border-radius: var(--ui-radius); background: var(--bg-input); box-shadow: var(--ui-control-shadow); }
-html[data-theme] .phase-one-landing .phase-image-tag { padding: 7px 9px; border-radius: 6px; border: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--bg-primary) 92%, transparent); color: var(--text-secondary); }
-html[data-theme] .phase-one-landing .phase-request-form { border-radius: 14px; box-shadow: var(--ui-panel-shadow); }
+html[data-theme] .phase-one-landing :is(.phase-hero-art,.phase-shot-grid img) { border-radius: var(--ui-radius-panel); border-color: var(--border-subtle); }
+html[data-theme] .landing .btn-primary { border-radius: var(--ui-radius-pill); }
+html[data-theme] .phase-one-landing .btn-quiet { border-radius: var(--ui-radius-pill); background: var(--bg-input); box-shadow: var(--ui-control-shadow); }
+html[data-theme] .phase-one-landing .phase-image-tag { padding: 7px 9px; border-radius: var(--ui-radius-pill); border: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--bg-primary) 92%, transparent); color: var(--text-secondary); }
+html[data-theme] .phase-one-landing .phase-request-form { border-radius: var(--ui-radius-panel); box-shadow: var(--ui-panel-shadow); }
+html[data-theme] .phase-one-landing .request-input { border-radius: var(--ui-radius); }
 html[data-theme] .phase-one-landing .request-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--ui-ring); }
+
+/* Carry the softer silhouette into the smaller utility controls. */
+html[data-theme] :is(.theme-toggle,.btn-cta,.btn-modal-blender,.btn-delete,.tattoo-library-upload) { border-radius: var(--ui-radius-pill); }
+html[data-theme] .file-card-actions :is(.btn-open,.btn-delete) { border-radius: var(--ui-radius-pill); }
+html[data-theme] :is(.editor-scene-name,.search-box,.tattoo-library-search,.placement-help,.measure-progress,.photo-mode-actions) { border-radius: var(--ui-radius); }
+html[data-theme] :is(.login-card,.empty-scenes) { border-radius: var(--ui-radius-panel); }
 
 html[data-theme] :is(.ep-sidebar-body,.tattoo-transform-card,.body-region-card,.snapshot-rail-body,.focus-dialog) {
   scrollbar-width: thin; scrollbar-color: var(--border-color) transparent;
