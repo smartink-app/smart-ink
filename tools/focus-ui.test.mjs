@@ -7,7 +7,7 @@ const landingSource = await fs.readFile('src/LandingPage.tsx','utf8');
 const requestForm = landingSource.slice(landingSource.indexOf('const RequestAccessForm:'), landingSource.indexOf('const LandingPage:'));
 let lazyId = 0;
 globalThis.__focusLazy = () => `Lazy${lazyId++}`;
-const stubNames = /^(\.\/)(AccountSettings|FocusDialog|TattooLibrary|RenderHistoryModal|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
+const stubNames = /^(\.\/)(artist\/ArtistPanel|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryModal|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
 const { outputFiles } = await build({
   stdin: { contents: `export {default as Dashboard} from './src/ScenesDashboard'; export {default as App} from './src/App'; export {default as Rail} from './src/StudioRail'; export {default as More} from './src/MoreControls'; export {ThemeToggle,ThemeRoot} from './src/Theme'; export {usePreference} from './src/usePreference'; export {RequestAccessForm} from 'focus-request-form';`, resolveDir: root },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', logLevel: 'silent',
@@ -21,7 +21,7 @@ const { outputFiles } = await build({
       export const useState=v=>globalThis.__focusHooks.state(v),useRef=v=>globalThis.__focusHooks.ref(v),useEffect=(f,d)=>globalThis.__focusHooks.effect(f,d),useMemo=(f,d)=>globalThis.__focusHooks.memo(f,d),useCallback=(f,d)=>globalThis.__focusHooks.memo(()=>f,d),useId=()=>globalThis.__focusHooks.memo(()=>"focus-test",[]),useSyncExternalStore=(...a)=>globalThis.__focusHooks.external(...a),lazy=()=>globalThis.__focusLazy(),Suspense="Suspense"; export default {};
     ` : 'export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="Fragment";' }));
     b.onResolve({ filter: /^react-icons\/fi$/ }, a => ({ path: a.path, namespace: 'icons' }));
-    b.onLoad({ filter: /.*/, namespace: 'icons' }, () => ({ contents: 'export const FiGrid="grid",FiEdit3="edit",FiImage="image",FiAperture="aperture",FiUser="user",FiMoon="moon",FiSun="sun",FiSearch="search",FiPlus="plus",FiArrowUpRight="arrow",FiEdit2="edit",FiTrash2="trash";' }));
+    b.onLoad({ filter: /.*/, namespace: 'icons' }, () => ({ contents: 'export const FiCalendar="calendar",FiGrid="grid",FiEdit3="edit",FiImage="image",FiAperture="aperture",FiUser="user",FiMoon="moon",FiSun="sun",FiSearch="search",FiPlus="plus",FiArrowUpRight="arrow",FiEdit2="edit",FiTrash2="trash";' }));
     b.onResolve({ filter: stubNames }, a => ({ path: a.path.slice(2), namespace: 'component' }));
     b.onLoad({ filter: /.*/, namespace: 'component' }, a => ({ contents: `export default ${JSON.stringify(a.path)};` }));
     b.onResolve({ filter: /\/sceneStorage$/ }, () => ({ path: 'store', namespace: 'data' }));
@@ -76,8 +76,8 @@ try {
 
   const railCalls=[];const rail=harness(api.Rail,{active:'studio',onNavigate:id=>railCalls.push(id),onHome:()=>railCalls.push('home'),studioAvailable:false});
   assert.equal(rail.button('Studio').props.disabled,true);
-  for(const label of ['Projects','Artwork','Renders','Account'])rail.button(label).props.onClick();
-  assert.deepEqual(railCalls,['projects','artwork','renders','account']);
+  for(const label of ['Projects','Artwork','Renders','Artist desk','Account'])rail.button(label).props.onClick();
+  assert.deepEqual(railCalls,['projects','artwork','renders','artist','account']);
   rail.unmount();
 
   // Creation waits for storage, cannot duplicate on double click, and keeps input on failure.

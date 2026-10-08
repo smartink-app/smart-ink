@@ -41,7 +41,7 @@ import { createSnapshotSession } from './services/snapshotSession'
 import { snapshotOutput, type SnapshotQuality } from './render/snapshot'
 import ScenesDashboard from './ScenesDashboard'
 import EditorLeftPanel from './EditorLeftPanel'
-import StudioRail from './StudioRail'
+import StudioRail, { type StudioSection } from './StudioRail'
 import FocusDialog from './FocusDialog'
 import AccountSettings from './AccountSettings'
 import { FiSidebar } from 'react-icons/fi'
@@ -159,6 +159,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [artworkOpen, setArtworkOpen] = useState(false)
   const [showDashboard, setShowDashboard] = useState(true)
+  const [dashboardSection, setDashboardSection] = useState<StudioSection>('projects')
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [sceneSaves] = useState(() => createSceneSaveQueue<SceneData>(updateScene))
   const [saveState, setSaveState] = useState(() => sceneSaves.getState())
@@ -1035,6 +1036,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     return (
       <div style={{ position: 'relative', width: '100%', minHeight: '100vh' }}>
         <ScenesDashboard
+          initialSection={dashboardSection}
           session={session}
           onSignOut={() => onSignOut()}
           onSelectScene={loadScene}
@@ -1050,7 +1052,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
       <StudioRail active={accountMenuOpen ? 'account' : artworkOpen ? 'artwork' : 'studio'}
         onHome={() => afterSaving(onHome)} disabled={snapshot.open || measureOpen || measureLoading}
         onNavigate={section => {
-          if (section === 'projects') afterSaving(() => setShowDashboard(true))
+          if (section === 'projects' || section === 'artist') afterSaving(() => { setDashboardSection(section); setShowDashboard(true) })
           if (section === 'studio') { setArtworkOpen(false); setSidebarCollapsed(false) }
           if (section === 'artwork') { setArtworkOpen(true); setSidebarCollapsed(false) }
           if (section === 'renders') setShowRenderHistory(true)

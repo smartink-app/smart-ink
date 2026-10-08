@@ -1,12 +1,13 @@
-import { FiGrid, FiEdit3, FiImage, FiAperture, FiUser } from 'react-icons/fi';
+import { FiGrid, FiEdit3, FiImage, FiAperture, FiUser, FiCalendar } from 'react-icons/fi';
 import { ThemeToggle } from './Theme';
 
-export type StudioSection = 'projects' | 'studio' | 'artwork' | 'renders' | 'account';
+export type StudioSection = 'projects' | 'studio' | 'artwork' | 'renders' | 'artist' | 'account';
 const items = [
   { id: 'projects', label: 'Projects', icon: FiGrid },
   { id: 'studio', label: 'Studio', icon: FiEdit3 },
   { id: 'artwork', label: 'Artwork', icon: FiImage },
   { id: 'renders', label: 'Renders', icon: FiAperture },
+  { id: 'artist', label: 'Artist desk', icon: FiCalendar },
   { id: 'account', label: 'Account', icon: FiUser },
 ] as const;
 

@@ -6,6 +6,7 @@ import type { BetaSession } from './auth/types';
 import { authMode } from './auth/betaAuthService';
 import AccountSettings from './AccountSettings';
 import StudioRail, { type StudioSection } from './StudioRail';
+import ArtistPanel from './artist/ArtistPanel';
 import FocusDialog from './FocusDialog';
 import TattooLibrary from './TattooLibrary';
 import RenderHistoryModal from './RenderHistoryModal';
@@ -20,10 +21,11 @@ interface Props {
   session: BetaSession;
   onSignOut: () => void;
   onResume?: () => void;
+  initialSection?: StudioSection;
 }
 
-export default function ScenesDashboard({ onSelectScene, onOpenLanding, session, onSignOut, onResume }: Props) {
-  const [section, setSection] = useState<StudioSection>('projects');
+export default function ScenesDashboard({ onSelectScene, onOpenLanding, session, onSignOut, onResume, initialSection = 'projects' }: Props) {
+  const [section, setSection] = useState<StudioSection>(initialSection);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [rendersOpen, setRendersOpen] = useState(false);
   const [projectName, setProjectName] = useState('');
@@ -212,7 +214,7 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
         }} />
       <div className="main-content focus-dashboard-content">
         {authMode() === 'demo' && <p className="focus-local-note">Local preview · Projects and uploads are saved in this browser.</p>}
-        {section === 'account' ? <AccountSettings session={session} onSignOut={onSignOut} /> : section === 'artwork' ? <>
+        {section === 'artist' ? <ArtistPanel key={session.userId ?? session.email} owner={session.userId ?? session.email} scenes={scenes} onOpenProject={openScene} /> : section === 'account' ? <AccountSettings session={session} onSignOut={onSignOut} /> : section === 'artwork' ? <>
           <header className="focus-page-heading"><div><p className="focus-eyebrow">Your collection</p><h1>Artwork</h1><p>Keep your designs close. Choose one to start a project.</p></div></header>
           <div className="focus-library-page"><TattooLibrary currentImage={draftArtwork} onChoose={source => { setDraftArtwork(source); setNewProjectOpen(true); }} /></div>
         </> : <>
