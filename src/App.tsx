@@ -14,8 +14,9 @@ import type { BetaSession } from './auth/types'
  * public page uses actual render images; the 3D editor loads after approval.
  */
 const Workspace = lazy(() => import('./Workspace'))
+const ArtistDiscovery = lazy(() => import('./discovery/ArtistDiscovery'))
 
-type GateView = 'landing' | 'login' | 'invite' | 'invite-code' | 'admin' | 'app'
+type GateView = 'landing' | 'artists' | 'login' | 'invite' | 'invite-code' | 'admin' | 'app'
 
 function initialGateView(): { view: GateView; inviteCode: string | null } {
   if (typeof window === 'undefined') return { view: 'landing', inviteCode: null }
@@ -23,6 +24,7 @@ function initialGateView(): { view: GateView; inviteCode: string | null } {
   if (params.get('admin') === '1') return { view: 'admin', inviteCode: null }
   const invite = params.get('invite')?.trim().toUpperCase() ?? null
   if (invite) return { view: 'invite', inviteCode: invite }
+  if (params.get('view') === 'artists') return { view: 'artists', inviteCode: null }
   return { view: 'landing', inviteCode: null }
 }
 
@@ -39,7 +41,7 @@ function App() {
     if (!betaAuth.ready || bootedRef.current) return
     bootedRef.current = true
     const boot = initialGateView()
-    if (boot.view === 'invite' || boot.view === 'admin') return
+    if (boot.view === 'invite' || boot.view === 'admin' || boot.view === 'artists') return
     if (betaAuth.session) setGateView('app')
     else if (betaAuth.accessError) setGateView('login')
   }, [betaAuth.ready, betaAuth.session, betaAuth.accessError])
@@ -51,10 +53,11 @@ function App() {
 
   const clearInviteQuery = useCallback(() => {
     const url = new URL(window.location.href)
-    if (url.searchParams.has('invite') || url.searchParams.has('admin') || url.searchParams.has('demo')) {
+    if (url.searchParams.has('invite') || url.searchParams.has('admin') || url.searchParams.has('demo') || url.searchParams.has('view')) {
       url.searchParams.delete('invite')
       url.searchParams.delete('admin')
       url.searchParams.delete('demo')
+      url.searchParams.delete('view')
       window.history.replaceState({}, '', url.pathname + url.search + url.hash)
     }
   }, [])
@@ -76,6 +79,13 @@ function App() {
     setGateView('landing')
   }, [clearInviteQuery, clearAccessError])
 
+  const exploreArtists = () => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('view', 'artists')
+    window.history.replaceState({}, '', url.pathname + url.search)
+    setGateView('artists')
+  }
+
   const betaSignOut = betaAuth.signOut
   const signOut = useCallback(
     async (opts?: { everywhere?: boolean }) => {
@@ -90,7 +100,13 @@ function App() {
   }
 
   if (gateView === 'landing') {
-    return <LandingPage signedIn={!!betaAuth.session} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
+    return <LandingPage signedIn={!!betaAuth.session} onExploreArtists={exploreArtists} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
+  }
+
+  if (gateView === 'artists') {
+    return <Suspense fallback={<div className="app-loading">Finding your next artist…</div>}>
+      <ArtistDiscovery signedIn={!!betaAuth.session} onHome={goHome} onStudio={() => { clearInviteQuery(); if (betaAuth.session) enterApp(); else setGateView('login') }} />
+    </Suspense>
   }
 
   if (gateView === 'admin') {
@@ -142,7 +158,7 @@ function App() {
 
   const session = betaAuth.session
   if (!session) {
-    return <LandingPage signedIn={!!betaAuth.session} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
+    return <LandingPage signedIn={!!betaAuth.session} onExploreArtists={exploreArtists} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
   }
 
   return (

@@ -2,6 +2,8 @@
 .landing.phase-one-landing { --measure: 1280px; --gutter: clamp(20px, 4vw, 56px); }
 .phase-one-landing .landing-nav { max-width: var(--measure); margin-inline: auto; padding-inline: var(--gutter); background: color-mix(in srgb, var(--surface) 90%, transparent); }
 .phase-one-landing main { position: relative; }
+.phase-one-landing .landing-nav-actions .landing-discover-button { border: 0; background: transparent; color: var(--text-secondary); padding: 10px 4px; font-size: 12px; white-space: nowrap; }
+.phase-one-landing .landing-discover-button:hover { color: var(--text-primary); }
 .phase-one-landing .phase-skip { position: absolute; top: -80px; left: 16px; z-index: 100; padding: 12px 18px; background: var(--surface-card); color: var(--fg); border: 1px solid var(--accent); border-radius: 8px; }
 .phase-one-landing .phase-skip:focus { top: 10px; }
 .phase-one-landing :is(a, button, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; }
@@ -62,6 +64,8 @@
   .phase-one-landing .phase-render-section .phase-section-heading { column-gap: 30px; }
 }
 @media (max-width: 700px) {
+  .phase-one-landing .landing-nav { flex-wrap: wrap; gap: 12px; }
+  .phase-one-landing .landing-nav-actions { flex-wrap: wrap; gap: 8px; }
   .phase-one-landing .phase-hero { grid-template-columns: 1fr; gap: 36px; padding-block: 40px 56px; }
   .phase-one-landing h1 { font-size: clamp(47px, 11vw, 70px); }
   .phase-one-landing .phase-hero-lead { font-size: 15px; }

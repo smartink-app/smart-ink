@@ -7,7 +7,7 @@ const landingSource = await fs.readFile('src/LandingPage.tsx','utf8');
 const requestForm = landingSource.slice(landingSource.indexOf('const RequestAccessForm:'), landingSource.indexOf('const LandingPage:'));
 let lazyId = 0;
 globalThis.__focusLazy = () => `Lazy${lazyId++}`;
-const stubNames = /^(\.\/)(artist\/ArtistPanel|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryModal|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
+const stubNames = /^(\.\/)(artist\/ArtistPanel|discovery\/ArtistDiscovery|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryModal|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
 const { outputFiles } = await build({
   stdin: { contents: `export {default as Dashboard} from './src/ScenesDashboard'; export {default as App} from './src/App'; export {default as Rail} from './src/StudioRail'; export {default as More} from './src/MoreControls'; export {ThemeToggle,ThemeRoot} from './src/Theme'; export {usePreference} from './src/usePreference'; export {RequestAccessForm} from 'focus-request-form';`, resolveDir: root },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', logLevel: 'silent',
@@ -110,6 +110,12 @@ try {
     assert.ok(!app.render().some(n=>n.type==='Lazy0'));assert.equal(authenticated,0);app.unmount();
   }
   // Existing invite acceptance and operator paths remain available, not the workspace.
+  auth.session=null;window.location={href:'http://local/?view=artists',search:'?view=artists'};
+  const discover=harness(api.App);discover.render();await discover.settle();
+  assert.ok(discover.render().some(n=>n.type==='Lazy1'),'Public discovery is available without studio access');
+  assert.ok(!discover.render().some(n=>n.type==='Lazy0'),'Public discovery must not expose the editor');
+  discover.render().find(n=>n.type==='Lazy1').props.onStudio();await discover.settle();
+  assert.equal(discover.tree.type,'LoginPage','Artist login from discovery still requires approval');discover.unmount();
   for(const [search,expected] of [['?invite=ABC123','InvitePage'], ['?admin=1','BetaAdminPage']]) {
     window.location={href:`http://local/${search}`,search};const gate=harness(api.App);gate.render();await gate.settle();assert.equal(gate.tree.type,expected);assert.ok(!gate.render().some(n=>n.type==='Lazy0'));gate.unmount();
   }

@@ -11,6 +11,7 @@ import './landing/phase-one-landing.css';
 
 interface LandingPageProps {
   onNavigateToLogin: () => void;
+  onExploreArtists?: () => void;
   signedIn?: boolean;
 }
 
@@ -139,7 +140,7 @@ const RequestAccessForm: React.FC<{ source: string; buttonLabel: string }> = ({
   );
 };
 
-const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, signedIn = false }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, onExploreArtists, signedIn = false }) => {
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 
   return (
@@ -152,6 +153,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, signedIn =
           <a href="#render">The studio</a>
         </nav>
         <div className="landing-nav-actions">
+          {onExploreArtists && <button type="button" className="landing-discover-button" onClick={onExploreArtists}>Find an artist</button>}
           <ThemeToggle />
           <button type="button" className="btn-quiet" onClick={onNavigateToLogin}>{signedIn ? 'Open studio' : 'Log in'}</button>
           {!signedIn && <button type="button" className="btn-primary btn-primary--sm" onClick={() => scrollTo('request')}>Request access</button>}

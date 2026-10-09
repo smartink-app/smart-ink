@@ -29,6 +29,7 @@
     "dev:focus": "bash tools/start-focus-studio.sh",
     "test:focus-ui": "node tools/focus-ui.test.mjs",
     "test:artist": "node tools/artist-workspace.test.mjs",
+    "test:discovery": "node tools/artist-discovery.test.mjs",
     "test:phase1": "npm run test:demo && npm run test:focus-ui && node tools/password-login.test.mjs && node tools/studio-interaction.test.mjs && node tools/reveal-panel-lifecycle.test.mjs && node tools/reveal-camera.test.mjs"
   },
   "dependencies": {
