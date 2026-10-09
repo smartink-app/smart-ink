@@ -4,15 +4,15 @@ import type { ReviewController } from './useReview';
 import type { FeedbackLocation } from './model';
 import './feedback.css';
 
-export function FeedbackToolbar({ review, name, onClose }: { review: ReviewController; name: string; onClose: () => void }) {
+export function FeedbackToolbar({ review, name, onClose, projectSpace = false }: { review: ReviewController; name: string; onClose: () => void; projectSpace?: boolean }) {
   return <header className="feedback-toolbar">
-    <button className="ep-btn" type="button" onClick={onClose}><FiArrowLeft aria-hidden /> Back to editing</button>
+    <button className="ep-btn" type="button" onClick={onClose}><FiArrowLeft aria-hidden /> {projectSpace ? 'Back to project' : 'Back to editing'}</button>
     <div className="feedback-heading"><strong>3D feedback</strong><span>{name}</span></div>
-    <div className="feedback-role" role="group" aria-label="Demo review role">
+    {projectSpace ? <span className="client-status">{review.role === 'client' ? 'Client feedback' : 'Artist feedback'}</span> : <div className="feedback-role" role="group" aria-label="Demo review role">
       {(['client', 'artist'] as const).map(role => <button type="button" key={role} aria-pressed={review.role === role}
         disabled={review.dirty || !!review.composer} title={review.dirty || review.composer ? 'Post or discard your draft before switching roles' : undefined}
         onClick={() => review.setRole(role)}>{role === 'client' ? 'Client view' : 'Artist view'}</button>)}
-    </div>
+    </div>}
   </header>;
 }
 

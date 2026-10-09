@@ -7,7 +7,7 @@ export type Booking = {
   duration: number; status: BookingStatus; price: number; deposit: number; depositPaid: boolean;
   brief: string; notes: string; projectId: string; moodboard?: MoodboardSnapshot;
 };
-export type Message = { id: string; clientId: string; from: 'artist' | 'client'; text: string; at: string; read: boolean };
+export type Message = { id: string; clientId: string; bookingId?: string; from: 'artist' | 'client'; text: string; at: string; read: boolean };
 export type Availability = { days: number[]; start: string; end: string; buffer: number };
 export type TimeOff = { id: string; date: string; start: string; end: string; label: string };
 export type ArtistData = {
@@ -90,10 +90,12 @@ export function addTimeOff(data: ArtistData, value: TimeOff): ArtistData {
   requireThat(!data.bookings.some(b => b.date === value.date && active(b) && minutes(b.time) < minutes(value.end) && minutes(value.start) < minutes(b.time) + b.duration), 'An appointment is already confirmed here. Reschedule it before blocking this time.');
   return { ...data, timeOff: [...data.timeOff, { ...value, label: value.label.trim() }] };
 }
-export function addMessage(data: ArtistData, clientId: string, text: string, from: Message['from'] = 'artist'): ArtistData {
+export function addMessage(data: ArtistData, clientId: string, text: string, from: Message['from'] = 'artist', bookingId?: string): ArtistData {
   requireThat(data.clients.some(c => c.id === clientId), 'Choose a client.');
+  requireThat(from === 'artist' || from === 'client', 'Choose a valid message author.');
+  requireThat(bookingId === undefined || data.bookings.some(b => b.id === bookingId && b.clientId === clientId), 'Choose a project belonging to this client.');
   requireThat(text.trim().length > 0 && text.trim().length <= 4000, 'Write a message of up to 4,000 characters.');
-  return { ...data, messages: [...data.messages, { id: id(), clientId, text: text.trim(), from, at: new Date().toISOString(), read: from === 'artist' }] };
+  return { ...data, messages: [...data.messages, { id: id(), clientId, ...(bookingId ? { bookingId } : {}), text: text.trim(), from, at: new Date().toISOString(), read: from === 'artist' }] };
 }
 
 export function demoData(now = new Date()): ArtistData {

@@ -95,11 +95,31 @@ for (const effect of saveEffects) {
   const fn = await evaluate(effect.getText(ast), { currentScene: { id: 'scene-a' }, showDashboard: false, reviewOpen: true });
   assert.equal(fn(), undefined, 'Review must return before any save or thumbnail effect');
 }
-let camera = null, request = 0, open = true;
+let camera = null, request = 0, open = true, dashboard = false, section = '', allowLeave = true;
+const review = { dirty: false, cancel: () => {}, setReplies: () => {} };
+const closeContext = { projectId: 'client-project', role: 'client' };
 const returnView = structuredClone(location.camera);
 const close = await evaluate(variables.get('closeReview').initializer.getText(ast), {
+  review, clientReview: closeContext, window: { confirm: () => allowLeave },
+  setDashboardSection: v => { section = v; }, setShowDashboard: v => { dashboard = v; },
   orbitControlsRef: { current: { freezeSnapshot: () => { camera = 'review camera'; } } }, reviewCamera: { current: returnView },
   setCameraState: v => { camera = v; }, setCameraRequestId: update => { request = update(request); }, setReviewOpen: v => { open = v; },
 });
-close(); assert.deepEqual(camera, returnView); assert.notEqual(camera, returnView); assert.equal(open, false); assert.equal(request, 1);
+review.dirty = true; allowLeave = false; close(); assert.equal(open, true); assert.equal(dashboard, false); assert.equal(request, 0);
+allowLeave = true; close(); assert.equal(section, 'client'); assert.equal(dashboard, true); assert.deepEqual(camera, returnView); assert.notEqual(camera, returnView); assert.equal(open, false); assert.equal(request, 1);
+// A client launch is locked in the same state transition that loads the scene.
+const loadSource = variables.get('loadScene').initializer.getText(ast), loadedState = {};
+const loadScope = {
+  afterSaving: fn => fn(), migrateScene: v => v, reviewCamera: { current: null },
+  review: { cancel: () => {}, setReplies: () => {}, setRole: role => { loadedState.role = role; } },
+  findById: () => undefined, REGISTRY: { looks: [] }, LIGHTING_PRESETS: { studio: true }, BACKGROUNDS: { dark: true },
+  CAMERA_PRESETS: { threeQuarter: location.camera }, FINAL_SAMPLES: { default: 32 }, resolveRig: () => ({}),
+};
+for (const [, name] of loadSource.matchAll(/\b(set[A-Z]\w*)\(/g)) loadScope[name] = v => { loadedState[name] = v; };
+for (const name of ['normalizePose','normalizeAppearance','normalizeStudio','normalizeShape']) loadScope[name] = v => v;
+const launch = await evaluate(loadSource, loadScope);
+launch({ id: 'scene-a', camera: location.camera, lightingPreset: 'studio', background: 'dark' }, closeContext);
+assert.equal(loadedState.setReviewOpen, true); assert.equal(loadedState.setShowDashboard, false);
+assert.equal(loadedState.role, 'client'); assert.equal(loadedState.setClientProjectId, 'client-project');
+assert.deepEqual(loadedState.setClientReview, closeContext);
 console.log('Feedback passed: anchored notes, replies, artist resolution, validation, scoped persistence, corruption/quota/stale-tab protection, gesture safety, mesh deformation, edit/save guards and camera restoration.');

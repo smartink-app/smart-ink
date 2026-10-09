@@ -133,6 +133,8 @@ function LoadingSignal({ onChange }: { onChange: (loading: boolean) => void }) {
 }
 
 interface WorkspaceProps {
+  initialClientProject?: string;
+  onMoodboard?: () => void;
   initialSection?: StudioSection;
   session: BetaSession
   /** Leave the workspace for the landing page. */
@@ -157,8 +159,11 @@ function sampleTrackStyle(samples: number): CSSProperties {
   };
 }
 
-export default function Workspace({ session, onHome, onSignOut, initialSection = 'projects' }: WorkspaceProps) {
+export default function Workspace({ session, onHome, onSignOut, initialSection = 'projects', initialClientProject, onMoodboard }: WorkspaceProps) {
   const [currentScene, setCurrentScene] = useState<SceneData | null>(null)
+  const [clientReview, setClientReview] = useState<{ projectId: string; role: 'client' | 'artist' } | null>(null)
+  const [clientProjectId, setClientProjectId] = useState(initialClientProject)
+  const [clientRole, setClientRole] = useState<'client' | 'artist'>('client')
   const [reviewOpen, setReviewOpen] = useState(false)
   const review = useReview(session.email, currentScene?.id)
   const reviewCamera = useRef<CameraView | null>(null)
@@ -551,8 +556,16 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
   const currentShotBuilder = useRef(buildShot)
   currentShotBuilder.current = buildShot
 
-  const loadScene = (scene: SceneData) => afterSaving(() => {
+  const loadScene = (scene: SceneData, reviewContext?: { projectId: string; role: 'client' | 'artist' }) => afterSaving(() => {
     const migrated = migrateScene(scene)
+    setClientReview(reviewContext ?? null)
+    setReviewOpen(!!reviewContext)
+    review.cancel(); review.setReplies({})
+    if (reviewContext) {
+      setClientProjectId(reviewContext.projectId); setClientRole(reviewContext.role)
+      review.setRole(reviewContext.role)
+      reviewCamera.current = structuredClone(migrated.camera ?? CAMERA_PRESETS.threeQuarter)
+    }
     setInspectorTab('tattoo')
     setArtworkOpen(false)
     setSidebarCollapsed(false)
@@ -1045,6 +1058,9 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
     setReviewOpen(true)
   })
   const closeReview = () => {
+    if (review.dirty && !window.confirm('Leave without posting your feedback draft?')) return
+    review.cancel(); review.setReplies({})
+    if (clientReview) { setDashboardSection('client'); setShowDashboard(true) }
     // Freeze damping before restoring the artist's framing; review orbits never save into the project.
     orbitControlsRef.current?.freezeSnapshot()
     if (reviewCamera.current) setCameraState(structuredClone(reviewCamera.current))
@@ -1061,10 +1077,12 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       <div style={{ position: 'relative', width: '100%', minHeight: '100vh' }}>
         <ScenesDashboard
           initialSection={dashboardSection}
+          initialClientProject={clientProjectId} initialClientRole={clientRole} onMoodboard={onMoodboard}
+          onReviewScene={(scene, projectId, role) => loadScene(scene, { projectId, role })}
           session={session}
           onSignOut={() => onSignOut()}
           onSelectScene={loadScene}
-          onResume={currentScene ? () => setShowDashboard(false) : undefined}
+          onResume={currentScene && !clientReview ? () => setShowDashboard(false) : undefined}
           onOpenLanding={() => afterSaving(onHome)}
         />
       </div>
@@ -1076,7 +1094,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       <StudioRail active={accountMenuOpen ? 'account' : artworkOpen ? 'artwork' : 'studio'}
         onHome={() => afterSaving(onHome)} disabled={reviewOpen || snapshot.open || measureOpen || measureLoading}
         onNavigate={section => {
-          if (section === 'projects' || section === 'artist') afterSaving(() => { setDashboardSection(section); setShowDashboard(true) })
+          if (section === 'projects' || section === 'artist' || section === 'client') afterSaving(() => { setDashboardSection(section); setShowDashboard(true) })
           if (section === 'studio') { setArtworkOpen(false); setSidebarCollapsed(false) }
           if (section === 'artwork') { setArtworkOpen(true); setSidebarCollapsed(false) }
           if (section === 'renders') setShowRenderHistory(true)
@@ -1116,7 +1134,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
         </div>
       </header>
 
-      {reviewOpen && <FeedbackToolbar review={review} name={currentScene?.name ?? 'Untitled project'} onClose={closeReview} />}
+      {reviewOpen && <FeedbackToolbar review={review} name={currentScene?.name ?? 'Untitled project'} onClose={closeReview} projectSpace={!!clientReview} />}
       {measureError && <div className="editor-notice" role="alert">{measureError}<button type="button" className="ep-btn" onClick={() => setMeasureError('')}>Dismiss</button></div>}
       {saveState.status === 'error' && <div className="editor-notice" role="alert">Your latest changes are still here. Saving failed; retry before leaving this page.</div>}
       {photoMode && <div className="photo-mode-actions" inert={snapshot.open || measureOpen || measureLoading} style={snapshot.open ? { visibility: 'hidden' } : undefined}>

@@ -7,7 +7,7 @@ const landingSource = await fs.readFile('src/LandingPage.tsx','utf8');
 const requestForm = landingSource.slice(landingSource.indexOf('const RequestAccessForm:'), landingSource.indexOf('const LandingPage:'));
 let lazyId = 0;
 globalThis.__focusLazy = () => `Lazy${lazyId++}`;
-const stubNames = /^(\.\/)(artist\/ArtistPanel|discovery\/ArtistDiscovery|moodboard\/MoodboardPortal|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryModal|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
+const stubNames = /^(\.\/)(client\/ClientProjectSpace|artist\/ArtistPanel|discovery\/ArtistDiscovery|moodboard\/MoodboardPortal|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryModal|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
 const { outputFiles } = await build({
   stdin: { contents: `export {default as Dashboard} from './src/ScenesDashboard'; export {default as App} from './src/App'; export {default as Rail} from './src/StudioRail'; export {default as More} from './src/MoreControls'; export {ThemeToggle,ThemeRoot} from './src/Theme'; export {usePreference} from './src/usePreference'; export {RequestAccessForm} from 'focus-request-form';`, resolveDir: root },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', logLevel: 'silent',
@@ -21,7 +21,7 @@ const { outputFiles } = await build({
       export const useState=v=>globalThis.__focusHooks.state(v),useRef=v=>globalThis.__focusHooks.ref(v),useEffect=(f,d)=>globalThis.__focusHooks.effect(f,d),useMemo=(f,d)=>globalThis.__focusHooks.memo(f,d),useCallback=(f,d)=>globalThis.__focusHooks.memo(()=>f,d),useId=()=>globalThis.__focusHooks.memo(()=>"focus-test",[]),useSyncExternalStore=(...a)=>globalThis.__focusHooks.external(...a),lazy=()=>globalThis.__focusLazy(),Suspense="Suspense"; export default {};
     ` : 'export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="Fragment";' }));
     b.onResolve({ filter: /^react-icons\/fi$/ }, a => ({ path: a.path, namespace: 'icons' }));
-    b.onLoad({ filter: /.*/, namespace: 'icons' }, () => ({ contents: 'export const FiCalendar="calendar",FiGrid="grid",FiEdit3="edit",FiImage="image",FiAperture="aperture",FiUser="user",FiMoon="moon",FiSun="sun",FiSearch="search",FiPlus="plus",FiArrowUpRight="arrow",FiEdit2="edit",FiTrash2="trash";' }));
+    b.onLoad({ filter: /.*/, namespace: 'icons' }, () => ({ contents: 'export const FiUsers="users",FiCalendar="calendar",FiGrid="grid",FiEdit3="edit",FiImage="image",FiAperture="aperture",FiUser="user",FiMoon="moon",FiSun="sun",FiSearch="search",FiPlus="plus",FiArrowUpRight="arrow",FiEdit2="edit",FiTrash2="trash";' }));
     b.onResolve({ filter: stubNames }, a => ({ path: a.path.slice(2), namespace: 'component' }));
     b.onLoad({ filter: /.*/, namespace: 'component' }, a => ({ contents: `export default ${JSON.stringify(a.path)};` }));
     b.onResolve({ filter: /\/sceneStorage$/ }, () => ({ path: 'store', namespace: 'data' }));
@@ -76,8 +76,8 @@ try {
 
   const railCalls=[];const rail=harness(api.Rail,{active:'studio',onNavigate:id=>railCalls.push(id),onHome:()=>railCalls.push('home'),studioAvailable:false});
   assert.equal(rail.button('Studio').props.disabled,true);
-  for(const label of ['Projects','Artwork','Renders','Artist desk','Account'])rail.button(label).props.onClick();
-  assert.deepEqual(railCalls,['projects','artwork','renders','artist','account']);
+  for(const label of ['Projects','Artwork','Renders','Client space','Artist desk','Account'])rail.button(label).props.onClick();
+  assert.deepEqual(railCalls,['projects','artwork','renders','client','artist','account']);
   rail.unmount();
 
   // Creation waits for storage, cannot duplicate on double click, and keeps input on failure.
@@ -126,6 +126,24 @@ try {
   auth.session=session;const boards=harness(api.App);boards.render();await boards.settle();
   assert.ok(boards.render().some(n=>n.type==='Lazy2'));assert.ok(!boards.render().some(n=>n.type==='Lazy0'));
   auth.session=null;await boards.settle();assert.equal(boards.tree.type,'LoginPage','Session loss closes private moodboards');boards.unmount();
+  // Direct client spaces preserve approved access and the intended destination after login.
+  window.location={href:'http://local/?view=client',search:'?view=client'};
+  auth.session=null; const clientGate=harness(api.App);clientGate.render();await clientGate.settle();
+  assert.equal(clientGate.tree.type,'LoginPage'); assert.ok(!clientGate.render().some(n=>n.type==='Lazy0'));
+  clientGate.tree.props.onAuthenticated(session);auth.session=session;await clientGate.settle();
+  assert.equal(clientGate.render().find(n=>n.type==='Lazy0').props.initialSection,'client');
+  auth.session=null;await clientGate.settle();assert.equal(clientGate.tree.type,'LoginPage');clientGate.unmount();
+  // Client links enter review through their own callback, never through the editing callback.
+  let reviewCalls=[];const hub=harness(api.Dashboard,{session,onSignOut:()=>{},onSelectScene:()=>assert.fail('Must not open editing'),initialSection:'client',onReviewScene:(...args)=>reviewCalls.push(args)});
+  hub.render();await hub.settle();const clientUI=hub.render().find(n=>n.type==='client/ClientProjectSpace');
+  assert.ok(clientUI);
+  clientUI.props.onDirtyChange(true);window.confirm=()=>false;
+  hub.render().find(n=>n.type===api.Rail).props.onNavigate('artist');
+  assert.ok(hub.render().some(n=>n.type==='client/ClientProjectSpace'),'Declining navigation keeps the client draft mounted');
+  window.confirm=()=>true;clientUI.props.onDirtyChange(false);
+  clientUI.props.onReview({id:'shared-scene'},'booking-one','client');
+  assert.deepEqual(reviewCalls,[[{id:'shared-scene'},'booking-one','client']]);
+  clientUI.props.onDesk('booking-one');assert.equal(hub.render().find(n=>n.type==='artist/ArtistPanel').props.initialBookingId,'booking-one');hub.unmount();
   // An approved session opens the full workspace; session loss closes it again.
   auth.session=session;window.location={href:'http://local/',search:''};
   const member=harness(api.App);member.render();await member.settle();assert.ok(member.render().some(n=>n.type==='Lazy0'));

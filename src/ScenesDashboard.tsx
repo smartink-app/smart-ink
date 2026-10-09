@@ -7,6 +7,8 @@ import { authMode } from './auth/betaAuthService';
 import AccountSettings from './AccountSettings';
 import StudioRail, { type StudioSection } from './StudioRail';
 import ArtistPanel from './artist/ArtistPanel';
+import ClientProjectSpace from './client/ClientProjectSpace';
+import type { ProjectRole } from './client/model';
 import FocusDialog from './FocusDialog';
 import TattooLibrary from './TattooLibrary';
 import RenderHistoryModal from './RenderHistoryModal';
@@ -22,9 +24,18 @@ interface Props {
   onSignOut: () => void;
   onResume?: () => void;
   initialSection?: StudioSection;
+  initialClientProject?: string; initialClientRole?: ProjectRole;
+  onReviewScene?: (scene: SceneData, projectId: string, role: ProjectRole) => void;
+  onMoodboard?: () => void;
 }
 
-export default function ScenesDashboard({ onSelectScene, onOpenLanding, session, onSignOut, onResume, initialSection = 'projects' }: Props) {
+export default function ScenesDashboard({ onSelectScene, onOpenLanding, session, onSignOut, onResume, initialSection = 'projects', initialClientProject, initialClientRole = 'client', onReviewScene, onMoodboard }: Props) {
+  const clientDraft = useRef(false);
+  const receiveClientDraft = useCallback((dirty: boolean) => { clientDraft.current = dirty; }, []);
+  const canLeaveClient = () => !clientDraft.current || window.confirm('Leave without saving your message draft?');
+  const [clientProjectId, setClientProjectId] = useState(initialClientProject);
+  const [clientRole, setClientRole] = useState<ProjectRole>(initialClientRole);
+  const [artistBooking, setArtistBooking] = useState<string | undefined>();
   const [section, setSection] = useState<StudioSection>(initialSection);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [rendersOpen, setRendersOpen] = useState(false);
@@ -206,15 +217,22 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
 
   return (
     <div className="dashboard">
-      <StudioRail active={rendersOpen ? 'renders' : section} studioAvailable={!!onResume} onHome={() => onOpenLanding?.()}
+      <StudioRail active={rendersOpen ? 'renders' : section} studioAvailable={!!onResume} onHome={() => { if (canLeaveClient()) onOpenLanding?.(); }}
         onNavigate={next => {
+          if (next === section && next !== 'renders') return;
+          if (!canLeaveClient()) return;
           if (next === 'studio') { onResume?.(); return; }
           if (next === 'renders') { setRendersOpen(true); return; }
           setSection(next);
         }} />
       <div className="main-content focus-dashboard-content">
         {authMode() === 'demo' && <p className="focus-local-note">Local preview · Projects and uploads are saved in this browser.</p>}
-        {section === 'artist' ? <ArtistPanel key={session.userId ?? session.email} owner={session.userId ?? session.email} scenes={scenes} onOpenProject={openScene} /> : section === 'account' ? <AccountSettings session={session} onSignOut={onSignOut} /> : section === 'artwork' ? <>
+        {section === 'client' ? <ClientProjectSpace key={session.userId ?? session.email} owner={session.userId ?? session.email} feedbackOwner={session.email} scenes={scenes} scenesLoading={loading} scenesError={loadError ? error : ''}
+          onDirtyChange={receiveClientDraft} initialProjectId={clientProjectId} initialRole={clientRole} onMoodboard={() => onMoodboard?.()}
+          onDesk={id => { setArtistBooking(id); setSection('artist'); }}
+          onReview={(scene, projectId, role) => { if (!unavailable) onReviewScene?.(scene, projectId, role); }} />
+          : section === 'artist' ? <ArtistPanel key={session.userId ?? session.email} owner={session.userId ?? session.email} scenes={scenes} initialBookingId={artistBooking} onOpenProject={openScene}
+            onClientSpace={id => { setClientProjectId(id); setClientRole('artist'); setSection('client'); }} /> : section === 'account' ? <AccountSettings session={session} onSignOut={onSignOut} /> : section === 'artwork' ? <>
           <header className="focus-page-heading"><div><p className="focus-eyebrow">Your collection</p><h1>Artwork</h1><p>Keep your designs close. Choose one to start a project.</p></div></header>
           <div className="focus-library-page"><TattooLibrary currentImage={draftArtwork} onChoose={source => { setDraftArtwork(source); setNewProjectOpen(true); }} /></div>
         </> : <>

@@ -14,9 +14,10 @@ import MoodboardPreview from './MoodboardPreview';
 import './moodboard.css';
 
 const blankItem = (kind: Inspiration['kind']): Inspiration => ({ id: crypto.randomUUID(), kind, title: '', note: '', image: '', url: '' });
-export default function MoodboardPortal({ owner, pending, onCollected, onArtists, onStudio, onDesk }: {
-  owner: string; pending: PortfolioImage | null; onCollected: () => void; onArtists: () => void; onStudio: () => void; onDesk: () => void;
+export default function MoodboardPortal({ owner, pending, onCollected, onArtists, onStudio, onDesk, onClientSpace }: {
+  onClientSpace: (projectId?: string) => void; owner: string; pending: PortfolioImage | null; onCollected: () => void; onArtists: () => void; onStudio: () => void; onDesk: () => void;
 }) {
+  const [sentProject, setSentProject] = useState<string | undefined>();
   const [loaded, setLoaded] = useState<{ data: MoodboardData | null; error: string }>(() => {
     try { return { data: loadMoodboards(owner), error: '' }; } catch (e) { return { data: null, error: e instanceof Error ? e.message : 'Could not load moodboards.' }; }
   });
@@ -41,7 +42,7 @@ export default function MoodboardPortal({ owner, pending, onCollected, onArtists
     if (!target) return; const to = items.findIndex(i => i.id === target.id); [items[from], items[to]] = [items[to], items[from]]; commit({ ...board, items });
   });
   return <div className="mood-page">
-    <header className="mood-nav"><button onClick={onArtists}><FiArrowLeft aria-hidden />Artists</button><span className="mood-wordmark">Smart Ink <i>/</i> Inspiration</span><div><ThemeToggle /><button onClick={onStudio}>Studio <FiArrowUpRight aria-hidden /></button></div></header>
+    <header className="mood-nav"><button onClick={onArtists}><FiArrowLeft aria-hidden />Artists</button><span className="mood-wordmark">Smart Ink <i>/</i> Inspiration</span><div><ThemeToggle /><button onClick={() => onClientSpace()}>Client space <FiArrowUpRight aria-hidden /></button><button onClick={onStudio}>Studio <FiArrowUpRight aria-hidden /></button></div></header>
     <main className="mood-main">
       <header className="mood-hero"><p className="focus-eyebrow">Before the first line</p><h1>Collect a feeling.<br /><span>Make it your own.</span></h1><p>A shape. A story. A detail you can’t stop thinking about.<br />Bring it all together for your artist.</p></header>
       <div className="mood-board-tabs" role="group" aria-label="Your moodboards">{data.boards.map(b => <button key={b.id} aria-pressed={b.id === board.id} onClick={() => { setChosen(b.id); setNotice(''); setSent(false); }}>{b.title}</button>)}<button onClick={() => attempt(() => { const next = newBoard(`New idea ${data.boards.length + 1}`); commit(next); setChosen(next.id); setDetails(true); setSent(false); })}><FiPlus aria-hidden />New board</button></div>
@@ -58,7 +59,7 @@ export default function MoodboardPortal({ owner, pending, onCollected, onArtists
             <div className="mood-card-body"><span className="mood-kind">{item.kind === 'image' ? 'Visual reference' : item.kind === 'link' ? 'Saved from the web' : 'A thought to keep'}</span><h3>{item.title}</h3>{item.kind !== 'note' && <p>{item.note || 'Add what you like about this reference.'}</p>}{item.url && <a href={item.url} target="_blank" rel="noopener noreferrer">Source <FiExternalLink aria-hidden /></a>}<div className="mood-card-tools"><button onClick={() => setEditing(item)}>Edit note</button><span /><button className="mood-icon" aria-label={`Move ${item.title} earlier`} disabled={index === 0} onClick={() => move(item.id, -1)}><FiArrowUp /></button><button className="mood-icon" aria-label={`Move ${item.title} later`} disabled={index === visible.length - 1} onClick={() => move(item.id, 1)}><FiArrowDown /></button><button className="mood-icon" aria-label={`Remove ${item.title}`} onClick={() => attempt(() => patchItem({ ...item, removed: true }))}><FiX /></button></div></div>
           </article>)}</div>}
       </section>
-      <section className="mood-handoff"><div><p className="focus-eyebrow">Turn inspiration into a conversation</p><h2>Ready to bring an artist in?</h2><p>Share the idea, the placement and what matters to you.<br />The artist reviews the request before confirming a session.</p></div><div className="mood-handoff-actions"><button className="focus-primary" disabled={!visible.length} onClick={() => setRequestOpen(true)}>Create artist request <FiArrowUpRight aria-hidden /></button><button className="mood-button" disabled={!visible.length || downloadBusy} onClick={() => void download()}><FiDownload aria-hidden />{downloadBusy ? 'Preparing…' : 'Download brief'}</button>{sent && <button className="mood-text-button" onClick={onDesk}>View request in artist desk <FiArrowUpRight aria-hidden /></button>}</div></section>
+      <section className="mood-handoff"><div><p className="focus-eyebrow">Turn inspiration into a conversation</p><h2>Ready to bring an artist in?</h2><p>Share the idea, the placement and what matters to you.<br />The artist reviews the request before confirming a session.</p></div><div className="mood-handoff-actions"><button className="focus-primary" disabled={!visible.length} onClick={() => setRequestOpen(true)}>Create artist request <FiArrowUpRight aria-hidden /></button><button className="mood-button" disabled={!visible.length || downloadBusy} onClick={() => void download()}><FiDownload aria-hidden />{downloadBusy ? 'Preparing…' : 'Download brief'}</button>{sent && <button className="mood-text-button" onClick={() => onClientSpace(sentProject)}>Open client project space <FiArrowUpRight aria-hidden /></button>}{sent && <button className="mood-text-button" onClick={onDesk}>View request in artist desk <FiArrowUpRight aria-hidden /></button>}</div></section>
       <p className="mood-local-note">Demo · Boards stay in this browser. Artist requests appear in your local artist desk; nothing is sent. Download a brief to share yourself.</p>
     </main>
     {editing && <ReferenceForm key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={item => { if (board.items.some(i => i.id === item.id)) patchItem(item); else commit(addInspiration(board, item)); setEditing(null); }} />}
@@ -66,7 +67,7 @@ export default function MoodboardPortal({ owner, pending, onCollected, onArtists
     {preview && <FocusDialog title="Your inspiration brief" wide onClose={() => setPreview(false)}><MoodboardPreview board={board} /><button className="focus-primary" disabled={downloadBusy} onClick={() => void download()}>Download brief</button></FocusDialog>}
     {requestOpen && <RequestForm board={board} onClose={() => setRequestOpen(false)} onSave={request => {
       const current = loadArtistData(owner); const next = requestWithMoodboard(current, board, request);
-      persistArtistData(owner, next, current.revision); setRequestOpen(false); setSent(true); setNotice('Request and moodboard saved in the demo artist desk. No message was sent.');
+      persistArtistData(owner, next, current.revision); setRequestOpen(false); setSent(true); setSentProject(request.id); setNotice('Request and moodboard saved in the demo artist desk. No message was sent.');
     }} />}
   </div>;
 }
