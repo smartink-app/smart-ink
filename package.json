@@ -33,7 +33,8 @@
     "test:phase1": "npm run test:demo && npm run test:focus-ui && node tools/password-login.test.mjs && node tools/studio-interaction.test.mjs && node tools/reveal-panel-lifecycle.test.mjs && node tools/reveal-camera.test.mjs",
     "test:feedback": "node tools/feedback.test.mjs",
     "test:moodboard": "node tools/moodboard.test.mjs",
-    "test:client": "node tools/client-project.test.mjs"
+    "test:client": "node tools/client-project.test.mjs",
+    "test:versions": "node tools/design-versions.test.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.3.0",

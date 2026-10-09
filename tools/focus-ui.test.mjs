@@ -134,15 +134,17 @@ try {
   assert.equal(clientGate.render().find(n=>n.type==='Lazy0').props.initialSection,'client');
   auth.session=null;await clientGate.settle();assert.equal(clientGate.tree.type,'LoginPage');clientGate.unmount();
   // Client links enter review through their own callback, never through the editing callback.
-  let reviewCalls=[];const hub=harness(api.Dashboard,{session,onSignOut:()=>{},onSelectScene:()=>assert.fail('Must not open editing'),initialSection:'client',onReviewScene:(...args)=>reviewCalls.push(args)});
+  let reviewCalls=[];const hub=harness(api.Dashboard,{session,onSignOut:()=>{},onSelectScene:()=>assert.fail('Must not open editing'),initialSection:'client',initialClientProject:'booking-one',initialVersionId:'version-one',onReviewScene:(...args)=>reviewCalls.push(args)});
   hub.render();await hub.settle();const clientUI=hub.render().find(n=>n.type==='client/ClientProjectSpace');
-  assert.ok(clientUI);
+  assert.ok(clientUI); assert.equal(clientUI.props.initialVersionId,'version-one');
   clientUI.props.onDirtyChange(true);window.confirm=()=>false;
   hub.render().find(n=>n.type===api.Rail).props.onNavigate('artist');
   assert.ok(hub.render().some(n=>n.type==='client/ClientProjectSpace'),'Declining navigation keeps the client draft mounted');
   window.confirm=()=>true;clientUI.props.onDirtyChange(false);
   clientUI.props.onReview({id:'shared-scene'},'booking-one','client');
   assert.deepEqual(reviewCalls,[[{id:'shared-scene'},'booking-one','client']]);
+  clientUI.props.onReview({id:'design-version:booking-one:version-one'},'booking-one','client','version-one');
+  assert.deepEqual(reviewCalls.at(-1),[{id:'design-version:booking-one:version-one'},'booking-one','client','version-one']);
   clientUI.props.onDesk('booking-one');assert.equal(hub.render().find(n=>n.type==='artist/ArtistPanel').props.initialBookingId,'booking-one');hub.unmount();
   // An approved session opens the full workspace; session loss closes it again.
   auth.session=session;window.location={href:'http://local/',search:''};

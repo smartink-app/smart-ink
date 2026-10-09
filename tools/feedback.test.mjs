@@ -97,7 +97,7 @@ for (const effect of saveEffects) {
 }
 let camera = null, request = 0, open = true, dashboard = false, section = '', allowLeave = true;
 const review = { dirty: false, cancel: () => {}, setReplies: () => {} };
-const closeContext = { projectId: 'client-project', role: 'client' };
+const closeContext = { projectId: 'client-project', role: 'client', versionId: 'v1' };
 const returnView = structuredClone(location.camera);
 const close = await evaluate(variables.get('closeReview').initializer.getText(ast), {
   review, clientReview: closeContext, window: { confirm: () => allowLeave },
@@ -120,6 +120,6 @@ for (const name of ['normalizePose','normalizeAppearance','normalizeStudio','nor
 const launch = await evaluate(loadSource, loadScope);
 launch({ id: 'scene-a', camera: location.camera, lightingPreset: 'studio', background: 'dark' }, closeContext);
 assert.equal(loadedState.setReviewOpen, true); assert.equal(loadedState.setShowDashboard, false);
-assert.equal(loadedState.role, 'client'); assert.equal(loadedState.setClientProjectId, 'client-project');
+assert.equal(loadedState.setClientReview.versionId, 'v1'); assert.equal(loadedState.role, 'client'); assert.equal(loadedState.setClientProjectId, 'client-project');
 assert.deepEqual(loadedState.setClientReview, closeContext);
 console.log('Feedback passed: anchored notes, replies, artist resolution, validation, scoped persistence, corruption/quota/stale-tab protection, gesture safety, mesh deformation, edit/save guards and camera restoration.');

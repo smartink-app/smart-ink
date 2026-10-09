@@ -161,7 +161,7 @@ function sampleTrackStyle(samples: number): CSSProperties {
 
 export default function Workspace({ session, onHome, onSignOut, initialSection = 'projects', initialClientProject, onMoodboard }: WorkspaceProps) {
   const [currentScene, setCurrentScene] = useState<SceneData | null>(null)
-  const [clientReview, setClientReview] = useState<{ projectId: string; role: 'client' | 'artist' } | null>(null)
+  const [clientReview, setClientReview] = useState<{ projectId: string; role: 'client' | 'artist'; versionId?: string } | null>(null)
   const [clientProjectId, setClientProjectId] = useState(initialClientProject)
   const [clientRole, setClientRole] = useState<'client' | 'artist'>('client')
   const [reviewOpen, setReviewOpen] = useState(false)
@@ -556,7 +556,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
   const currentShotBuilder = useRef(buildShot)
   currentShotBuilder.current = buildShot
 
-  const loadScene = (scene: SceneData, reviewContext?: { projectId: string; role: 'client' | 'artist' }) => afterSaving(() => {
+  const loadScene = (scene: SceneData, reviewContext?: { projectId: string; role: 'client' | 'artist'; versionId?: string }) => afterSaving(() => {
     const migrated = migrateScene(scene)
     setClientReview(reviewContext ?? null)
     setReviewOpen(!!reviewContext)
@@ -1077,8 +1077,8 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       <div style={{ position: 'relative', width: '100%', minHeight: '100vh' }}>
         <ScenesDashboard
           initialSection={dashboardSection}
-          initialClientProject={clientProjectId} initialClientRole={clientRole} onMoodboard={onMoodboard}
-          onReviewScene={(scene, projectId, role) => loadScene(scene, { projectId, role })}
+          initialClientProject={clientProjectId} initialClientRole={clientRole} initialVersionId={clientReview?.versionId} onMoodboard={onMoodboard}
+          onReviewScene={(scene, projectId, role, versionId) => loadScene(scene, { projectId, role, versionId })}
           session={session}
           onSignOut={() => onSignOut()}
           onSelectScene={loadScene}

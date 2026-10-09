@@ -24,12 +24,12 @@ interface Props {
   onSignOut: () => void;
   onResume?: () => void;
   initialSection?: StudioSection;
-  initialClientProject?: string; initialClientRole?: ProjectRole;
-  onReviewScene?: (scene: SceneData, projectId: string, role: ProjectRole) => void;
+  initialClientProject?: string; initialClientRole?: ProjectRole; initialVersionId?: string;
+  onReviewScene?: (scene: SceneData, projectId: string, role: ProjectRole, versionId?: string) => void;
   onMoodboard?: () => void;
 }
 
-export default function ScenesDashboard({ onSelectScene, onOpenLanding, session, onSignOut, onResume, initialSection = 'projects', initialClientProject, initialClientRole = 'client', onReviewScene, onMoodboard }: Props) {
+export default function ScenesDashboard({ onSelectScene, onOpenLanding, session, onSignOut, onResume, initialSection = 'projects', initialClientProject, initialClientRole = 'client', initialVersionId, onReviewScene, onMoodboard }: Props) {
   const clientDraft = useRef(false);
   const receiveClientDraft = useCallback((dirty: boolean) => { clientDraft.current = dirty; }, []);
   const canLeaveClient = () => !clientDraft.current || window.confirm('Leave without saving your message draft?');
@@ -228,9 +228,9 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
       <div className="main-content focus-dashboard-content">
         {authMode() === 'demo' && <p className="focus-local-note">Local preview · Projects and uploads are saved in this browser.</p>}
         {section === 'client' ? <ClientProjectSpace key={session.userId ?? session.email} owner={session.userId ?? session.email} feedbackOwner={session.email} scenes={scenes} scenesLoading={loading} scenesError={loadError ? error : ''}
-          onDirtyChange={receiveClientDraft} initialProjectId={clientProjectId} initialRole={clientRole} onMoodboard={() => onMoodboard?.()}
+          onDirtyChange={receiveClientDraft} initialProjectId={clientProjectId} initialRole={clientRole} initialVersionId={clientProjectId === initialClientProject ? initialVersionId : undefined} onMoodboard={() => onMoodboard?.()}
           onDesk={id => { setArtistBooking(id); setSection('artist'); }}
-          onReview={(scene, projectId, role) => { if (!unavailable) onReviewScene?.(scene, projectId, role); }} />
+          onReview={(scene, projectId, role, versionId) => { if (versionId) onReviewScene?.(scene, projectId, role, versionId); else if (!unavailable) onReviewScene?.(scene, projectId, role); }} />
           : section === 'artist' ? <ArtistPanel key={session.userId ?? session.email} owner={session.userId ?? session.email} scenes={scenes} initialBookingId={artistBooking} onOpenProject={openScene}
             onClientSpace={id => { setClientProjectId(id); setClientRole('artist'); setSection('client'); }} /> : section === 'account' ? <AccountSettings session={session} onSignOut={onSignOut} /> : section === 'artwork' ? <>
           <header className="focus-page-heading"><div><p className="focus-eyebrow">Your collection</p><h1>Artwork</h1><p>Keep your designs close. Choose one to start a project.</p></div></header>
