@@ -7,7 +7,7 @@ const landingSource = await fs.readFile('src/LandingPage.tsx','utf8');
 const requestForm = landingSource.slice(landingSource.indexOf('const RequestAccessForm:'), landingSource.indexOf('const LandingPage:'));
 let lazyId = 0;
 globalThis.__focusLazy = () => `Lazy${lazyId++}`;
-const stubNames = /^(\.\/)(artist\/ArtistPanel|discovery\/ArtistDiscovery|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryModal|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
+const stubNames = /^(\.\/)(artist\/ArtistPanel|discovery\/ArtistDiscovery|moodboard\/MoodboardPortal|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryModal|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
 const { outputFiles } = await build({
   stdin: { contents: `export {default as Dashboard} from './src/ScenesDashboard'; export {default as App} from './src/App'; export {default as Rail} from './src/StudioRail'; export {default as More} from './src/MoreControls'; export {ThemeToggle,ThemeRoot} from './src/Theme'; export {usePreference} from './src/usePreference'; export {RequestAccessForm} from 'focus-request-form';`, resolveDir: root },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', logLevel: 'silent',
@@ -119,6 +119,13 @@ try {
   for(const [search,expected] of [['?invite=ABC123','InvitePage'], ['?admin=1','BetaAdminPage']]) {
     window.location={href:`http://local/${search}`,search};const gate=harness(api.App);gate.render();await gate.settle();assert.equal(gate.tree.type,expected);assert.ok(!gate.render().some(n=>n.type==='Lazy0'));gate.unmount();
   }
+  // Moodboards require an approved session, and do not load the editor.
+  window.location={href:'http://local/?view=moodboard',search:'?view=moodboard'};
+  const boardGate=harness(api.App);boardGate.render();await boardGate.settle();assert.equal(boardGate.tree.type,'LoginPage');
+  assert.ok(!boardGate.render().some(n=>n.type==='Lazy2'));boardGate.unmount();
+  auth.session=session;const boards=harness(api.App);boards.render();await boards.settle();
+  assert.ok(boards.render().some(n=>n.type==='Lazy2'));assert.ok(!boards.render().some(n=>n.type==='Lazy0'));
+  auth.session=null;await boards.settle();assert.equal(boards.tree.type,'LoginPage','Session loss closes private moodboards');boards.unmount();
   // An approved session opens the full workspace; session loss closes it again.
   auth.session=session;window.location={href:'http://local/',search:''};
   const member=harness(api.App);member.render();await member.settle();assert.ok(member.render().some(n=>n.type==='Lazy0'));

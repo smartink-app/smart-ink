@@ -133,6 +133,7 @@ function LoadingSignal({ onChange }: { onChange: (loading: boolean) => void }) {
 }
 
 interface WorkspaceProps {
+  initialSection?: StudioSection;
   session: BetaSession
   /** Leave the workspace for the landing page. */
   onHome: () => void
@@ -156,7 +157,7 @@ function sampleTrackStyle(samples: number): CSSProperties {
   };
 }
 
-export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps) {
+export default function Workspace({ session, onHome, onSignOut, initialSection = 'projects' }: WorkspaceProps) {
   const [currentScene, setCurrentScene] = useState<SceneData | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
   const review = useReview(session.email, currentScene?.id)
@@ -165,7 +166,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [artworkOpen, setArtworkOpen] = useState(false)
   const [showDashboard, setShowDashboard] = useState(true)
-  const [dashboardSection, setDashboardSection] = useState<StudioSection>('projects')
+  const [dashboardSection, setDashboardSection] = useState<StudioSection>(initialSection)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [sceneSaves] = useState(() => createSceneSaveQueue<SceneData>(updateScene))
   const [saveState, setSaveState] = useState(() => sceneSaves.getState())

@@ -1,3 +1,5 @@
+import type { PortfolioImage } from './discovery/artists'
+import type { StudioSection } from './StudioRail'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import LandingPage from './LandingPage'
 import LoginPage from './LoginPage'
@@ -15,8 +17,9 @@ import type { BetaSession } from './auth/types'
  */
 const Workspace = lazy(() => import('./Workspace'))
 const ArtistDiscovery = lazy(() => import('./discovery/ArtistDiscovery'))
+const MoodboardPortal = lazy(() => import('./moodboard/MoodboardPortal'))
 
-type GateView = 'landing' | 'artists' | 'login' | 'invite' | 'invite-code' | 'admin' | 'app'
+type GateView = 'landing' | 'artists' | 'moodboard' | 'login' | 'invite' | 'invite-code' | 'admin' | 'app'
 
 function initialGateView(): { view: GateView; inviteCode: string | null } {
   if (typeof window === 'undefined') return { view: 'landing', inviteCode: null }
@@ -24,6 +27,7 @@ function initialGateView(): { view: GateView; inviteCode: string | null } {
   if (params.get('admin') === '1') return { view: 'admin', inviteCode: null }
   const invite = params.get('invite')?.trim().toUpperCase() ?? null
   if (invite) return { view: 'invite', inviteCode: invite }
+  if (params.get('view') === 'moodboard') return { view: 'moodboard', inviteCode: null }
   if (params.get('view') === 'artists') return { view: 'artists', inviteCode: null }
   return { view: 'landing', inviteCode: null }
 }
@@ -33,6 +37,9 @@ function App() {
   const [gateView, setGateView] = useState<GateView>(() => initialGateView().view)
   const [inviteCode, setInviteCode] = useState<string | null>(() => initialGateView().inviteCode)
   const bootedRef = useRef(false)
+  const returnToMoodboard = useRef(initialGateView().view === 'moodboard')
+  const [pendingInspiration, setPendingInspiration] = useState<PortfolioImage | null>(null)
+  const [workspaceSection, setWorkspaceSection] = useState<StudioSection>('projects')
 
   // Once the backend has reported the initial session, route past the landing
   // page: straight into the app for a signed-in user, or to the login page
@@ -41,7 +48,7 @@ function App() {
     if (!betaAuth.ready || bootedRef.current) return
     bootedRef.current = true
     const boot = initialGateView()
-    if (boot.view === 'invite' || boot.view === 'admin' || boot.view === 'artists') return
+    if (boot.view === 'invite' || boot.view === 'admin' || boot.view === 'artists' || boot.view === 'moodboard') return
     if (betaAuth.session) setGateView('app')
     else if (betaAuth.accessError) setGateView('login')
   }, [betaAuth.ready, betaAuth.session, betaAuth.accessError])
@@ -66,6 +73,12 @@ function App() {
   const enterApp = useCallback(
     (session?: BetaSession | null) => {
       if (session) setBetaSession(session)
+      if (returnToMoodboard.current) {
+        clearInviteQuery()
+        const url = new URL(window.location.href); url.searchParams.set('view', 'moodboard')
+        window.history.replaceState({}, '', url.pathname + url.search)
+        setGateView('moodboard'); return
+      }
       clearInviteQuery()
       setGateView('app')
     },
@@ -74,16 +87,27 @@ function App() {
 
   const clearAccessError = betaAuth.clearAccessError
   const goHome = useCallback(() => {
+    returnToMoodboard.current = false
     clearInviteQuery()
     clearAccessError()
     setGateView('landing')
   }, [clearInviteQuery, clearAccessError])
 
   const exploreArtists = () => {
+    returnToMoodboard.current = false
     const url = new URL(window.location.href)
     url.searchParams.set('view', 'artists')
     window.history.replaceState({}, '', url.pathname + url.search)
     setGateView('artists')
+  }
+
+  const openMoodboard = (image?: PortfolioImage) => {
+    if (image) setPendingInspiration(image)
+    returnToMoodboard.current = true
+    const url = new URL(window.location.href)
+    url.searchParams.set('view', 'moodboard')
+    window.history.replaceState({}, '', url.pathname + url.search)
+    setGateView('moodboard')
   }
 
   const betaSignOut = betaAuth.signOut
@@ -105,7 +129,16 @@ function App() {
 
   if (gateView === 'artists') {
     return <Suspense fallback={<div className="app-loading">Finding your next artist…</div>}>
-      <ArtistDiscovery signedIn={!!betaAuth.session} onHome={goHome} onStudio={() => { clearInviteQuery(); if (betaAuth.session) enterApp(); else setGateView('login') }} />
+      <ArtistDiscovery onMoodboard={openMoodboard} signedIn={!!betaAuth.session} onHome={goHome} onStudio={() => { clearInviteQuery(); if (betaAuth.session) enterApp(); else setGateView('login') }} />
+    </Suspense>
+  }
+
+  if (gateView === 'moodboard' && betaAuth.session) {
+    return <Suspense fallback={<div className="app-loading">Gathering your inspiration…</div>}>
+      <MoodboardPortal key={betaAuth.session.userId ?? betaAuth.session.email} owner={betaAuth.session.userId ?? betaAuth.session.email}
+        pending={pendingInspiration} onCollected={() => setPendingInspiration(null)} onArtists={exploreArtists}
+        onStudio={() => { returnToMoodboard.current = false; setWorkspaceSection('projects'); enterApp() }}
+        onDesk={() => { returnToMoodboard.current = false; setWorkspaceSection('artist'); enterApp() }} />
     </Suspense>
   }
 
@@ -145,7 +178,7 @@ function App() {
     return <InvitePage code={inviteCode} onBack={goHome} onAuthenticated={enterApp} />
   }
 
-  if (gateView === 'login' || (gateView === 'invite' && !inviteCode)) {
+  if (gateView === 'login' || gateView === 'moodboard' || (gateView === 'invite' && !inviteCode)) {
     return (
       <LoginPage
         onAuthenticated={enterApp}
@@ -163,7 +196,7 @@ function App() {
 
   return (
     <Suspense fallback={<div className="app-loading">Loading Smart Ink…</div>}>
-      <Workspace session={session} onHome={goHome} onSignOut={(opts) => void signOut(opts)} />
+      <Workspace initialSection={workspaceSection} session={session} onHome={goHome} onSignOut={(opts) => void signOut(opts)} />
     </Suspense>
   )
 }

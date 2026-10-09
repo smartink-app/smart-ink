@@ -1,10 +1,11 @@
+import { validMoodboardSnapshot, type MoodboardSnapshot } from '../moodboard/model';
 export type BookingStatus = 'requested' | 'confirmed' | 'completed' | 'cancelled' | 'declined';
 export type Service = 'Tattoo session' | 'Consultation' | 'Touch-up';
 export type Client = { id: string; name: string; email: string; phone: string; notes: string };
 export type Booking = {
   id: string; clientId: string; title: string; service: Service; date: string; time: string;
   duration: number; status: BookingStatus; price: number; deposit: number; depositPaid: boolean;
-  brief: string; notes: string; projectId: string;
+  brief: string; notes: string; projectId: string; moodboard?: MoodboardSnapshot;
 };
 export type Message = { id: string; clientId: string; from: 'artist' | 'client'; text: string; at: string; read: boolean };
 export type Availability = { days: number[]; start: string; end: string; buffer: number };
@@ -56,6 +57,7 @@ export function saveClient(data: ArtistData, client: Client): ArtistData {
 export function saveBooking(data: ArtistData, booking: Booking, now = new Date()): ArtistData {
   const next = { ...booking, title: booking.title.trim(), brief: booking.brief.trim(), notes: booking.notes.trim() };
   requireThat(data.clients.some(c => c.id === next.clientId), 'Select a client first.');
+  requireThat(next.moodboard === undefined || validMoodboardSnapshot(next.moodboard), 'Check the attached moodboard.');
   requireThat(next.title.length > 0 && next.title.length <= 120, 'Add a design or appointment name (up to 120 characters).');
   requireThat(SERVICES.includes(next.service) && Object.hasOwn(STATUS_LABEL, next.status), 'Choose a valid appointment type and status.');
   requireThat(validDate(next.date) && validTime(next.time), 'Choose a valid date and start time.');

@@ -16,3 +16,5 @@ Artist desk demonstrates the request/approval workflow with its own local data.
 `npm run test:discovery` checks filtering, saved-only intersections, sort stability,
 image availability and that the public page has no private-workspace dependency.
 Access routing is also covered by `npm run test:focus-ui`.
+
+Approved beta users can now open **Moodboard** from discovery, collect portfolio references, and attach a saved inspiration brief to a local Artist desk consultation request. Public visitors still pass through the existing access gate before opening boards. See `../moodboard/README.md`.

@@ -1,3 +1,4 @@
+import MoodboardPreview from '../moodboard/MoodboardPreview';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { FiCalendar, FiChevronLeft, FiChevronRight, FiClock, FiPlus, FiMessageCircle, FiUsers, FiCheck, FiArrowUpRight, FiSliders, FiInbox, FiSearch, FiSend, FiX } from 'react-icons/fi';
 import FocusDialog from '../FocusDialog';
@@ -154,6 +155,7 @@ function AppointmentForm({ initial, data, scenes, clientPreview, onClose, onSave
     <form className="artist-form" onSubmit={submit}>
       <p className="artist-muted">{clientPreview ? 'Step into the client’s shoes. Submit an idea and preferred time, then review it from the artist desk. This is a local preview.' : 'Plan the session, keep the brief close, and link the design. Changes are saved in this demo only.'}</p>
       {existing && <div className="artist-inline artist-form-status"><Status value={initial.status} /><button type="button" className="artist-button" onClick={onMessage}><FiMessageCircle aria-hidden />Conversation</button></div>}
+      {value.moodboard && <MoodboardPreview board={value.moodboard} />}
       <div className="artist-form-grid">
         <Field label="Client" wide><select value={creatingClient ? '__new' : value.clientId} onChange={e => { setCreatingClient(e.target.value === '__new'); if (e.target.value !== '__new') update('clientId', e.target.value); }} required><option value="">Select a client</option>{data.clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}<option value="__new">+ New client</option></select></Field>
         {creatingClient && <><Field label="Client name"><input value={newClient.name} onChange={e => setNewClient({ ...newClient, name: e.target.value })} required maxLength={100} autoComplete="off" /></Field><Field label="Client email"><input type="email" value={newClient.email} onChange={e => setNewClient({ ...newClient, email: e.target.value })} required maxLength={254} autoComplete="off" placeholder="For the demo, use an example address" /></Field></>}
