@@ -10,8 +10,15 @@
   --ui-radius-panel: 24px;
   --ui-radius-pill: 999px;
   --ui-motion: 150ms ease;
+  --ui-control-height: 40px;
+  --ui-control-compact: 36px;
+  --ui-control-font: 12px;
+  --ui-title-page: clamp(30px, 3.2vw, 42px);
+  --ui-title-section: clamp(24px, 2.5vw, 30px);
+  --ui-title-panel: 20px;
+  --ui-warning: #e2c395;
 }
-:root[data-theme="light"] { --ui-top-edge: #ffffffd9; }
+:root[data-theme="light"] { --ui-top-edge: #ffffffd9; --ui-warning: #896020; }
 html[data-theme] { -webkit-font-smoothing: antialiased; }
 html[data-theme] ::selection { background: var(--selection-border); color: var(--text-primary); }
 
@@ -35,11 +42,12 @@ html[data-theme] .viewport-tools { background: var(--bg-sidebar); }
 html[data-theme] .editor-history-controls { border-color: var(--border-subtle); }
 
 /* Shared button finish. Primary, selected, destructive and disabled states
-   retain distinct semantics; these rules do not change hit areas or order. */
+   retain distinct semantics and the existing control order. */
 html[data-theme] :is(.ep-btn,.ep-pill,.tool-btn--ghost,.tool-btn--export,.focus-icon-button,.focus-panel-toggle,
   .btn-open,.btn-modal-cancel,.snapshot-button,.snapshot-camera-nudges > :where(button),
   .wrap-actions :where(button),.sleeve-section-tabs :where(button),.tattoo-transform-row :where(button),
-  .body-region-card :where(footer button),.body-region-card-lock :where(button),.tattoo-bounds-controls :where(button)) {
+  .body-region-card :where(footer button),.body-region-card-lock :where(button),.tattoo-bounds-controls :where(button),
+  .artist-button,.artist-icon,.mood-button,.client-button,.discover-studio-button,.discover-collect,.discover-saved-toggle) {
   border-radius: var(--ui-radius-pill);
   border-color: var(--border-color);
   background: var(--bg-input);
@@ -51,12 +59,13 @@ html[data-theme] :is(.ep-btn,.ep-pill,.tool-btn--ghost,.tool-btn--export,.focus-
 html[data-theme] :is(.ep-btn,.ep-pill,.tool-btn--ghost,.tool-btn--export,.focus-icon-button,.focus-panel-toggle,
   .btn-open,.btn-modal-cancel,.snapshot-button,.snapshot-camera-nudges > :where(button),
   .wrap-actions :where(button),.sleeve-section-tabs :where(button),.tattoo-transform-row :where(button),
-  .body-region-card :where(footer button),.body-region-card-lock :where(button),.tattoo-bounds-controls :where(button)):hover:not(:disabled) {
+  .body-region-card :where(footer button),.body-region-card-lock :where(button),.tattoo-bounds-controls :where(button),
+  .artist-button,.artist-icon,.mood-button,.client-button,.discover-studio-button,.discover-collect,.discover-saved-toggle):hover:not(:disabled) {
   background: var(--bg-card-hover); color: var(--text-primary);
   border-color: color-mix(in srgb, var(--border-color) 55%, var(--text-secondary));
 }
 html[data-theme] :is(.focus-primary,.tool-btn--primary,.ep-btn.ep-btn--primary,.btn-create,.btn-continue,.btn-modal-primary,.snapshot-button.snapshot-button--primary) {
-  border-radius: var(--ui-radius-pill); font-weight: 650; letter-spacing: -.01em;
+  border-radius: var(--ui-radius-pill); font-weight: 600; letter-spacing: -.01em;
   background: var(--accent-blue); border-color: var(--accent-blue); color: var(--on-accent);
   box-shadow: inset 0 1px 0 #ffffff26, 0 2px 5px #0002;
 }
@@ -209,6 +218,149 @@ html[data-theme] :is(.login-card,.empty-scenes) { border-radius: var(--ui-radius
 
 html[data-theme] :is(.ep-sidebar-body,.tattoo-transform-card,.body-region-card,.snapshot-rail-body,.focus-dialog) {
   scrollbar-width: thin; scrollbar-color: var(--border-color) transparent;
+}
+/* The collaboration screens use the same control sizes and type hierarchy as
+   the studio. Scope these to presentation classes so canvas tools stay compact. */
+html[data-theme] :is(.focus-primary,.artist-button,.mood-button,.client-button,.discover-studio-button,.discover-collect,.discover-saved-toggle,
+  .account-settings .btn-create,.account-settings .btn-open,.focus-dialog .btn-modal-primary,.focus-dialog .btn-modal-cancel) {
+  min-height: var(--ui-control-height); padding: 10px 16px;
+  font-size: var(--ui-control-font); line-height: 18px; gap: 8px;
+}
+html[data-theme] :is(.focus-primary,.artist-button,.mood-button,.client-button,.discover-studio-button,.discover-collect) > svg {
+  width: 15px; height: 15px; flex-shrink: 0;
+}
+html[data-theme] :is(.artist-icon,.focus-dialog > header > .focus-icon-button) {
+  width: var(--ui-control-compact); height: var(--ui-control-compact); min-height: var(--ui-control-compact);
+  padding: 0; flex-shrink: 0; border-radius: 50%;
+}
+html[data-theme] :is(.file-card-actions .btn-open,.file-card-actions .btn-delete) { min-height: var(--ui-control-compact); }
+html[data-theme] .artist-button.artist-danger { color: var(--focus-error); }
+html[data-theme] .artist-button.artist-danger:hover:not(:disabled) {
+  color: var(--focus-error); border-color: var(--focus-error);
+  background: color-mix(in srgb, var(--focus-error) 8%, var(--bg-input));
+}
+html[data-theme] .discover-saved-toggle[aria-pressed="true"] {
+  color: var(--accent-blue); border-color: var(--selection-border); background: var(--selection);
+}
+html[data-theme] :is(.client-text-button,.mood-text-button,.feedback-text-button) {
+  color: var(--accent-blue); font-size: var(--ui-control-font); font-weight: 500; line-height: 1.5;
+  text-underline-offset: 4px; transition: color var(--ui-motion);
+}
+html[data-theme] :is(.client-text-button,.mood-text-button,.feedback-text-button):hover:not(:disabled) { text-decoration: underline; }
+html[data-theme] :is(.mood-page,.client-space,.artist-panel,.focus-dialog,.discover-page) button:disabled {
+  opacity: .45; cursor: default; box-shadow: none;
+}
+
+/* Page, section, panel and card titles retain four deliberate levels. */
+html[data-theme] :is(.focus-page-heading,.artist-heading,.client-heading) { margin-block: 12px 32px; }
+html[data-theme] :is(.focus-page-heading,.artist-heading,.client-heading) h1 { margin: 0 0 12px; }
+html[data-theme] :is(.focus-page-heading,.artist-heading,.client-heading,.account-settings) > h1,
+html[data-theme] :is(.focus-page-heading,.artist-heading,.client-heading) > div > h1 {
+  font-size: var(--ui-title-page); font-weight: 500; line-height: 1.15; letter-spacing: -.04em;
+}
+html[data-theme] :is(.mood-board-heading,.client-project-heading,.discover-collection-heading) h2 {
+  font-size: var(--ui-title-section); font-weight: 500; line-height: 1.25; letter-spacing: -.035em;
+}
+html[data-theme] :is(.artist-section-heading h2,.client-card-heading h3,.settings-session h2,.artist-client-history h3) {
+  font-size: var(--ui-title-panel); font-weight: 500; line-height: 1.3; letter-spacing: -.025em;
+}
+html[data-theme] :is(.focus-dialog > header h2,.feedback-intro h2,.design-versions > header h3,.mood-handoff h2) {
+  font-size: 24px; font-weight: 500; line-height: 1.25; letter-spacing: -.03em;
+}
+html[data-theme] :is(.mood-card h3,.discover-identity h3,.artist-client-card h3) {
+  font-size: 16px; font-weight: 550; line-height: 1.4; letter-spacing: -.015em;
+}
+html[data-theme] :is(.mood-kind,.feedback-eyebrow,.discover-eyebrow,.phase-eyebrow) {
+  font-size: 10px; font-weight: 600; letter-spacing: .1em; line-height: 1.5;
+}
+html[data-theme] :is(.focus-page-heading,.artist-heading,.client-heading) > div > p:not(.focus-eyebrow),
+html[data-theme] .account-settings > p { color: var(--text-secondary); font-size: 13px; line-height: 1.7; }
+
+html[data-theme] .client-aside .client-card-heading h3 { font-size: 16px; }
+
+/* Fields and dialogs share their inset treatment, including textareas. */
+html[data-theme] :is(.mood-form,.artist-field,.account-settings,.client-compose,.artist-compose,.feedback-panel)
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),textarea,select) {
+  border-color: var(--border-color); border-radius: var(--ui-radius); background: var(--bg-input);
+  color: var(--text-primary); font: 400 13px/1.6 var(--font); box-shadow: inset 0 1px 2px #0000000a;
+  transition: border-color var(--ui-motion), box-shadow var(--ui-motion);
+}
+html[data-theme] :is(.mood-form,.artist-field,.account-settings)
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),select) { min-height: 44px; padding: 10px 12px; }
+html[data-theme] :is(.mood-form,.artist-field,.account-settings,.client-compose,.artist-compose,.feedback-panel) textarea { padding: 12px; }
+html[data-theme] :is(.client-space,.mood-page,.artist-panel,.focus-dialog,.feedback-panel) :is(input,textarea,select,button,a):focus-visible {
+  outline: 2px solid var(--accent-blue); outline-offset: 3px;
+}
+html[data-theme] :is(.mood-form,.artist-field,.account-settings) :is(input,textarea,select):focus-visible {
+  border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--ui-ring);
+}
+html[data-theme] :is(.mood-form,.artist-form) { gap: 18px; }
+html[data-theme] .mood-form footer { flex-wrap: wrap; align-items: center; padding-top: 18px; border-top: 1px solid var(--border-subtle); }
+html[data-theme] .account-settings label { font-size: 12px; color: var(--text-secondary); }
+html[data-theme] .account-settings form { border-radius: var(--ui-radius-panel); }
+
+/* Keep content panels quiet and reserve elevation for dialogs and floating tools. */
+html[data-theme] :is(.client-card,.artist-card,.mood-handoff) {
+  border-radius: var(--ui-radius-panel); border-color: var(--border-subtle);
+  background: var(--bg-sidebar); box-shadow: inset 0 1px 0 var(--ui-top-edge);
+}
+html[data-theme] :is(.mood-card,.discover-artist-card,.design-preview) {
+  border-radius: var(--ui-radius-card); border-color: var(--border-subtle);
+  box-shadow: inset 0 1px 0 var(--ui-top-edge);
+}
+html[data-theme] :is(.client-demo,.artist-demo-note) {
+  border-radius: 18px; border-color: var(--border-color); background: var(--bg-input);
+  color: var(--text-secondary); font-size: 11px; line-height: 1.6;
+}
+html[data-theme] :is(.client-tabs > button,.artist-tabs > button,.mood-board-tabs > button,.discover-style-list > button) {
+  min-height: var(--ui-control-height); font-size: var(--ui-control-font); line-height: 18px; font-weight: 500;
+  transition: background var(--ui-motion), color var(--ui-motion), border-color var(--ui-motion);
+}
+html[data-theme] .client-tabs { padding: 5px 5px 20px; margin-inline: -5px; }
+html[data-theme] .design-history { padding: 5px 5px 18px; margin-inline: -3px; }
+html[data-theme] .client-tabs > button { color: var(--text-secondary); }
+html[data-theme] .client-tabs > button[aria-current="page"] { color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--border-color), var(--ui-control-shadow); }
+html[data-theme] .client-tabs > button:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+/* Requested/confirmed states mean the same thing in both sides of a project. */
+html[data-theme] :is(.artist-status,.client-status,.design-status) { padding: 7px 10px; font-size: 10px; line-height: 16px; font-weight: 500; }
+html[data-theme] :is(.artist-status--requested,.client-status--requested,.design-status--changes_requested) {
+  color: var(--ui-warning); background: color-mix(in srgb, var(--ui-warning) 10%, transparent);
+}
+html[data-theme] :is(.artist-status--confirmed,.artist-status--completed,.client-status--confirmed,.client-status--completed,.design-status--approved) {
+  color: var(--focus-success); background: color-mix(in srgb, var(--focus-success) 10%, transparent);
+}
+html[data-theme] :is(.artist-status--cancelled,.artist-status--declined,.client-status--cancelled,.client-status--declined) {
+  color: var(--focus-error); background: color-mix(in srgb, var(--focus-error) 8%, transparent);
+}
+/* This pale callout needs its own dark foreground in both themes. */
+html[data-theme] .client-next .focus-eyebrow { color: #52604d; }
+html[data-theme] .client-next .focus-primary { color: #f0f3ec; background: #2a3b2a; border-color: #2a3b2a; box-shadow: none; }
+html[data-theme] .client-next .focus-primary:hover:not(:disabled) { color: #fff; background: #354c35; border-color: #354c35; }
+
+/* Moodboard navigation follows the artist directory's compact pill actions. */
+html[data-theme] .mood-nav { flex-wrap: wrap; gap: 16px; }
+html[data-theme] .mood-nav > div { gap: 10px; }
+html[data-theme] .mood-nav > div > button {
+  min-height: var(--ui-control-height); padding: 10px 14px; font-size: var(--ui-control-font); line-height: 18px;
+  border: 1px solid var(--border-color); border-radius: var(--ui-radius-pill); background: var(--bg-input);
+  color: var(--text-secondary); box-shadow: var(--ui-control-shadow); transition: background var(--ui-motion), color var(--ui-motion);
+}
+html[data-theme] .mood-nav > div > button:hover { color: var(--text-primary); background: var(--bg-card-hover); }
+
+/* Give the full artwork page room to breathe without enlarging the studio rail. */
+html[data-theme] .focus-library-page .tattoo-library-intro strong { font-size: var(--ui-title-panel); font-weight: 500; letter-spacing: -.025em; }
+html[data-theme] .focus-library-page .tattoo-library-upload { min-height: var(--ui-control-height); font-size: var(--ui-control-font); }
+html[data-theme] .focus-library-page .tattoo-library-filters button { min-height: var(--ui-control-compact); font-size: var(--ui-control-font); }
+html[data-theme] .focus-library-page .tattoo-asset-select { border-radius: var(--ui-radius-card); overflow: hidden; border: 1px solid var(--border-subtle); background: var(--bg-sidebar); }
+html[data-theme] .focus-library-page .tattoo-asset-art { border-radius: var(--ui-radius-card); }
+html[data-theme] .focus-library-page .tattoo-asset-select strong { margin: 12px 12px 4px; font-size: 13px; line-height: 1.5; }
+html[data-theme] .focus-library-page .tattoo-asset-select small { margin: 0 12px 12px; font-size: 11px; line-height: 1.5; }
+html[data-theme] .focus-library-page .tattoo-asset-remove { width: 30px; height: 30px; right: 8px; top: 8px; border-radius: 50%; }
+@media (max-width: 580px) {
+  html[data-theme] .mood-nav > div { flex-basis: 100%; justify-content: flex-end; margin-left: 0; }
+  html[data-theme] :is(.mood-form,.artist-field,.account-settings,.client-compose,.artist-compose) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),textarea,select) { font-size: 16px; }
+  html[data-theme] .client-session h3 { font-size: 16px; }
 }
 @media (max-width: 760px) { html[data-theme] .ep-inspector-tabs { margin-bottom: 10px; } }
 @media (prefers-reduced-motion: reduce) {
