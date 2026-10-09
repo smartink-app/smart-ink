@@ -1,3 +1,4 @@
+import FeedbackScene, { type FeedbackSceneProps } from './feedback/FeedbackScene';
 import { deformFit, heightWarp, type BodyFit } from './measurements/fitter';
 import { bindSkinRestCoordinates, SKIN_DETAIL, SKIN_DETAIL_GLSL } from './render/skinDetail';
 import { isTattooHit, tattooAnchorPoint } from './model/tattooHit';
@@ -313,6 +314,7 @@ export interface ModelWithUVTattooHandle {
 }
 
 interface ModelWithUVTattooProps {
+  feedback?: FeedbackSceneProps;
   uploadedImage: string | null;
   skinToneId: string;
   /** Which figure to load; falls back to the first registry entry. */
@@ -365,6 +367,7 @@ interface ModelWithUVTattooProps {
 const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooProps>(
   function ModelWithUVTattoo(
     {
+      feedback,
       uploadedImage,
       skinToneId,
       bodyMeshId,
@@ -1172,6 +1175,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     if (!cloneGroup) return null;
     return <>
       <primitive object={cloneGroup} />
+      {feedback && <FeedbackScene {...feedback} mesh={bodyMeshRef} bodyMeshId={bodyDef.id} pick={pick} />}
       {editingEnabled && interactionMode === 'tattoo' && hasPlaced && visible && onDecalScaleChange && onDecalRotationChange && <TattooViewportControls
         mesh={bodyMeshRef} anchor={anchorRef} scale={decalScale} rotation={decalRotation}
         onScale={value => onDecalScaleChange(limitScale(value))} onRotation={value => onDecalRotationChange(limitRotation(value))}

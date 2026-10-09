@@ -1,3 +1,6 @@
+import FeedbackPanel, { FeedbackToolbar } from './feedback/FeedbackPanel'
+import { useReview } from './feedback/useReview'
+import type { FeedbackLocation } from './feedback/model'
 import RevealPanel from './RevealPanel'
 import { revealCamera, type RevealPreset } from './render/reveal'
 import BodyRegionCard from './model/BodyRegionCard'
@@ -155,6 +158,9 @@ function sampleTrackStyle(samples: number): CSSProperties {
 
 export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps) {
   const [currentScene, setCurrentScene] = useState<SceneData | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const review = useReview(session.email, currentScene?.id)
+  const reviewCamera = useRef<CameraView | null>(null)
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('tattoo')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [artworkOpen, setArtworkOpen] = useState(false)
@@ -470,9 +476,9 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   }, [])
   const editHistory = useEditorHistory({ value: editValue, onRestore: restoreEdits,
     scopeId: currentScene?.id, enabled: Boolean(currentScene) && !showDashboard })
-  const historyBlocked = accountMenuOpen || measureOpen || showDashboard || snapshot.open || showExportModal || showRenderHistory || modelLoading
-  const historyCommands = useRef({ ...editHistory, blocked: historyBlocked, gesturesBlocked: measureOpen || showDashboard || modelLoading })
-  historyCommands.current = { ...editHistory, blocked: historyBlocked, gesturesBlocked: measureOpen || showDashboard || modelLoading }
+  const historyBlocked = reviewOpen || accountMenuOpen || measureOpen || showDashboard || snapshot.open || showExportModal || showRenderHistory || modelLoading
+  const historyCommands = useRef({ ...editHistory, blocked: historyBlocked, gesturesBlocked: reviewOpen || measureOpen || showDashboard || modelLoading })
+  historyCommands.current = { ...editHistory, blocked: historyBlocked, gesturesBlocked: reviewOpen || measureOpen || showDashboard || modelLoading }
   useEffect(() => {
     const root = canvasContainerRef.current
     if (!root || showDashboard) return
@@ -589,7 +595,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
 
   // Save editor state to current scene (except thumbnail)
   useEffect(() => {
-    if (!currentScene || showDashboard || measureOpen || snapshot.open) return
+    if (!currentScene || showDashboard || reviewOpen || measureOpen || snapshot.open) return
     const updated: SceneData = {
       ...currentScene,
       decalImage: uploadedImage,
@@ -627,13 +633,13 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     // currentScene is deliberately not a dependency: this effect writes it, so
     // including it would re-run on every save and loop forever.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentScene?.id, showDashboard, measureOpen, snapshot.open, bodyFit, stageScene, flushPendingSave, uploadedImage, decalVisible, surfacePlacement, decalRotation, decalScale, decalColor, decalOpacity, decalPosition, decalNormal, background, studio, lightingPreset, lights, cameraState, bodyMeshId, skinToneId, poseId, lookId, qualityTier, finalSamples, bodyShape, bodyPose, bodyAppearance, isolateRegion])
+  }, [currentScene?.id, showDashboard, reviewOpen, measureOpen, snapshot.open, bodyFit, stageScene, flushPendingSave, uploadedImage, decalVisible, surfacePlacement, decalRotation, decalScale, decalColor, decalOpacity, decalPosition, decalNormal, background, studio, lightingPreset, lights, cameraState, bodyMeshId, skinToneId, poseId, lookId, qualityTier, finalSamples, bodyShape, bodyPose, bodyAppearance, isolateRegion])
 
   // Capture a dashboard thumbnail once the user pauses. Encoding the full
   // canvas on every change produced multi-megabyte data URLs and a save per
   // slider tick; this waits for 1.5 s of quiet and shrinks to 512 px.
   useEffect(() => {
-    if (!currentScene || showDashboard || measureOpen || snapshot.open || !canvasContainerRef.current) return
+    if (!currentScene || showDashboard || reviewOpen || measureOpen || snapshot.open || !canvasContainerRef.current) return
     const timeout = setTimeout(() => {
       if (document.hidden) return
       const canvas = canvasContainerRef.current?.querySelector('canvas') as HTMLCanvasElement | null
@@ -653,7 +659,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
       void flushPendingSave().catch(() => {})
     }, 1500)
     return () => clearTimeout(timeout)
-  }, [currentScene, showDashboard, measureOpen, snapshot.open, bodyFit, sceneSaves, stageScene, flushPendingSave, uploadedImage, surfacePlacement, decalRotation, decalScale, decalColor, decalOpacity, decalPosition, decalNormal, background, studio, lightingPreset, lights, cameraState, bodyShape, bodyPose, bodyAppearance, isolateRegion])
+  }, [currentScene, showDashboard, reviewOpen, measureOpen, snapshot.open, bodyFit, sceneSaves, stageScene, flushPendingSave, uploadedImage, surfacePlacement, decalRotation, decalScale, decalColor, decalOpacity, decalPosition, decalNormal, background, studio, lightingPreset, lights, cameraState, bodyShape, bodyPose, bodyAppearance, isolateRegion])
 
   const handleBodyMeshChange = (id: string) => {
     if (id === bodyMeshId || !findById(REGISTRY.bodyMeshes, id)) return
@@ -1032,6 +1038,23 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showRenderHistory, snapshot.open, closeSnapshot])
 
+  const openReview = () => afterSaving(() => {
+    reviewCamera.current = structuredClone(orbitControlsRef.current?.freezeSnapshot(true) ?? cameraState)
+    setShapeMenu(null); setPanelRegions([]); setSelectedLight(null)
+    setReviewOpen(true)
+  })
+  const closeReview = () => {
+    // Freeze damping before restoring the artist's framing; review orbits never save into the project.
+    orbitControlsRef.current?.freezeSnapshot()
+    if (reviewCamera.current) setCameraState(structuredClone(reviewCamera.current))
+    setCameraRequestId(value => value + 1)
+    setReviewOpen(false)
+  }
+  const viewFeedback = (location: FeedbackLocation) => {
+    orbitControlsRef.current?.freezeSnapshot()
+    setCameraState(structuredClone(location.camera)); setCameraRequestId(value => value + 1)
+  }
+
   if (showDashboard) {
     return (
       <div style={{ position: 'relative', width: '100%', minHeight: '100vh' }}>
@@ -1048,9 +1071,9 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
   }
 
   return (
-    <div className={`editor-app-root${measureOpen ? ' editor-app-root--measuring' : ''}${photoMode ? ' editor-app-root--photo' : ''}${snapshot.open ? ' editor-app-root--shooting' : ''}`} ref={canvasContainerRef}>
+    <div className={`editor-app-root${reviewOpen ? ' editor-app-root--review' : ''}${measureOpen ? ' editor-app-root--measuring' : ''}${photoMode ? ' editor-app-root--photo' : ''}${snapshot.open ? ' editor-app-root--shooting' : ''}`} ref={canvasContainerRef}>
       <StudioRail active={accountMenuOpen ? 'account' : artworkOpen ? 'artwork' : 'studio'}
-        onHome={() => afterSaving(onHome)} disabled={snapshot.open || measureOpen || measureLoading}
+        onHome={() => afterSaving(onHome)} disabled={reviewOpen || snapshot.open || measureOpen || measureLoading}
         onNavigate={section => {
           if (section === 'projects' || section === 'artist') afterSaving(() => { setDashboardSection(section); setShowDashboard(true) })
           if (section === 'studio') { setArtworkOpen(false); setSidebarCollapsed(false) }
@@ -1058,7 +1081,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
           if (section === 'renders') setShowRenderHistory(true)
           if (section === 'account') afterSaving(() => setAccountMenuOpen(true))
         }} />
-      <header className="editor-toolbar editor-toolbar--main" inert={snapshot.open || measureOpen || measureLoading}>
+      <header className="editor-toolbar editor-toolbar--main" inert={reviewOpen || snapshot.open || measureOpen || measureLoading}>
         <button type="button" className="focus-panel-toggle" onClick={() => setSidebarCollapsed(value => !value)} aria-expanded={!sidebarCollapsed} title={sidebarCollapsed ? 'Show editing controls' : 'Hide editing controls'}><FiSidebar aria-hidden /><span>Controls</span></button>
         <div className="editor-toolbar-center editor-scene-heading">
           <input key={currentScene?.id} className="editor-scene-name" aria-label="Scene name"
@@ -1086,11 +1109,13 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             <button type="button" className="tool-btn tool-btn--ghost" aria-label="Redo edit" title="Redo · ⌘ / Ctrl Shift Z" disabled={historyBlocked || !editHistory.canRedo} onClick={editHistory.redo}><FaRedo aria-hidden="true" /><span>Redo</span></button>
           </div>
           <button type="button" className="tool-btn tool-btn--primary" onClick={() => openSnapshot()} disabled={modelLoading || !canvasHostSized || renderBusy} title="Frame the tattoo and set up a Blender snapshot">Shoot</button>
+          <button type="button" className="tool-btn tool-btn--ghost" onClick={openReview} disabled={modelLoading || !canvasHostSized}>Feedback</button>
           <EditorOutputMenu onExport={() => setShowExportModal(true)} onShare={() => setShowRenderHistory(true)} />
 
         </div>
       </header>
 
+      {reviewOpen && <FeedbackToolbar review={review} name={currentScene?.name ?? 'Untitled project'} onClose={closeReview} />}
       {measureError && <div className="editor-notice" role="alert">{measureError}<button type="button" className="ep-btn" onClick={() => setMeasureError('')}>Dismiss</button></div>}
       {saveState.status === 'error' && <div className="editor-notice" role="alert">Your latest changes are still here. Saving failed; retry before leaving this page.</div>}
       {photoMode && <div className="photo-mode-actions" inert={snapshot.open || measureOpen || measureLoading} style={snapshot.open ? { visibility: 'hidden' } : undefined}>
@@ -1176,7 +1201,12 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
         </div>
 
         <div className="editor-canvas-host">
-          {!photoMode && <ViewportControls disabled={snapshot.open || measureOpen || measureLoading || modelLoading}
+          {reviewOpen && <div className="feedback-view-tools" role="group" aria-label="Review camera">
+            <span>Explore the placement</span>
+            <button type="button" className="ep-btn" onClick={() => viewWrap(false)} disabled={!surfacePlacement}>Frame tattoo</button>
+            <button type="button" className="ep-btn" onClick={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}>Fit model</button>
+          </div>}
+          {!photoMode && !reviewOpen && <ViewportControls disabled={snapshot.open || measureOpen || measureLoading || modelLoading}
             showPlacementTips={showPlacementTips} onPlacementTipsChange={togglePlacementTips}
             cameraPreset={cameraPreset} cameras={CAMERA_PRESETS}
             onCameraChange={(preset) => handleCameraPresetChange(preset as CameraPresetKey)}
@@ -1237,7 +1267,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
           performanceMode={performanceMode}
         />
         <StudioBackdrop studio={studio} isolateRegion={isolateRegion} performanceMode={performanceMode} />
-        {!photoMode && !snapshot.open && !measureOpen && studio.showGuides && <LightHandles lights={lights} selectedIndex={selectedLight} onSelect={setSelectedLight} />}
+        {!reviewOpen && !photoMode && !snapshot.open && !measureOpen && studio.showGuides && <LightHandles lights={lights} selectedIndex={selectedLight} onSelect={setSelectedLight} />}
         <Suspense fallback={<LoadingSignal onChange={setModelLoading} />}>
           <ModelWithUVTattoo
             key={`${currentScene?.id}:${bodyMeshId}`}
@@ -1266,13 +1296,19 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             bodyPose={measureOpen ? DEFAULT_BODY_POSE : bodyPose}
             bodyAppearance={measureOpen ? DEFAULT_BODY_APPEARANCE : bodyAppearance}
             isolateRegion={measureOpen ? null : isolateRegion}
-            highlightRegions={photoMode || snapshot.open || measureOpen ? [] : highlightRegions}
-            editingEnabled={!photoMode && !snapshot.open && !measureOpen && inspectorTab !== 'studio'}
+            highlightRegions={reviewOpen || photoMode || snapshot.open || measureOpen ? [] : highlightRegions}
+            editingEnabled={!reviewOpen && !photoMode && !snapshot.open && !measureOpen && inspectorTab !== 'studio'}
             interactionMode={inspectorTab === 'figure' ? 'model' : 'tattoo'}
             onDecalScaleChange={setDecalScale}
             onDecalRotationChange={setDecalRotation}
             onRegionPress={inspectorTab === 'figure' ? handleRegionPress : undefined}
-            onFrameRegion={measureOpen ? undefined : handleFrameRegion}
+            onFrameRegion={measureOpen || reviewOpen ? undefined : handleFrameRegion}
+            feedback={reviewOpen ? {
+              threads: review.data.threads, selected: review.selected, draft: review.composer?.location ?? null, armed: review.armed,
+              onSelect: review.setSelected,
+              onMiss: () => review.setNotice('Choose a visible spot on the skin.'),
+              onPick: (anchor, label) => review.pick({ anchor, label, camera: structuredClone(orbitControlsRef.current?.freezeSnapshot() ?? cameraState) }),
+            } : undefined}
           />
         </Suspense>
         {measureOpen && <MeasurementScene model={uvPlacementRef} step={measureStep} onFrame={frameMeasurement} />}
@@ -1289,12 +1325,13 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
             </ErrorBoundary>
             </>
             )}
-            {showPlacementTips && !modelLoading && !photoMode && !snapshot.open && !measureOpen && (
+            {showPlacementTips && !reviewOpen && !modelLoading && !photoMode && !snapshot.open && !measureOpen && (
               <div className="placement-help" role="status" aria-live="polite">
                 <strong>{inspectorTab === 'figure' ? 'Personalize the model' : inspectorTab === 'studio' ? 'Set the scene' : 'Place your tattoo'}</strong>
                 <span>{inspectorTab === 'figure' ? 'Click a body region to adjust it. Drag the background to orbit.' : inspectorTab === 'studio' ? 'Choose a shot on the left to open your photo studio.' : placementStatus}</span>
               </div>
             )}
+            {reviewOpen && <div className="feedback-viewport-hint">{review.armed ? 'Click skin to pin · drag to rotate' : 'Drag to explore · placement locked'}</div>}
             {modelLoading && (
               <div className="editor-canvas-loading" role="status">
                 Loading body mesh…
@@ -1329,6 +1366,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
         </div>
 
 
+        {reviewOpen && <FeedbackPanel review={review} bodyMeshId={bodyMeshId} onView={viewFeedback} />}
       </div>
 
       {accountMenuOpen && <FocusDialog title="Your account" onClose={() => setAccountMenuOpen(false)}>
@@ -1619,7 +1657,7 @@ export default function Workspace({ session, onHome, onSignOut }: WorkspaceProps
         </FocusDialog>
       )}
 
-      {shapeMenu && !photoMode && (
+      {shapeMenu && !photoMode && !reviewOpen && (
         <BodyRegionCard
           region={shapeMenu.region}
           x={shapeMenu.x}
