@@ -37,6 +37,8 @@ def validate_input(job):
         raise ValueError("Scene contract is too large")
     try:
         contract = renderer.validate_contract(raw)
+        if 'reveal' in contract:
+            raise ValueError('Motion export is not enabled on this cloud worker; use the local motion renderer.')
         ink = data.get("ink_base64")
         if not isinstance(ink, str) or len(ink) > 4 * ((MAX_INK_BYTES + 2) // 3):
             raise ValueError("ink_base64 must be a PNG of at most 6 MiB")

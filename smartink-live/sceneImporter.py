@@ -22,6 +22,7 @@ import bmesh
 import bpy
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from server.measurement_fit import validate_fit, load_asset as load_measurement_asset, deform_fit
 
 # ---------------------------------------------------------------------------
@@ -2597,6 +2598,9 @@ def _resolve_texture(contract_dir: str, filename: str) -> Optional[str]:
         os.path.join(contract_dir, "assets", "derived"),
         os.path.join(script_dir, "assets"),
         os.path.join(script_dir, "..", "assets", "derived"),
+        os.path.join(script_dir, "..", "public", "models"),
+        os.path.join(script_dir, "..", "public", "textures"),
+        os.path.join(script_dir, "..", "server", "runpod", "textures"),
         os.path.join(script_dir, "..", "..", "assets", "derived"),
     ):
         if not base:
@@ -3975,6 +3979,9 @@ def build_scene(contract_path: str) -> str:
     center_body_at_origin(body)
     ensure_box_projection_uvs(body)
     apply_skin(body, contract.get("skinToneId", "tone_03"), contract_dir)
+    if contract.get('skinMaterial') == 'studio':
+        from studioSkin import bind_rest_skin
+        bind_rest_skin(body)
     if 'bodyFit' in contract:
         if any(contract.get('bodyShape', {}).values()):
             raise ValueError('bodyFit replaces bodyShape; they cannot be combined')
@@ -4055,6 +4062,9 @@ def build_scene(contract_path: str) -> str:
     )
     if cinematic:
         enhance_skin_realism(body, contract["bodyMeshId"], contract_dir)
+        if contract.get('skinMaterial') == 'studio':
+            from studioSkin import apply_studio_skin
+            apply_studio_skin(body, _resolve_texture(contract_dir, 'soft-cells-height.png'), _world_scale(body))
         enhance_appearance_materials(body)
         apply_cinematic_grade(contract.get("output", {}).get("qualityTier", "final"))
 

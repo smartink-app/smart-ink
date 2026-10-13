@@ -2,6 +2,7 @@
 !server/
 !server/app.py
 !server/measurement_fit.py
+!server/video_jobs.py
 !public/
 !public/measurements/
 !public/measurements/*-v1.bin
@@ -14,6 +15,8 @@
 !server/runpod/textures/*.png
 !smartink-live/
 !smartink-live/sceneImporter.py
+!smartink-live/studioSkin.py
+!smartink-live/revealRender.py
 !smartink-live/body_full.blend
 !smartink-live/body_full_female.blend
 !smartink-live/assets/

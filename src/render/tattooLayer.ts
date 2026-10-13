@@ -49,3 +49,16 @@ vec4 sampleSurfaceTattoo(
   return vec4(ink.rgb * tint, ink.a * clamp(opacity, 0.0, 1.0) * fade.x * fade.y);
 }
 `;
+
+/** Periodic artwork: no fade on the horizontal join, and continuous texture
+ * derivatives across it. Both preview and bake use a RepeatWrapping texture. */
+export const WRAP_TATTOO_GLSL = /* glsl */ `
+vec4 sampleWrapTattoo(sampler2D image, vec2 strip, float mask, vec3 tint, float opacity) {
+  if (mask < 0.9999 || abs(strip.y) > 0.5) return vec4(0.0);
+  vec2 uv = vec2(strip.x, strip.y + 0.5);
+  vec4 ink = texture2D(image, uv);
+  float feather = min(0.005, max(fwidth(uv.y) * 0.5, 0.00001));
+  float fade = smoothstep(0.0, feather, min(uv.y, 1.0 - uv.y));
+  return vec4(ink.rgb * tint, ink.a * clamp(opacity, 0.0, 1.0) * fade);
+}
+`;

@@ -155,12 +155,13 @@ findHandle(ast); assert.ok(handle);
 const code = (await transform(`(${handle})()`, { loader: 'ts' })).code;
 const expectedFrame = { center: [1, 2, 3] }, framedArgs = [];
 const scope = { placeInView: () => false, resolveTattooSource: api.resolveTattooSource, tattooFramingFromGeometry: (...args) => { framedArgs.push(args); return expectedFrame; }, uploadedImage: null, loadedImageRef: { current: '/logo.png' }, hasPlacedRef: { current: true }, visible: true,
+  setWrap() {}, setSleeve() {}, getSleeveFraming: () => expectedFrame, limitScale: value => value, limitRotation: value => value, setAreaLock() {}, fitToArea() {}, assessment: null,
   bodyMeshRef: { current: { geometry: {}, matrixWorld: identity, updateWorldMatrix() {} } }, anchorRef: { current: anchor(0) }, chartRef: { current: {} }, hairCoverageRef: { current: null },
   size: .42, imageAspect: 2, rotationRad: .3, decalColor: '#223344', decalOpacity: .6, regionFraming: () => null, isolateRegion: null };
 const getHandle = () => new Function('scope', `with(scope) { return ${code} }`)(scope);
 assert.equal(getHandle().getPlacement().imageReady, true); assert.equal(getHandle().getPlacement().imageSource, '/logo.png'); assert.equal(getHandle().getPlacement().hasPlaced, true);
 assert.equal(getHandle().getTattooFraming(), expectedFrame); assert.equal(framedArgs[0][2], scope.anchorRef.current);
-assert.deepEqual(framedArgs[0][3], { size: .42, aspect: 2, rotationRad: .3, hairCoverage: null });
+assert.deepEqual(framedArgs[0][3], { size: .42, aspect: 2, rotationRad: .3, wrap: false, hairCoverage: null });
 for (const change of [{ uploadedImage: '/new-image.png' }]) {
   const saved = { ...scope }; Object.assign(scope, change); assert.equal(getHandle().getTattooFraming(), null); assert.equal(getHandle().getPlacement().imageReady, false); Object.assign(scope, saved);
 }

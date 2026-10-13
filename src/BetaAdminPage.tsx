@@ -41,6 +41,10 @@ export default function BetaAdminPage({
   onGoLogin,
   onSignOut,
 }: BetaAdminPageProps) {
+  const [query, setQuery] = useState('');
+  const [section, setSection] = useState<'waitlisted' | 'invited' | 'active' | 'revoked' | 'invites'>('waitlisted');
+  const [inviteFilter, setInviteFilter] = useState('all');
+  const [note, setNote] = useState('');
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -79,10 +83,12 @@ export default function BetaAdminPage({
     const copied = await copy(link);
     let text = `${created}${copied ? ' Link copied.' : ''}`;
     if (invite.email) {
-      const result = await sendInviteEmail(invite.code);
-      text += result.sent
-        ? ` Emailed to ${invite.email}.`
-        : ` Not emailed: ${result.reason ?? 'unknown reason'}`;
+      try {
+        const result = await sendInviteEmail(invite.code);
+        text += result.sent ? ` Emailed to ${invite.email}.` : ` Not emailed: ${result.reason ?? 'Use the invitation link or retry from Invite links.'}`;
+      } catch {
+        text += ' Invitation saved, but email delivery failed. Retry from Invite links.';
+      }
     }
     setMessage(text);
     await onRefresh();
@@ -110,9 +116,10 @@ export default function BetaAdminPage({
     try {
       const invite = await createInvite({
         email: manualEmail.trim() ? manualEmail : null,
-        note: 'Manual invite',
+        note: note.trim() || 'Manual invite',
       });
       setManualEmail('');
+      setNote('');
       await deliver(invite, invite.email ? `Invite created for ${invite.email}.` : 'Open invite created.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create invite.');
@@ -122,7 +129,7 @@ export default function BetaAdminPage({
   };
 
   const handleRevoke = async (entry: WaitlistEntry) => {
-    if (!window.confirm(`Revoke beta access for ${entry.email}? They will be signed out and cannot sign in again.`)) {
+    if (!window.confirm(`Revoke beta access for ${entry.email}? They will lose beta access when access is next checked.`)) {
       return;
     }
     setError(null);
@@ -137,6 +144,22 @@ export default function BetaAdminPage({
     } finally {
       setBusy(null);
     }
+  };
+
+  const handleRefresh = async () => {
+    setBusy('refresh'); setError(null);
+    try { await onRefresh(); } catch (err) { setError(err instanceof Error ? err.message : 'Could not refresh.'); }
+    finally { setBusy(null); }
+  };
+
+  const handleResend = async (invite: Invite) => {
+    setBusy(invite.code); setError(null); setMessage(null);
+    try {
+      const result = await sendInviteEmail(invite.code);
+      if (!result.sent) throw new Error(result.reason || 'Email could not be sent. You can copy the link instead.');
+      setMessage(`Invitation sent to ${invite.email}.`);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not send invitation.'); }
+    finally { setBusy(null); }
   };
 
   const handleCopyLink = async (code: string) => {
@@ -212,195 +235,63 @@ export default function BetaAdminPage({
     );
   }
 
-  const pending = waitlist.filter((w) => w.status === 'waitlisted');
-  const active = waitlist.filter((w) => w.status === 'active');
-  const activeOnlyEmails = activeEmails.filter((e) => !active.some((w) => w.email === e));
-  const revoked = waitlist.filter((w) => w.status === 'revoked');
+  const matches = (...values: (string | null | undefined)[]) => values.join(' ').toLowerCase().includes(query.trim().toLowerCase());
+  const counts = {
+    waitlisted: waitlist.filter(w => w.status === 'waitlisted').length,
+    invited: waitlist.filter(w => w.status === 'invited').length,
+    active: new Set([...waitlist.filter(w => w.status === 'active').map(w => w.email), ...activeEmails]).size,
+    revoked: waitlist.filter(w => w.status === 'revoked').length,
+    invites: invites.length,
+  };
+  const people = waitlist.filter(w => w.status === section && matches(w.email, w.source)).sort((a,b) => b.createdAt - a.createdAt);
+  const extraActive = section === 'active' ? activeEmails.filter(email => !waitlist.some(w => w.status === 'active' && w.email === email) && matches(email)) : [];
+  const inviteStatus = (invite: Invite) => invite.redeemedAt ? 'used' : invite.expiresAt < Date.now() ? 'expired' : 'open';
+  const shownInvites = invites.filter(i => matches(i.email, i.code, i.note, i.redeemedByEmail) && (inviteFilter === 'all' || inviteStatus(i) === inviteFilter)).sort((a,b) => b.createdAt - a.createdAt);
 
-  return (
-    <div className="beta-admin-page">
-      <header className="beta-admin-header">
-        <div>
-          <p className="beta-eyebrow">Operator · {mode === 'supabase' ? 'Supabase' : 'Local demo'}</p>
-          <h1>Beta console</h1>
-        </div>
-        <div className="beta-admin-actions">
-          <button type="button" className="btn-login" onClick={onBack}>
-            Back
-          </button>
-          <button type="button" className="btn-login" onClick={() => void onRefresh()}>
-            Refresh
-          </button>
-          {mode === 'demo' ? (
-            <button type="button" className="btn-login" onClick={onLock}>
-              Lock
-            </button>
-          ) : (
-            <button type="button" className="btn-login" onClick={onSignOut}>
-              Sign out
-            </button>
-          )}
-        </div>
-      </header>
-
-      {mode === 'demo' && (
-        <p className="beta-admin-note">
-          Local demo backend: everything here is stored in this browser only. Invites minted here
-          cannot be redeemed on another device. Configure Supabase for the real thing.
-        </p>
-      )}
-      {session && mode === 'supabase' && (
-        <p className="beta-admin-note">Signed in as {session.email}.</p>
-      )}
-
-      {message && <div className="beta-banner">{message}</div>}
-      {error && <div className="beta-banner beta-banner--error">{error}</div>}
-      {loadError && <div className="beta-banner beta-banner--error">{loadError}</div>}
-      {lastLink && (
-        <div className="beta-banner">
-          Invite link:{' '}
-          <button type="button" className="beta-inline-link" onClick={() => void copy(lastLink)}>
-            {lastLink}
-          </button>
-        </div>
-      )}
-
-      <section className="beta-admin-section">
-        <h2>Create invite</h2>
-        <form className="beta-admin-inline-form" onSubmit={handleCreateInvite}>
-          <input
-            className="login-input"
-            type="email"
-            placeholder="Optional email lock"
-            value={manualEmail}
-            onChange={(e) => setManualEmail(e.target.value)}
-          />
-          <button type="submit" className="btn-getstarted" disabled={busy !== null}>
-            {busy === 'mint' ? 'Creating…' : 'Mint invite link'}
-          </button>
-        </form>
-        <p className="beta-muted">
-          With an email, the invite is locked to that address and emailed if the send-invite
-          function is deployed. The link is copied either way.
-        </p>
-      </section>
-
-      <section className="beta-admin-section">
-        <h2>Waitlist ({pending.length})</h2>
-        {pending.length === 0 ? (
-          <p className="beta-muted">No pending requests.</p>
-        ) : (
-          <ul className="beta-admin-list">
-            {pending.map((entry) => (
-              <li key={entry.id}>
-                <div>
-                  <strong>{entry.email}</strong>
-                  <span className="beta-muted">
-                    {' '}
-                    · {new Date(entry.createdAt).toLocaleString()}
-                    {entry.source ? ` · ${entry.source}` : ''}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="btn-getstarted"
-                  disabled={busy !== null}
-                  onClick={() => void handleApprove(entry)}
-                >
-                  {busy === entry.id ? 'Approving…' : 'Approve + send invite'}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="beta-admin-section">
-        <h2>Invites ({invites.length})</h2>
-        {invites.length === 0 ? (
-          <p className="beta-muted">No invites yet.</p>
-        ) : (
-          <ul className="beta-admin-list">
-            {invites.map((invite) => {
-              const open = !invite.redeemedAt && Date.now() <= invite.expiresAt;
-              return (
-                <li key={invite.code}>
-                  <div>
-                    <code className="beta-code">{invite.code}</code>
-                    <span className="beta-muted">
-                      {' '}
-                      · {invite.email ?? 'open seat'} ·{' '}
-                      {invite.redeemedAt
-                        ? `used by ${invite.redeemedByEmail}`
-                        : Date.now() > invite.expiresAt
-                          ? 'expired'
-                          : `open until ${new Date(invite.expiresAt).toLocaleDateString()}`}
-                    </span>
-                  </div>
-                  {open && (
-                    <button
-                      type="button"
-                      className="btn-login"
-                      onClick={() => void handleCopyLink(invite.code)}
-                    >
-                      Copy link
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section className="beta-admin-section">
-        <h2>Active ({active.length + activeOnlyEmails.length})</h2>
-        {active.length === 0 && activeOnlyEmails.length === 0 ? (
-          <p className="beta-muted">No activated accounts yet.</p>
-        ) : (
-          <ul className="beta-admin-list">
-            {active.map((entry) => (
-              <li key={entry.id}>
-                <div>
-                  <strong>{entry.email}</strong>
-                  {entry.activatedAt && (
-                    <span className="beta-muted">
-                      {' '}
-                      · since {new Date(entry.activatedAt).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="btn-login"
-                  disabled={busy !== null}
-                  onClick={() => void handleRevoke(entry)}
-                >
-                  {busy === entry.id ? 'Revoking…' : 'Revoke'}
-                </button>
-              </li>
-            ))}
-            {activeOnlyEmails.map((email) => (
-              <li key={email}>
-                <strong>{email}</strong>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {revoked.length > 0 && (
-        <section className="beta-admin-section">
-          <h2>Revoked ({revoked.length})</h2>
-          <ul className="beta-admin-list">
-            {revoked.map((entry) => (
-              <li key={entry.id}>
-                <strong>{entry.email}</strong>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+  return <div className="beta-admin-page">
+    <header className="beta-admin-header">
+      <div><p className="beta-eyebrow">Beta management</p><h1>Beta console</h1><p className="beta-muted">Review requests, invite artists, and manage access.</p></div>
+      <div className="beta-admin-actions">
+        <button className="btn-login" onClick={onBack}>Back to studio</button>
+        <button className="btn-login" disabled={busy !== null} onClick={() => void handleRefresh()}>{busy === 'refresh' ? 'Refreshing…' : 'Refresh'}</button>
+        <button className="btn-login" onClick={mode === 'demo' ? onLock : onSignOut}>{mode === 'demo' ? 'Lock' : 'Sign out'}</button>
+      </div>
+    </header>
+    <p className="beta-admin-note">{mode === 'demo' ? 'Local preview · Changes stay in this browser. No real invitation emails are sent.' : `Hosted beta · Signed in as ${session?.email ?? 'operator'}`}</p>
+    <div className="admin-summary">
+      {(['waitlisted','invited','active','revoked'] as const).map(status => <button key={status} aria-pressed={section === status} onClick={() => setSection(status)}><strong>{counts[status]}</strong><span>{status === 'waitlisted' ? 'Awaiting review' : status === 'invited' ? 'Invited' : status === 'active' ? 'Active access' : 'Revoked'}</span></button>)}
     </div>
-  );
+    {message && <div className="beta-banner" role="status">{message}</div>}
+    {(error || loadError) && <div className="beta-banner beta-banner--error" role="alert">{error || loadError}</div>}
+    {lastLink && <div className="beta-banner admin-last-link"><span>Latest invitation</span><input aria-label="Latest invitation link" value={lastLink} readOnly onFocus={e => e.target.select()} /><button className="btn-login" onClick={() => void copy(lastLink).then(ok => setMessage(ok ? 'Link copied.' : 'Select and copy the link manually.'))}>Copy link</button></div>}
+
+    <details className="beta-admin-section admin-create">
+      <summary>Create an invitation</summary>
+      <p className="beta-muted">Enter an email to reserve and send the invitation. Leave it blank for a single-use link you can share yourself.</p>
+      <form className="beta-admin-inline-form" onSubmit={handleCreateInvite}>
+        <input className="login-input" aria-label="Invitation email" type="email" placeholder="Email address (optional)" value={manualEmail} onChange={e => setManualEmail(e.target.value)} />
+        <input className="login-input" aria-label="Invitation note" maxLength={200} placeholder="Internal note (optional)" value={note} onChange={e => setNote(e.target.value)} />
+        <button className="btn-getstarted" disabled={busy !== null}>{busy === 'mint' ? 'Creating…' : manualEmail.trim() ? 'Create & send invite' : 'Create invite link'}</button>
+      </form>
+    </details>
+
+    <section className="beta-admin-section">
+      <div className="admin-list-tools">
+        <nav aria-label="Beta records" className="admin-record-tabs">{(['waitlisted','invited','active','revoked','invites'] as const).map(status => <button key={status} aria-pressed={section === status} onClick={() => setSection(status)}>{status === 'waitlisted' ? 'Requests' : status === 'invites' ? 'Invite links' : status[0].toUpperCase()+status.slice(1)} <span>{counts[status]}</span></button>)}</nav>
+        <input type="search" className="login-input" aria-label="Search beta records" placeholder="Search email, source or invite…" value={query} onChange={e => setQuery(e.target.value)} />
+        {section === 'invites' && <select aria-label="Invitation status" value={inviteFilter} onChange={e => setInviteFilter(e.target.value)}><option value="all">All invitations</option><option value="open">Open</option><option value="used">Used</option><option value="expired">Expired</option></select>}
+      </div>
+      <p className="beta-muted">{section === 'invites' ? shownInvites.length : people.length + extraActive.length} results{query && <> for “{query}” <button className="beta-link-btn" onClick={() => setQuery('')}>Clear search</button></>}</p>
+      {section === 'invites' ? <ul className="beta-admin-list">{shownInvites.map(invite => <li key={invite.code}>
+        <div><strong>{invite.email || 'Shareable invitation'}</strong><span className="admin-status">{inviteStatus(invite)}</span><p className="beta-muted"><code>{invite.code}</code> · {invite.redeemedAt ? `Redeemed ${new Date(invite.redeemedAt).toLocaleDateString()}` : `Expires ${new Date(invite.expiresAt).toLocaleDateString()}`}</p>{invite.note && <p className="beta-muted">{invite.note}</p>}</div>
+        {inviteStatus(invite) === 'open' && <div className="beta-admin-actions"><button className="btn-login" onClick={() => void handleCopyLink(invite.code)}>Copy link</button>{invite.email && <button className="btn-login" disabled={busy !== null} onClick={() => void handleResend(invite)}>{busy === invite.code ? 'Sending…' : 'Resend email'}</button>}</div>}
+      </li>)}</ul> : <ul className="beta-admin-list">{people.map(entry => <li key={entry.id}>
+        <div><strong>{entry.email}</strong><p className="beta-muted">Requested {new Date(entry.createdAt).toLocaleDateString()}{entry.source ? ` · ${entry.source}` : ''}</p>{entry.activatedAt && <p className="beta-muted">Activated {new Date(entry.activatedAt).toLocaleDateString()}</p>}</div>
+        {section === 'waitlisted' && <button className="btn-getstarted" disabled={busy !== null} onClick={() => void handleApprove(entry)}>{busy === entry.id ? 'Approving…' : 'Approve & invite'}</button>}
+        {section === 'invited' && <button className="btn-login" onClick={() => { setQuery(entry.email); setSection('invites'); setInviteFilter('all'); }}>View invitations</button>}
+        {section === 'active' && <button className="btn-login" disabled={busy !== null || entry.email === session?.email} title={entry.email === session?.email ? 'You cannot revoke your own access here' : undefined} onClick={() => void handleRevoke(entry)}>{busy === entry.id ? 'Revoking…' : 'Revoke access'}</button>}
+      </li>)}{extraActive.map(email => <li key={email}><strong>{email}</strong><span className="beta-muted">Active account</span></li>)}</ul>}
+      {(section === 'invites' ? shownInvites.length === 0 : people.length + extraActive.length === 0) && <div className="admin-empty"><h3>{query ? 'No matching records' : 'Nothing here yet'}</h3><p className="beta-muted">{query ? 'Try another email or clear your search.' : 'New records will appear here as people move through the beta.'}</p></div>}
+    </section>
+  </div>;
 }

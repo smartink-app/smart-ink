@@ -70,6 +70,8 @@ try {
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2));
   geometry.setAttribute('aTattooUv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2));
   geometry.setAttribute('aTattooMask', new THREE.Float32BufferAttribute([1, 1, 1], 1));
+  geometry.setAttribute('aTattooBoundary', new THREE.Float32BufferAttribute([.1, -.2, .1], 1));
+  for (const name of ['aSleeveShoulder', 'aSleeveChest']) geometry.setAttribute(name, new THREE.Float32BufferAttribute(new Float32Array(12).fill(.25), 4));
   let snapshot;
   let disposed = false;
   let originalDisposed = false;
@@ -86,7 +88,11 @@ try {
   });
   assert.ok(snapshot, 'geometry must be cloned before waiting for source image');
   geometry.getAttribute('aTattooUv').setX(0, 42);
+  geometry.getAttribute('aTattooBoundary').setX(0, -42);
+  assert.ok(Math.abs(snapshot.getAttribute('aTattooBoundary').getX(0) - .1) < 1e-7, 'export freezes the same region cutoff before another drag/override');
   assert.equal(snapshot.getAttribute('aTattooUv').getX(0), 0, 'snapshot must not alias live attributes');
+  geometry.getAttribute('aSleeveShoulder').setX(0, .9);
+  assert.equal(snapshot.getAttribute('aSleeveShoulder').getX(0), .25, 'export freezes independent sleeve transforms');
   events.error({ type: 'error' });
   await assert.rejects(baking);
   assert.equal(disposed, true, 'image-load failure must dispose snapshot');
@@ -114,6 +120,29 @@ try {
     assert.equal(textureDisposals.length, 1, 'pending texture released on cancel');
     events.load.call({});
     assert.equal(textureDisposals.length, 1, 'late image callback cannot double-dispose or retain the texture');
+  } finally { THREE.Texture.prototype.dispose = disposeTexture; }
+  // A partial multi-layer load failure must reject before rendering and
+  // release both the successfully loaded ink and the failed request.
+  const images = new Map();
+  globalThis.document.createElementNS = () => {
+    const callbacks = {};
+    const image = { addEventListener: (name, callback) => { callbacks[name] = callback; }, removeEventListener() {},
+      set src(value) { images.set(value, { image, callbacks }); } };
+    return image;
+  };
+  const sleeveDisposals = [];
+  THREE.Texture.prototype.dispose = function () { sleeveDisposals.push(this); return disposeTexture.call(this); };
+  try {
+    disposed = false;
+    const failedSleeve = bakeInkLayer({ tattooImage: 'arm.png', surface: { geometry, sleeve: true, wrap: true, size: 1, aspect: 1, color: '#fff', opacity: 1 } });
+    const first = images.get('arm.png'); first.callbacks.load.call(first.image);
+    await Promise.resolve();
+    const shoulder = images.get('/tattoos/orbit-sleeve-shoulder.png'), chest = images.get('/tattoos/orbit-sleeve-chest.png');
+    assert.ok(shoulder && chest, 'all sleeve images participate in the render snapshot');
+    shoulder.callbacks.load.call(shoulder.image); chest.callbacks.error({ type: 'error' });
+    await assert.rejects(failedSleeve);
+    assert.equal(disposed, true); assert.equal(originalDisposed, false);
+    assert.equal(new Set(sleeveDisposals).size, 3, 'partial layer failure releases all three textures');
   } finally { THREE.Texture.prototype.dispose = disposeTexture; }
   geometry.dispose();
 } finally {

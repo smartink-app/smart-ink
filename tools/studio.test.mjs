@@ -8,7 +8,7 @@ const { outputFiles } = await build({
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic',
   plugins: [{ name: 'controlled-hooks', setup(b) {
     b.onResolve({ filter: /^(react(?:\/jsx-runtime)?|@react-three\/fiber)$/ }, a => ({ path: a.path, namespace: 'hooks' }));
-    b.onLoad({ filter: /.*/, namespace: 'hooks' }, a => ({ contents: a.path === 'react' ? 'export const useId=()=>"studio-test";export const useState=v=>[v,()=>{}];export const useRef=v=>({current:v});export const useEffect=(...a)=>globalThis.__studioHooks.effect(...a);export const useMemo=(...a)=>globalThis.__studioHooks.memo(...a);' : a.path === '@react-three/fiber' ? 'export const useFrame=fn=>{globalThis.__studioHooks.frame=fn};export const useThree=selector=>selector(globalThis.__studioHooks.environment);' : 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";' }));
+    b.onLoad({ filter: /.*/, namespace: 'hooks' }, a => ({ contents: a.path === 'react' ? 'export const useSyncExternalStore=(subscribe,read,server)=>server();export const useId=()=>"studio-test";export const useState=v=>[v,()=>{}];export const useRef=v=>({current:v});export const useEffect=(...a)=>globalThis.__studioHooks.effect(...a);export const useMemo=(...a)=>globalThis.__studioHooks.memo(...a);' : a.path === '@react-three/fiber' ? 'export const useFrame=fn=>{globalThis.__studioHooks.frame=fn};export const useThree=selector=>selector(globalThis.__studioHooks.environment);' : 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";' }));
     b.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
   } }],
 });

@@ -26,13 +26,13 @@ async function callback(name, names) {
   }));
 }
 const { outputFiles } = await build({
-  stdin: { contents: `export * from './src/render/buildContract'; export * from './src/render/snapshot'; export * from './src/render/tattooSource'; export * from './src/render/tattooCamera'; export * from './src/render/studioSettings'; export * from './src/render/exportPresentation'; export * from './src/services/snapshotSession'; export * as THREE from 'three';`, resolveDir: root },
+  stdin: { contents: `export * from './src/render/buildContract'; export * from './src/render/cinematicPresets'; export * from './src/render/reveal'; export * from './src/render/snapshot'; export * from './src/render/tattooSource'; export * from './src/render/tattooCamera'; export * from './src/render/studioSettings'; export * from './src/render/exportPresentation'; export * from './src/services/snapshotSession'; export * as THREE from 'three';`, resolveDir: root },
   bundle: true, platform: 'node', format: 'esm', write: false,
 });
 const api = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
-const dependencies = ['snapshotLook', 'cinematicPreset', 'bodyFit', 'useCallback', 'uvPlacementRef', 'uploadedImage', 'decalVisible', 'orbitControlsRef', 'cameraState', 'canvasHostRef', 'modelLoading', 'bakeInkLayer', 'blankInkLayer', 'snapshotOutput', 'exportDimensions', 'buildRenderContract', 'exportPreset', 'bodyMeshId', 'skinToneId', 'poseId', 'lookId', 'qualityTier', 'finalSamples', 'bodyShape', 'bodyPose', 'bodyAppearance', 'studio', 'studioForExport', 'background', 'BACKGROUNDS', 'isolateRegion', 'lightingPreset', 'lights', 'LIGHTING_PRESETS', 'resolveTattooSource'];
+const dependencies = ['snapshotLook', 'shotBlur', 'cinematicPreset', 'bodyFit', 'useCallback', 'uvPlacementRef', 'uploadedImage', 'decalVisible', 'orbitControlsRef', 'cameraState', 'canvasHostRef', 'modelLoading', 'bakeInkLayer', 'blankInkLayer', 'snapshotOutput', 'exportDimensions', 'buildRenderContract', 'exportPreset', 'bodyMeshId', 'skinToneId', 'poseId', 'lookId', 'qualityTier', 'finalSamples', 'bodyShape', 'bodyPose', 'bodyAppearance', 'studio', 'studioForExport', 'background', 'BACKGROUNDS', 'isolateRegion', 'lightingPreset', 'lights', 'LIGHTING_PRESETS', 'resolveTattooSource'];
 const makeShot = await callback('buildShot', dependencies);
-const makeOpen = await callback('openSnapshot', ['setSnapshotLook', 'renderBusy', 'modelLoading', 'canvasHostSized', 'setShapeMenu', 'setHoverRegion', 'setPanelRegions', 'setAccountMenuOpen', 'snapshotSession', 'currentShotBuilder', 'snapshotReturnCamera', 'orbitControlsRef', 'cameraState', 'setTattooFraming', 'setSnapshotHasTattoo', 'setSnapshotFramingHint', 'regionSnapshotFraming', 'setSnapshotCamera', 'uvPlacementRef', 'DEFAULT_TATTOO_CAMERA_ADJUSTMENT', 'currentScene']);
+const makeOpen = await callback('openSnapshot', ['nativeHost', 'shotFormat', 'setShotFormat', 'setSnapshotLook', 'cinematicPreset', 'setShotBrightness', 'setShotBlur', 'frameTattoo', 'viewportAspect', 'setLightingPreset', 'setLights', 'cinematicLights', 'LIGHTING_PRESETS', 'setStudio', 'renderBusy', 'modelLoading', 'canvasHostSized', 'setShapeMenu', 'setHoverRegion', 'setPanelRegions', 'setAccountMenuOpen', 'snapshotSession', 'currentShotBuilder', 'snapshotReturnCamera', 'snapshotReturnStudio', 'studio', 'lights', 'lightingPreset', 'selectedLight', 'orbitControlsRef', 'cameraState', 'setTattooFraming', 'setSnapshotHasTattoo', 'setSnapshotFramingHint', 'regionSnapshotFraming', 'setSnapshotCamera', 'uvPlacementRef', 'DEFAULT_TATTOO_CAMERA_ADJUSTMENT', 'currentScene']);
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const deferred = () => {
   let resolve, reject;
@@ -48,8 +48,8 @@ function fixture(overrides = {}) {
   const calls = { freeze: 0, freezeFlags: [], snapshot: 0, baked: [], blank: 0 };
   const ink = new Blob(['snapshot ink'], { type: 'image/png' });
   const scope = {
-    useCallback: (fn) => fn, modelLoading: false, bodyFit: null, snapshotLook: null, cinematicPreset: () => undefined,
-    uvPlacementRef: { current: { getPlacement: () => placement, getTattooFraming: () => ({ center: [.2, .8, .1], radius: .4 }), getRegionFraming: () => ({ center: [0, 0, 0], radius: 1 }) } },
+    useCallback: (fn) => fn, modelLoading: false, bodyFit: null, snapshotLook: null, shotBlur: 0, cinematicPreset: () => undefined,
+    uvPlacementRef: { current: { getPlacement: () => placement, getTattooFraming: () => api.regionSnapshotFraming({ center: [.2, .8, .1], radius: .4 }, [0,0,1]), getRegionFraming: () => ({ center: [0, 0, 0], radius: 1 }) } },
     uploadedImage: 'data:image/png;base64,dGVzdA==', decalVisible: true,
     orbitControlsRef: { current: {
       freezeSnapshot: (finish) => { calls.freeze++; calls.freezeFlags.push(finish); return structuredClone(live); },
@@ -88,7 +88,7 @@ for (const aspect of [.4, 1, 16 / 9, 2.5]) for (const quality of ['quick', 'deta
   assert.equal(shot.inkBlob, f.ink);
   assert.equal(f.calls.baked[0].surface, f.placement.surface, 'actual surface geometry, tint and opacity reach the baker');
   assert.equal(f.calls.baked[0].rotationRad, f.placement.rotationRad);
-  assert.equal(f.calls.baked[0].size, 4096, 'Both snapshot qualities retain full-resolution ink when rerendering');
+  assert.equal(f.calls.baked[0].size, 4096, 'Every snapshot freezes server-compatible ink for a later Detailed rerender');
   assert.equal(f.calls.baked[0].signal, signal); assert.equal(f.calls.baked[0].tattooImage, f.scope.uploadedImage);
   f.dispose();
 }
@@ -112,13 +112,14 @@ for (const hidden of ['show-before', 'placement-hidden']) {
   assert.equal(f.calls.baked.length, 0); assert.equal(f.calls.blank, 1);
   assert.equal(await shot.inkBlob.text(), 'transparent'); f.dispose();
 }
-for (const reason of ['model-loading', 'body-unavailable', 'image-loading', 'pre-aborted']) {
+for (const reason of ['model-loading', 'body-unavailable', 'image-loading', 'pre-aborted', 'out-of-bounds']) {
   const f = fixture(), controller = new AbortController();
   if (reason === 'model-loading') f.scope.modelLoading = true;
   if (reason === 'body-unavailable') f.scope.uvPlacementRef.current.getRegionFraming = () => null;
   if (reason === 'image-loading') f.placement.imageReady = false;
+  if (reason === 'out-of-bounds') f.placement.bounds = { valid: false, empty: false, outside: .2, distorted: 0 };
   if (reason === 'pre-aborted') controller.abort();
-  await assert.rejects(f.build()({ snapshot: 'quick', signal: controller.signal }), /loading|load|place|aborted/i, reason);
+  await assert.rejects(f.build()({ snapshot: 'quick', signal: controller.signal }), /loading|load|place|aborted|placement area/i, reason);
   assert.equal(f.calls.freeze, 0, `${reason} cannot freeze an unready shot`); assert.equal(f.calls.baked.length, 0); f.dispose();
 }
 
@@ -149,10 +150,10 @@ for (const reason of ['model-loading', 'body-unavailable', 'image-loading', 'pre
 function openerScope(f, session, overrides = {}) {
   const menuChanges = [];
   return {
-    setSnapshotLook: () => {}, renderBusy: false, modelLoading: false, canvasHostSized: true,
+    nativeHost: false, shotFormat: 'view', setShotFormat: () => {}, setSnapshotLook: () => {}, cinematicPreset: api.cinematicPreset, setShotBrightness: () => {}, setShotBlur: () => {}, frameTattoo: api.frameTattoo, viewportAspect: 16/9, setLightingPreset: () => {}, setLights: () => {}, cinematicLights: api.cinematicLights, LIGHTING_PRESETS: f.scope.LIGHTING_PRESETS, setStudio: () => {}, renderBusy: false, modelLoading: false, canvasHostSized: true,
     setShapeMenu: (value) => menuChanges.push(['shape', value]), setHoverRegion: (value) => menuChanges.push(['hover', value]),
     setPanelRegions: (value) => menuChanges.push(['regions', value]), setAccountMenuOpen: (value) => menuChanges.push(['account', value]),
-    snapshotSession: session, currentShotBuilder: { current: f.build() }, snapshotReturnCamera: { current: null }, orbitControlsRef: f.scope.orbitControlsRef, cameraState: f.scope.cameraState, uvPlacementRef: f.scope.uvPlacementRef, setTattooFraming: () => {}, setSnapshotHasTattoo: () => {}, setSnapshotFramingHint: () => {}, regionSnapshotFraming: api.regionSnapshotFraming, setSnapshotCamera: () => {}, DEFAULT_TATTOO_CAMERA_ADJUSTMENT: api.DEFAULT_TATTOO_CAMERA_ADJUSTMENT, currentScene: { name: 'My current figure' }, menuChanges, ...overrides,
+    snapshotSession: session, currentShotBuilder: { current: f.build() }, snapshotReturnCamera: { current: null }, snapshotReturnStudio: { current: null }, studio: f.scope.studio, lights: f.scope.lights, lightingPreset: f.scope.lightingPreset, selectedLight: 1, orbitControlsRef: f.scope.orbitControlsRef, cameraState: f.scope.cameraState, uvPlacementRef: f.scope.uvPlacementRef, setTattooFraming: () => {}, setSnapshotHasTattoo: () => {}, setSnapshotFramingHint: () => {}, regionSnapshotFraming: api.regionSnapshotFraming, setSnapshotCamera: () => {}, DEFAULT_TATTOO_CAMERA_ADJUSTMENT: api.DEFAULT_TATTOO_CAMERA_ADJUSTMENT, currentScene: { name: 'My current figure' }, menuChanges, ...overrides,
   };
 }
 for (const guard of ['renderBusy', 'modelLoading', 'canvasHostSized']) {
@@ -173,6 +174,10 @@ for (const guard of ['renderBusy', 'modelLoading', 'canvasHostSized']) {
   assert.equal(session.getState().mode, 'compose'); assert.equal(requests.length, 0, 'opening does not submit to Blender');
   assert.equal(f.calls.baked.length, 0, 'opening does not bake ink');
   assert.deepEqual(scope.snapshotReturnCamera.current.position, [3,.5,6]);
+  assert.deepEqual(scope.snapshotReturnStudio.current.studio, f.scope.studio);
+  assert.notEqual(scope.snapshotReturnStudio.current.studio, f.scope.studio, 'Shot entry stores a clone of the editor backdrop');
+  assert.deepEqual(scope.snapshotReturnStudio.current.lights, f.scope.lights);
+  assert.notEqual(scope.snapshotReturnStudio.current.lights, f.scope.lights, 'Shot lighting cannot mutate the saved editor rig');
   await session.render();
   assert.deepEqual(scope.menuChanges.slice(0, 4), [['shape', null], ['regions', []], ['account', false]]);
   assert.equal(session.getState().status, 'done'); assert.equal(requests.length, 1, 'double click cannot submit twice');
@@ -233,24 +238,33 @@ for (const placed of [false,true]) {
 }
 // Returning to editing restores the pre-Snapshot camera and consumes the saved view once.
 {
- const makeClose=await callback('closeSnapshot',['useCallback','snapshotSession','snapshotReturnCamera','setCameraState','setCameraRequestId','setCameraPreset']);
- const restored=[];let closed=0,request=4;const saved={position:[4,2,6],target:[0,1,0],fov:48};const ref={current:saved};
- const close=makeClose({useCallback:f=>f,snapshotSession:{close:()=>closed++},snapshotReturnCamera:ref,setCameraState:v=>restored.push(v),setCameraRequestId:f=>request=f(request),setCameraPreset:v=>assert.equal(v,'custom')});
- close();close();assert.equal(closed,2);assert.deepEqual(restored,[saved]);assert.equal(request,5);assert.equal(ref.current,null);
+ const makeClose=await callback('closeSnapshot',['useCallback','snapshotSession','snapshotReturnCamera','setCameraState','setCameraRequestId','setCameraPreset','setRevealPreview','snapshotReturnStudio','setStudio','setLights','setLightingPreset','setSelectedLight']);
+ const restored=[], restoredStudio=[];let closed=0,request=4;const saved={position:[4,2,6],target:[0,1,0],fov:48};const ref={current:saved}; const appearance={studio:{mode:'plain',color:'#fff'},lights:[{type:'ambient',intensity:.1}],preset:'studio',selected:2};const studioRef={current:appearance};
+ const close=makeClose({useCallback:f=>f,setRevealPreview:()=>{},snapshotReturnStudio:studioRef,setStudio:v=>restoredStudio.push(['studio',v]),setLights:v=>restoredStudio.push(['lights',v]),setLightingPreset:v=>restoredStudio.push(['preset',v]),setSelectedLight:v=>restoredStudio.push(['selected',v]),snapshotSession:{close:()=>closed++},snapshotReturnCamera:ref,setCameraState:v=>restored.push(v),setCameraRequestId:f=>request=f(request),setCameraPreset:v=>assert.equal(v,'custom')});
+ close();close();assert.equal(closed,2);assert.deepEqual(restored,[saved]);assert.equal(request,5);assert.equal(ref.current,null);assert.equal(studioRef.current,null);assert.deepEqual(restoredStudio,[['studio',appearance.studio],['lights',appearance.lights],['preset',appearance.preset],['selected',appearance.selected]],'Exit restores the editor studio once as well as its camera');
 }
 console.log('Fallback/exit passed: no-tattoo controls move the camera, uncovered/covered hints, body-only render and original camera restoration.');
 
+// Shoot uses its chosen paper colour; legacy exports retain plain gradients.
 for (const background of ['gray', 'bluepurple', 'peach']) {
-  const f = fixture({ background, studio: { mode: 'plain', color: '#ffffff', shadow: .4, showGuides: false } });
+  const f = fixture({ background, studio: { mode: 'sweep', color: '#b99093', shadow: .4, showGuides: true } });
   const shot = await f.build()({ snapshot: 'detailed' });
-  assert.ok(shot.contract.studio.gradient.length >= 2);
-  assert.equal(shot.contract.studio.gradient[0], shot.contract.studio.color);
+  assert.equal(shot.contract.studio.mode, 'sweep');
+  assert.equal(shot.contract.studio.color, '#b99093', 'A chosen shot paper is not replaced by the editor gradient');
+  assert.equal(shot.contract.studio.gradient, undefined);
+  assert.equal(shot.contract.studio.showGuides, false);
+  assert.equal(shot.contract.skinMaterial, 'studio');
   assert.equal(shot.contract.output.samples, 512);
   assert.equal(shot.contract.showEyes, true);
   assert.equal(shot.contract.eyeColor, '#634530');
   f.dispose();
+  const legacy = fixture({ background, studio: { mode: 'plain', color: '#ffffff', shadow: .4, showGuides: false } });
+  const exported = await legacy.build()();
+  assert.ok(exported.contract.studio.gradient.length >= 2);
+  assert.equal(exported.contract.studio.gradient[0], exported.contract.studio.color);
+  legacy.dispose();
 }
-console.log('Viewport gradient choices survive the real snapshot builder.');
+console.log('Shot paper survives snapshot capture; legacy viewport gradients survive ordinary export.');
 
 { const f = fixture({ bodyFit: { version: 1 } }); await assert.rejects(f.build()({ snapshot: 'quick' }), /measurement fit is invalid/); assert.equal(f.calls.baked.length, 0); f.dispose(); }
 
@@ -272,13 +286,38 @@ console.log('Viewport gradient choices survive the real snapshot builder.');
   f.dispose();
 }
 
-// A chosen look survives capture and quality changes without losing the fit.
-{
- const f = fixture({snapshotLook:'detail',cinematicPreset:()=>({aperture:11})});
+// The selected lens blur, skin material and hair survive capture/quality changes.
+for (const blur of [0, .5, 1]) {
+ const f = fixture({snapshotLook:'detail',shotBlur:blur,cinematicPreset:api.cinematicPreset});
  const shot=await f.build()({snapshot:'detailed'});
- assert.equal(shot.contract.camera.aperture,11);
- assert.equal(shot.contract.camera.depthOfField,true);
+ const aperture = 11 / (1 + blur * 2);
+ assert.equal(shot.contract.camera.aperture,aperture);
+ assert.equal(shot.contract.camera.depthOfField,blur>0);
  assert.equal(shot.contract.bodyHair,'vellus');
- assert.equal(api.snapshotContract(shot.contract,'detailed').camera.aperture,11);
+ assert.equal(shot.contract.skinMaterial,'studio');
+ assert.equal(api.snapshotContract(shot.contract,'detailed').camera.aperture,aperture);
+ assert.equal(api.snapshotContract(shot.contract,'detailed').camera.depthOfField,blur>0);
  f.dispose();
 }
+
+// Exercise the production preview effect: stopping restores the shot, while
+// closing Shoot must not overwrite the separate editor-camera restoration.
+let previewEffect;
+function findPreviewEffect(node) {
+  if (ts.isCallExpression(node) && node.expression.getText(ast) === 'useEffect' && node.arguments[0]?.getText(ast).includes('revealCamera(base')) previewEffect = node.arguments[0];
+  ts.forEachChild(node, findPreviewEffect);
+}
+findPreviewEffect(ast);assert.ok(previewEffect);
+const previewNames=['revealPreview','snapshot','threeCamera','orbitControlsRef','cameraState','performance','revealCamera','requestAnimationFrame','cancelAnimationFrame','setRevealPreview','setCameraState','setCameraRequestId','snapshotSession'];
+const previewCode=await transform(`(function(${previewNames.join(',')}) { return ${previewEffect.getText(ast)}; })`,{loader:'ts'});
+const makePreview=(0,eval)(previewCode.code);
+for(const stillOpen of [true,false]) {
+  const base={position:[0,0,5],target:[0,0,0],fov:35};const camera=new api.THREE.PerspectiveCamera(35);const updates=[];let tickFrame,request=0,cancelled=false;
+  const scope={revealPreview:'reveal',snapshot:{open:true},threeCamera:camera,orbitControlsRef:{current:{freezeSnapshot:()=>base}},cameraState:base,performance:{now:()=>0},revealCamera:api.revealCamera,
+    requestAnimationFrame:fn=>{tickFrame=fn;return 1;},cancelAnimationFrame:()=>{cancelled=true;},setRevealPreview:()=>{},setCameraState:v=>updates.push(v),setCameraRequestId:fn=>{request=fn(request);},snapshotSession:{getState:()=>({open:stillOpen})}};
+  const cleanup=makePreview(...previewNames.map(name=>scope[name]))();tickFrame(2000);assert.ok(camera.position.z>base.position[2]);
+  cleanup();assert.equal(cancelled,true);
+  if(stillOpen){assert.deepEqual(updates,[base]);assert.equal(request,1);assert.deepEqual(camera.position.toArray(),base.position);}
+  else{assert.deepEqual(updates,[],'Closing Shoot owns camera restoration; preview cleanup must not overwrite it');assert.equal(request,0);}
+}
+console.log('Reveal preview lifecycle passed: motion, stop restoration, and no camera overwrite on Shoot exit.');

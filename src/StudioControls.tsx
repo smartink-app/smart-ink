@@ -1,3 +1,4 @@
+import MoreControls from './MoreControls';
 import { useId } from 'react';
 import AdjustmentControl from './AdjustmentControl';
 import { DEFAULT_STUDIO, STUDIO_PAPERS, normalizeStudio, type StudioSettings } from './render/studioSettings';
@@ -6,6 +7,7 @@ import type { BodyRegionId } from './render/bodyRegions';
 import './studio-controls.css';
 
 export interface StudioControlsProps {
+  compact?: boolean;
   studio: StudioSettings;
   onStudioChange: (studio: StudioSettings) => void;
   isolateRegion: BodyRegionId | null;
@@ -15,7 +17,7 @@ export interface StudioControlsProps {
 
 const BACKGROUND_LABELS: Record<BackgroundId, string> = { white: 'White', dark: 'Charcoal', gray: 'Gray', bluepurple: 'Sunset', peach: 'Peach' };
 
-export default function StudioControls({ studio, onStudioChange, isolateRegion, background = 'white', onBackgroundChange }: StudioControlsProps) {
+export default function StudioControls({ compact = false, studio, onStudioChange, isolateRegion, background = 'white', onBackgroundChange }: StudioControlsProps) {
   const id = useId();
   const update = (change: Partial<StudioSettings>) => onStudioChange(normalizeStudio({ ...studio, ...change }));
   return <details className="ep-section ep-details studio-controls" open>
@@ -33,8 +35,10 @@ export default function StudioControls({ studio, onStudioChange, isolateRegion, 
           <span>{paper.name}</span>
         </button>)}
       </div>
+      <MoreControls id="backdrop" label={compact ? "More backdrop controls" : "Paper & shadow"} summary={studio.shadow !== DEFAULT_STUDIO.shadow ? `${Math.round(studio.shadow * 100)}% shadow` : undefined}>
       <label className="studio-setting" htmlFor={`${id}-color`}><span>Custom paper</span><input id={`${id}-color`} type="color" value={studio.color} onChange={e => update({ color: e.target.value })} /></label>
       <AdjustmentControl label="Ground shadow" value={studio.shadow * 100} min={0} max={100} step={5} unit="%" resetValue={DEFAULT_STUDIO.shadow * 100} onChange={value => update({ shadow: value / 100 })} />
+      </MoreControls>
       <p className="ep-hint studio-note">{isolateRegion ? 'Focus keeps your backdrop color and hides the floor.' : 'The paper curves into the floor and follows your viewing angle. Ground shadows are hidden in fast mode.'}</p>
     </> : onBackgroundChange ? <>
       <div className="studio-papers studio-backgrounds" role="group" aria-label="Simple background">

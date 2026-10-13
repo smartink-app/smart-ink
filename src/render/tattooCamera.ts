@@ -28,13 +28,14 @@ export interface TattooFraming {
   bodyTriangles?: Float32Array;
 }
 export interface TattooFootprint {
+  wrap?: boolean;
   size: number;
   aspect: number;
   rotationRad: number;
   /** Hair is drawn over skin; covered anchor/footprint regions cannot frame ink. */
   hairCoverage?: ArrayLike<number> | null;
 }
-interface Corner { point: THREE.Vector3; x: number; y: number; focus: number; uncovered: number; hair: number }
+interface Corner { point: THREE.Vector3; x: number; y: number; focus: number; uncovered: number; hair: number; boundary: number }
 function clip(polygon: Corner[], field: (vertex: Corner) => number): Corner[] {
   const output: Corner[] = [];
   for (let i = 0; i < polygon.length; i++) {
@@ -43,7 +44,7 @@ function clip(polygon: Corner[], field: (vertex: Corner) => number): Corner[] {
     if ((fa >= 0) !== (fb >= 0)) {
       const t = fa / (fa - fb), lerp = (a: number, b: number) => a + (b - a) * t;
       output.push({ point: a.point.clone().lerp(b.point, t), x: lerp(a.x, b.x), y: lerp(a.y, b.y),
-        focus: lerp(a.focus, b.focus), uncovered: lerp(a.uncovered, b.uncovered), hair: lerp(a.hair, b.hair) });
+        focus: lerp(a.focus, b.focus), uncovered: lerp(a.uncovered, b.uncovered), hair: lerp(a.hair, b.hair), boundary: lerp(a.boundary, b.boundary) });
     }
   }
   return output;
@@ -63,9 +64,10 @@ export function tattooFramingFromGeometry(
   const anchorIds = [0, 1, 2].map(k => id(anchor.faceIndex * 3 + k));
   if (anchorIds.some(i => mask.getX(i) < .9999)) return null;
   const focus = geometry.getAttribute('aFocusMask'), clothing = geometry.getAttribute('aClothingMask');
+  const boundary = geometry.getAttribute('aTattooBoundary');
   const fieldAtAnchor = (field: ArrayLike<number> | undefined | null, fallback: number) => field
     ? anchorIds.reduce((sum, i, k) => sum + field[i] * anchor.barycentric[k], 0) : fallback;
-  if (fieldAtAnchor(focus?.array, 1) < 0 || fieldAtAnchor(clothing?.array, -1) >= 0 || fieldAtAnchor(footprint.hairCoverage, 0) >= .5) return null;
+  if (fieldAtAnchor(focus?.array, 1) < 0 || fieldAtAnchor(boundary?.array, 1) < 0 || fieldAtAnchor(clothing?.array, -1) >= 0 || fieldAtAnchor(footprint.hairCoverage, 0) >= .5) return null;
   const center = new THREE.Vector3(), normal = new THREE.Vector3(), point = new THREE.Vector3();
   anchorIds.forEach((i, k) => {
     center.addScaledVector(point.fromBufferAttribute(position, i), anchor.barycentric[k]);
@@ -81,9 +83,9 @@ export function tattooFramingFromGeometry(
   const up = new THREE.Vector3(0, 1, 0).addScaledVector(normal, -normal.y);
   if (up.lengthSq() < 1e-6) up.set(0, 0, -1).addScaledVector(normal, normal.z);
   up.normalize();
-  const c = Math.cos(footprint.rotationRad), s = Math.sin(footprint.rotationRad);
-  const halfWidth = footprint.size * Math.min(footprint.aspect, 1) / 2;
-  const halfHeight = footprint.size * Math.min(1 / footprint.aspect, 1) / 2;
+  const c = footprint.wrap ? 1 : Math.cos(footprint.rotationRad), s = footprint.wrap ? 0 : Math.sin(footprint.rotationRad);
+  const halfWidth = footprint.wrap ? Infinity : footprint.size * Math.min(footprint.aspect, 1) / 2;
+  const halfHeight = footprint.wrap ? .5 : footprint.size * Math.min(1 / footprint.aspect, 1) / 2;
   const output: number[] = [], body: number[] = [];
   const world = new Float32Array(position.count * 3);
   for (let i = 0; i < position.count; i++) point.fromBufferAttribute(position, i).applyMatrix4(matrixWorld).toArray(world, i * 3);
@@ -97,10 +99,11 @@ export function tattooFramingFromGeometry(
     let polygon: Corner[] = ids.map(i => ({
       point: new THREE.Vector3().fromArray(world, i * 3), x: c * uv.getX(i) + s * uv.getY(i), y: -s * uv.getX(i) + c * uv.getY(i),
       focus: focus?.getX(i) ?? 1, uncovered: -(clothing?.getX(i) ?? -1), hair: .5 - (footprint.hairCoverage?.[i] ?? 0),
+      boundary: boundary?.getX(i) ?? 1,
     }));
     for (const field of [(v: Corner) => halfWidth - v.x, (v: Corner) => halfWidth + v.x,
       (v: Corner) => halfHeight - v.y, (v: Corner) => halfHeight + v.y,
-      (v: Corner) => v.focus, (v: Corner) => v.uncovered, (v: Corner) => v.hair]) {
+      (v: Corner) => v.focus, (v: Corner) => v.uncovered, (v: Corner) => v.hair, (v: Corner) => v.boundary]) {
       polygon = clip(polygon, field); if (!polygon.length) break;
     }
     for (const vertex of polygon) { output.push(...vertex.point.toArray()); radius = Math.max(radius, vertex.point.distanceTo(center)); }

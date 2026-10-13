@@ -10,11 +10,11 @@ export interface CinematicPreset {
   key: [number, number, number, number]; fill: number; rim: number;
 }
 export const CINEMATIC_PRESETS: CinematicPreset[] = [
-  { id: 'editorial', name: 'Editorial', description: 'Soft light · complete design', fov: 27, aperture: 8,
+  { id: 'editorial', name: 'Portfolio', description: 'Soft light · complete design', fov: 27, aperture: 8,
     adjustment: { azimuth: -12, elevation: 6, zoom: 1 }, background: '#323337', key: [-3, 2.6, 3.8, .95], fill: .14, rim: .3 },
   { id: 'sculpted', name: 'Sculpted light', description: 'Deep shadows · angled view', fov: 24, aperture: 6.3,
     adjustment: { azimuth: 24, elevation: 8, zoom: 1.05 }, background: '#12151b', key: [-4, 1.8, 1.8, 1.05], fill: .055, rim: .45 },
-  { id: 'detail', name: 'Ink detail', description: 'Tight crop · skin texture', fov: 25, aperture: 11,
+  { id: 'detail', name: 'Skin detail', description: 'Tight crop · skin texture', fov: 25, aperture: 11,
     adjustment: { azimuth: -22, elevation: 4, zoom: 1.45 }, background: '#292622', key: [3.3, 1.6, 2.4, .9], fill: .1, rim: .22 },
 ];
 export function cinematicPreset(id: string | null) { return CINEMATIC_PRESETS.find(p => p.id === id); }

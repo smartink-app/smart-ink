@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { SURFACE_TATTOO_GLSL, TATTOO_LAYER_GLSL } from './tattooLayer';
+import { SLEEVE_SOURCES } from './sleeveTypes';
+import { SLEEVE_VERTEX_DECL, SLEEVE_VERTEX_ASSIGN, SLEEVE_GLSL } from './sleeveShader';
+import { SURFACE_TATTOO_GLSL, TATTOO_LAYER_GLSL, WRAP_TATTOO_GLSL } from './tattooLayer';
 
 const LEGACY_VERTEX = /* glsl */ `
   varying vec2 vUv;
@@ -10,13 +12,18 @@ const LEGACY_VERTEX = /* glsl */ `
 `;
 
 const SURFACE_VERTEX = /* glsl */ `
+  ${SLEEVE_VERTEX_DECL}
   attribute vec2 aTattooUv;
   attribute float aTattooMask;
+  attribute float aTattooBoundary;
   varying vec2 vTattooUv;
   varying float vTattooMask;
+  varying float vTattooBoundary;
   void main() {
+    ${SLEEVE_VERTEX_ASSIGN}
     vTattooUv = aTattooUv;
     vTattooMask = aTattooMask;
+    vTattooBoundary = aTattooBoundary;
     // GLTFLoader keeps glTF's downward V axis; Blender converts it back to
     // upward V during import. Bake into the UV coordinates Blender will use.
     vec2 atlasUv = vec2(uv.x, 1.0 - uv.y);
@@ -50,6 +57,9 @@ const LEGACY_FRAGMENT = /* glsl */ `
 
 const SURFACE_FRAGMENT = /* glsl */ `
   ${SURFACE_TATTOO_GLSL}
+  ${WRAP_TATTOO_GLSL}
+  ${SLEEVE_GLSL}
+  uniform float tattooWrap;
   ${OUTPUT_COLOR}
   uniform sampler2D tattooTexture;
   uniform float tattooSize;
@@ -59,11 +69,14 @@ const SURFACE_FRAGMENT = /* glsl */ `
   uniform float tattooOpacity;
   varying vec2 vTattooUv;
   varying float vTattooMask;
+  varying float vTattooBoundary;
   void main() {
     vec4 ink = sampleSurfaceTattoo(
-      tattooTexture, vTattooUv, vTattooMask, tattooSize, tattooAspect,
+      tattooTexture, vTattooUv, vTattooMask * step(0.0, vTattooBoundary), tattooSize, tattooAspect,
       tattooRotation, tattooTint, tattooOpacity
     );
+    if (tattooWrap > .5) ink = sampleWrapTattoo(tattooTexture, vTattooUv, vTattooMask * step(0.0, vTattooBoundary), tattooTint, tattooOpacity);
+    if (sleeveEnabled > .5) ink = sleeveComposite(ink, tattooTint, tattooOpacity);
     gl_FragColor = vec4(inkToSRGB(ink.rgb), ink.a);
   }
 `;
@@ -147,6 +160,8 @@ function loadTexture(src: string, signal?: AbortSignal, timeoutMs = 20_000): Pro
 }
 
 export interface SurfaceBakeParams {
+  sleeve?: boolean;
+  wrap?: boolean;
   /** Original body atlas, with continuous aTattooUv and aTattooMask attributes. */
   geometry: THREE.BufferGeometry;
   /** Longest side of the design, in body units. */
@@ -195,6 +210,7 @@ export async function bakeInkLayer(params: BakeParams): Promise<Blob> {
     throw new Error('Place a tattoo before exporting its ink layer.');
   }
 
+  const sleeveTextures: THREE.Texture[] = [];
   let texture: THREE.Texture | undefined;
   let renderer: THREE.WebGLRenderer | undefined;
   let target: THREE.WebGLRenderTarget | undefined;
@@ -205,8 +221,24 @@ export async function bakeInkLayer(params: BakeParams): Promise<Blob> {
   try {
     // Snapshot before the asynchronous image load: dragging in the editor can
     // replace the live surface coordinates while an export is in progress.
-    if (surface) ownedGeometry = surface.geometry.clone();
+    if (surface) {
+      ownedGeometry = surface.geometry.clone();
+      for (const name of ['aSleeveShoulder', 'aSleeveChest']) if (!ownedGeometry.getAttribute(name)) ownedGeometry.setAttribute(name, new THREE.BufferAttribute(new Float32Array(ownedGeometry.getAttribute('position').count * 4), 4));
+      // Legacy callers have no region restriction. New placements snapshot the
+      // exact same signed boundary used by the viewport before any async work.
+      if (!ownedGeometry.getAttribute('aTattooBoundary')) ownedGeometry.setAttribute('aTattooBoundary',
+        new THREE.BufferAttribute(new Float32Array(ownedGeometry.getAttribute('position').count).fill(1), 1));
+    }
     texture = await loadTexture(params.tattooImage, params.signal, params.textureTimeoutMs);
+    if (surface?.sleeve) {
+      const results = await Promise.allSettled([SLEEVE_SOURCES.shoulder, SLEEVE_SOURCES.chest].map(async src => {
+        const loaded = await loadTexture(src, params.signal, params.textureTimeoutMs); sleeveTextures.push(loaded); return loaded;
+      }));
+      for (const result of results) if (result.status === 'rejected') throw result.reason;
+      // Preserve deterministic sampler order even if the chest loads first.
+      sleeveTextures.splice(0, sleeveTextures.length, ...results.map(r => (r as PromiseFulfilledResult<THREE.Texture>).value));
+    }
+    if (surface?.wrap) { texture.wrapS = THREE.RepeatWrapping; texture.needsUpdate = true; }
     params.signal?.throwIfAborted();
     renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
     renderer.debug.onShaderError = () => {
@@ -229,6 +261,8 @@ export async function bakeInkLayer(params: BakeParams): Promise<Blob> {
     };
     if (surface) {
       Object.assign(uniforms, {
+        sleeveEnabled: { value: surface.sleeve ? 1 : 0 }, sleeveShoulderTexture: { value: sleeveTextures[0] ?? null }, sleeveChestTexture: { value: sleeveTextures[1] ?? null },
+        tattooWrap: { value: surface.wrap ? 1 : 0 },
         tattooSize: { value: surface.size },
         tattooAspect: { value: surface.aspect },
         tattooTint: { value: new THREE.Color(surface.color) },
@@ -323,6 +357,7 @@ export async function bakeInkLayer(params: BakeParams): Promise<Blob> {
     coverageMaterial?.dispose();
     ownedGeometry?.dispose();
     target?.dispose();
+    sleeveTextures.forEach(texture => texture.dispose());
     texture?.dispose();
     renderer?.dispose();
     renderer?.forceContextLoss();

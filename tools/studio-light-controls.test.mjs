@@ -55,7 +55,7 @@ const {outputFiles:handlerBundle}=await build({
  plugins:[{name:'actual-handler-hooks',setup(builder){
   builder.onResolve({filter:/^react(?:\/jsx-runtime)?$/},args=>({path:args.path,namespace:'test-hooks'}));
   builder.onLoad({filter:/.*/,namespace:'test-hooks'},args=>({contents:args.path==='react'
-   ? 'export const useState=v=>[v,()=>{}];export const useId=()=>"studio-handler";export const useRef=value=>globalThis.__lightControlHooks.ref(value);'
+   ? 'export const useState=v=>[v,()=>{}];export const useSyncExternalStore=(subscribe,read,server)=>server();export const useId=()=>"studio-handler";export const useRef=value=>globalThis.__lightControlHooks.ref(value);'
    : 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";'}));
   builder.onLoad({filter:/\.css$/},()=>({contents:'',loader:'js'}));
  }}],logLevel:'silent',

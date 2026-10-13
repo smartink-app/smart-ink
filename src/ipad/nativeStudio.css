@@ -1,0 +1,15 @@
+/* Native chrome owns navigation and the inspector; the browser layout is untouched. */
+html.native-studio .editor-app-root > .studio-rail,
+html.native-studio .editor-app-root > .editor-toolbar,
+html.native-studio .focus-control-panel,
+html.native-studio .viewport-tools,
+html.native-studio .tattoo-transform-card,
+html.native-studio .body-region-card,
+html.native-studio .placement-help { display: none !important; }
+html.native-studio .editor-app-root { padding: 0 !important; grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; height: 100dvh !important; }
+html.native-studio .editor-body-row { margin: 0 !important; grid-column: 1 / -1; grid-row: 1 / -1; }
+html.native-studio .editor-canvas-host { min-height: 0; }
+html.native-studio .snapshot-toolbar,
+html.native-studio .snapshot-compose-rail,
+html.native-studio .snapshot-footer { display: none !important; }
+html.native-studio .snapshot-overlay { grid-template-rows: 1fr; padding: 0; }

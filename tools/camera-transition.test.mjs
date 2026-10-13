@@ -148,10 +148,11 @@ visitModel(modelAst);
 const modelCode = await transform(`(() => { const setOrbitEnabled = ${modelCallbacks.get('setOrbitEnabled')}; const finishPointer = ${modelCallbacks.get('finishPointer')}; return finishPointer; })()`, { loader: 'ts' });
 function modelPointerRelease(app, editingEnabled) {
   const scope = {
-    useCallback: fn => fn, scene: app.scene, editingEnabled,
+    useCallback: fn => fn, scene: app.scene, editingEnabled, interactionMode: 'tattoo', onRegionPress: undefined, onFrameRegion: undefined, regionFraming: () => null,
     pick: () => { throw Error('Disabled editing must not pick'); },
     applyAnchor: () => { throw Error('Disabled editing must not place'); },
     gl: { domElement: { hasPointerCapture: () => false } }, onPlacementStatus: undefined,
+    touchGesture: { current: { pointers: new Set(), blocked: false } },
     pointerStart: { current: null }, pendingMove: { current: null }, dragFrame: { current: null }, isDragging: { current: false },
   };
   return new Function('scope', `with (scope) { return ${modelCode.code} }`)(scope);

@@ -1,5 +1,16 @@
-import { skinDetailSettings, SKIN_DETAIL_GLSL } from './render/skinDetailTest';
+import FeedbackScene, { type FeedbackSceneProps } from './feedback/FeedbackScene';
 import { deformFit, heightWarp, type BodyFit } from './measurements/fitter';
+import { bindSkinRestCoordinates, SKIN_DETAIL, SKIN_DETAIL_GLSL } from './render/skinDetail';
+import { isTattooHit, tattooAnchorPoint } from './model/tattooHit';
+import TattooViewportControls from './model/TattooViewportControls';
+import SleeveTattooControls from './model/SleeveTattooControls';
+import { DEFAULT_SLEEVE, SLEEVE_SOURCES, type SleeveSettings, type SleeveSectionId } from './render/sleeveTypes';
+import { buildSleeveComposition, attachSleeveToGeometry, sleeveFraming, type SleeveComposition } from './render/sleevePlacement';
+import { SLEEVE_VERTEX_DECL, SLEEVE_VERTEX_ASSIGN, SLEEVE_GLSL } from './render/sleeveShader';
+import WrapTattooControls from './model/WrapTattooControls';
+import { buildWrapChart, DEFAULT_WRAP, type WrapSettings } from './render/wrapPlacement';
+import TattooBoundsControls from './model/TattooBoundsControls';
+import { areaAtAnchor, createPlacementDomain, assessPlacement, footprintFromImage, fitPlacement, limitPlacement, type InkFootprint, type PlacementDomain, type PlacementBoundsStatus, type BoundsAssessment } from './render/placementBounds';
 import { loadFitAsset } from './measurements/service';
 import { measurementGuide, type MeasurementGuide } from './measurements/geometry';
 import { createPreviewEyes } from './render/previewEyes';
@@ -29,7 +40,7 @@ import { useLoader, useThree, useFrame } from '@react-three/fiber';
 import { DRACOLoader, GLTFLoader } from 'three-stdlib';
 import * as THREE from 'three';
 import { TextureLoader } from 'three';
-import { SURFACE_TATTOO_GLSL } from './render/tattooLayer';
+import { SURFACE_TATTOO_GLSL, WRAP_TATTOO_GLSL } from './render/tattooLayer';
 import { createSurfaceTopology, buildSurfaceChart, type SurfaceAnchor, type SurfaceChart } from './render/surfacePlacement';
 import { findById, REGISTRY } from './render/registry';
 import type { LightDefinition } from './config/lightingPresets';
@@ -65,28 +76,29 @@ function recenterGroup(group: THREE.Object3D, body: THREE.Mesh): void {
 /** Normalized figure height and palm-sized design in world units. */
 const TARGET_BODY_HEIGHT = 4.2;
 const TATTOO_BASE_SIZE = 0.42;
-/** Experiment: preserve the chosen size everywhere; keep safe fitting available. */
-const AUTO_FIT_TATTOO_SIZE = false;
 
 const DRACO_DECODER_PATH = '/draco/';
 
 const vertexShader = `
+  ${SLEEVE_VERTEX_DECL}
   #include <common>
 
-  attribute vec3 aSkinRest;
-  attribute vec3 aSkinNormal;
-  varying vec3 vSkinRest;
-  varying vec3 vSkinNormal;
   attribute float aRegion;
   attribute float aFocusMask;
   attribute float aClothingMask;
   attribute vec2 aTattooUv;
   attribute float aTattooMask;
+  attribute float aTattooBoundary;
   attribute vec4 tangent;
+  attribute vec3 aSkinRest;
+  attribute vec3 aSkinNormal;
+  varying vec3 vSkinRest;
+  varying vec3 vSkinNormal;
 
   varying vec2 vUv;
   varying vec2 vTattooUv;
   varying float vTattooMask;
+  varying float vTattooBoundary;
   varying vec3 vWorldNormal;
   varying vec3 vWorldTangent;
   varying vec3 vWorldBitangent;
@@ -98,11 +110,13 @@ const vertexShader = `
   uniform float uHighlightRegion2;
 
   void main() {
+    ${SLEEVE_VERTEX_ASSIGN}
+    vUv = uv;
     vSkinRest = aSkinRest;
     vSkinNormal = aSkinNormal;
-    vUv = uv;
     vTattooUv = aTattooUv;
     vTattooMask = aTattooMask;
+    vTattooBoundary = aTattooBoundary;
     vFocusMask = aFocusMask;
     vClothingMask = aClothingMask;
     vHighlightMask = max(1.0 - step(0.5, abs(aRegion - uHighlightRegion)),
@@ -123,6 +137,9 @@ const vertexShader = `
 
 const fragmentShader = `
   ${SURFACE_TATTOO_GLSL}
+  ${WRAP_TATTOO_GLSL}
+  ${SLEEVE_GLSL}
+  uniform float tattooWrap;
 
   ${STUDIO_LIGHTING_GLSL}
 
@@ -145,6 +162,7 @@ const fragmentShader = `
   varying vec2 vUv;
   varying vec2 vTattooUv;
   varying float vTattooMask;
+  varying float vTattooBoundary;
   varying vec3 vWorldNormal;
   varying vec3 vWorldTangent;
   varying vec3 vWorldBitangent;
@@ -172,24 +190,29 @@ const fragmentShader = `
   }
 
   void main() {
-    // Evaluate derivatives before divergent mask/ink branches, once per pixel.
-    vec3 skinLighting = studioLighting(skinDetailNormal(surfaceNormal()), vWorldPosition);
     // Cutting a region out is a fragment reject, so UVs, the placed tattoo
     // and the shape maths all still refer to the whole figure.
     if (uIsolateRegion >= 0.0 && vFocusMask < 0.0) discard;
     if (vClothingMask >= 0.0) discard;
 
     vec4 skin = texture2D(skinTexture, vUv);
-    vec3 litRgb = skin.rgb * skinLighting;
-    skin.rgb = litRgb;
+    // Compute relief before branching on ink coverage; both surfaces share it.
+    float microHeight = skinHeight();
+    vec3 N = skinDetailNormal(surfaceNormal(), microHeight);
+    vec3 skinLighting = studioLighting(N, vWorldPosition);
+    float roughness = clamp(.56 + (microHeight - .5) * .14, .48, .64);
+    vec3 reflection = skinSpecular(N, roughness);
+    skin.rgb = skin.rgb * skinLighting + reflection;
 
     if (tattooVisible > 0.5) {
       vec4 tattooLayer = sampleSurfaceTattoo(
-        tattooTexture, vTattooUv, vTattooMask, tattooScale,
+        tattooTexture, vTattooUv, vTattooMask * step(0.0, vTattooBoundary), tattooScale,
         tattooAspect, tattooRotation, tattooColor, tattooOpacity
       );
+      if (tattooWrap > .5) tattooLayer = sampleWrapTattoo(tattooTexture, vTattooUv, vTattooMask * step(0.0, vTattooBoundary), tattooColor, tattooOpacity);
+      if (sleeveEnabled > .5) tattooLayer = sleeveComposite(tattooLayer, tattooColor, tattooOpacity);
       if (tattooLayer.a > 0.0) {
-        skin.rgb = mix(skin.rgb, tattooLayer.rgb * 0.85 * skinLighting, tattooLayer.a);
+        skin.rgb = mix(skin.rgb, tattooLayer.rgb * 0.85 * skinLighting + reflection, tattooLayer.a);
       }
     }
 
@@ -271,18 +294,27 @@ export interface UVTattooPlacementSnapshot {
   imageReady: boolean;
   /** Effective visibility, including before/after mode and image readiness. */
   visible: boolean;
-  surface?: { geometry: THREE.BufferGeometry; size: number; aspect: number; color: string; opacity: number };
+  bounds?: BoundsAssessment;
+  surface?: { sleeve?: boolean; wrap?: boolean; geometry: THREE.BufferGeometry; size: number; aspect: number; color: string; opacity: number };
 }
 
 export interface ModelWithUVTattooHandle {
+  setSleeve: (value: SleeveSettings | null) => boolean;
+  getSleeveFraming: (section?: SleeveSectionId) => TattooFraming | null;
+  setWrap: (value: WrapSettings | null) => boolean;
   placeInView: () => boolean;
   getPlacement: () => UVTattooPlacementSnapshot;
   getRegionFraming: () => RegionFraming | null;
   getMeasurementGuide: (key: string) => MeasurementGuide | null;
-  getTattooFraming: () => TattooFraming | null;
+  getTattooFraming: (join?: boolean) => TattooFraming | null;
+  limitScale: (value: number) => number;
+  limitRotation: (value: number) => number;
+  setAreaLock: (locked: boolean) => void;
+  fitToArea: () => void;
 }
 
 interface ModelWithUVTattooProps {
+  feedback?: FeedbackSceneProps;
   uploadedImage: string | null;
   skinToneId: string;
   /** Which figure to load; falls back to the first registry entry. */
@@ -295,6 +327,17 @@ interface ModelWithUVTattooProps {
   visible?: boolean;
   /** Photo mode keeps camera navigation available while blocking edits. */
   editingEnabled?: boolean;
+  showTattooControls?: boolean;
+  onHideTattooControls?: () => void;
+  fingerPlacement?: boolean;
+  /** Model mode selects anatomy; it never places or moves ink. */
+  interactionMode?: 'tattoo' | 'model';
+  onDecalScaleChange?: (value: number) => void;
+  onDecalRotationChange?: (value: number) => void;
+  onSleeveView?: (section?: SleeveSectionId) => void;
+  onWrapRegion?: (region: 'armLeft' | 'armRight') => void;
+  onWrapView?: (join: boolean) => void;
+  onBoundsStatus?: (status: PlacementBoundsStatus | null) => void;
   initialPlacement?: SurfaceAnchor | null;
   onPlacementChange?: (anchor: SurfaceAnchor | null) => void;
   onPlacementStatus?: (message: string) => void;
@@ -313,7 +356,7 @@ interface ModelWithUVTattooProps {
   highlightRegions?: BodyRegionId[];
   /** Pointer moved over (or off) a region, for the hover tint. */
   onHoverRegion?: (region: BodyRegionId | null) => void;
-  /** Right-press on a region: where the radial shape menu should open. */
+  /** Primary click in Model mode, or legacy right-press in Tattoo mode. */
   onRegionPress?: (
     region: BodyRegionId,
     clientX: number,
@@ -327,6 +370,7 @@ interface ModelWithUVTattooProps {
 const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooProps>(
   function ModelWithUVTattoo(
     {
+      feedback,
       uploadedImage,
       skinToneId,
       bodyMeshId,
@@ -337,11 +381,22 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       setDecalVisible,
       visible = true,
       editingEnabled = true,
+      showTattooControls = true,
+      onHideTattooControls,
+      fingerPlacement = false,
+      interactionMode = 'tattoo',
+      onDecalScaleChange,
+      onDecalRotationChange,
+      onBoundsStatus,
+      onWrapView,
+      onSleeveView,
+      onWrapRegion,
       initialPlacement = null,
       onPlacementChange,
       onPlacementStatus,
       lights = [],
       intensityScale = 1,
+      performanceMode = false,
       bodyShape = DEFAULT_BODY_SHAPE,
       bodyFit = null,
       bodyPose = DEFAULT_BODY_POSE,
@@ -370,18 +425,24 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     const referenceGeoRef = useRef<THREE.BufferGeometry | null>(null);
     const topologyRef = useRef<ReturnType<typeof createSurfaceTopology> | null>(null);
     const chartRef = useRef<SurfaceChart | null>(null);
+    const domainRef = useRef<PlacementDomain | null>(null);
+    const [inkFootprint, setInkFootprint] = useState<InkFootprint | null>(null);
+    const [boundsLimitMessage, setBoundsLimitMessage] = useState('');
     const anchorRef = useRef<SurfaceAnchor | null>(initialPlacement);
     const [chartVersion, setChartVersion] = useState(0);
     const [imageAspect, setImageAspect] = useState(1);
     const loadedImageRef = useRef<string | null>(null);
     const pointerStart = useRef<{ x: number; y: number; id: number; moved: boolean } | null>(null);
+    const grabOffset = useRef({ x: 0, y: 0 });
     const pendingMove = useRef<PointerEvent | null>(null);
     const dragFrame = useRef<number | null>(null);
     const [hasPlaced, setHasPlaced] = useState(false);
     const hasPlacedRef = useRef(false);
     const isDragging = useRef(false);
+    const touchGesture = useRef({ pointers: new Set<number>(), blocked: false });
     const isolateRef = useRef<BodyRegionId | null>(isolateRegion);
     const hoverRef = useRef<BodyRegionId | null>(null);
+    const [hoveredRegion, setHoveredRegion] = useState<BodyRegionId | null>(null);
 
     useEffect(() => {
       hasPlacedRef.current = hasPlaced;
@@ -390,6 +451,12 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     useEffect(() => {
       isolateRef.current = isolateRegion;
     }, [isolateRegion]);
+
+    useEffect(() => {
+      hoverRef.current = null;
+      setHoveredRegion(null);
+      gl.domElement.style.cursor = '';
+    }, [interactionMode, gl]);
 
     const bodyDef =
       (bodyMeshId ? findById(REGISTRY.bodyMeshes, bodyMeshId) : undefined) ??
@@ -401,15 +468,17 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       (loader as GLTFLoader).setDRACOLoader(draco);
     });
     const normalMap = useLoader(TextureLoader, bodyDef.normalMapUrl);
-    const detailMap = useLoader(TextureLoader, '/textures/soft-cells-height.png');
+    const [sleeveShoulderTexture, sleeveChestTexture] = useLoader(TextureLoader, [SLEEVE_SOURCES.shoulder, SLEEVE_SOURCES.chest]);
+    useEffect(() => { for (const texture of [sleeveShoulderTexture, sleeveChestTexture]) { texture.colorSpace = THREE.SRGBColorSpace; texture.needsUpdate = true; } }, [sleeveShoulderTexture, sleeveChestTexture]);
+    const detailMap = useLoader(TextureLoader, SKIN_DETAIL.texture);
     useEffect(() => {
       detailMap.colorSpace = THREE.NoColorSpace;
       detailMap.wrapS = detailMap.wrapT = THREE.RepeatWrapping;
       detailMap.minFilter = THREE.LinearMipmapLinearFilter;
       detailMap.magFilter = THREE.LinearFilter;
-      detailMap.anisotropy = 4;
+      detailMap.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy());
       detailMap.needsUpdate = true;
-    }, [detailMap]);
+    }, [detailMap, gl]);
     useEffect(() => {
       // A normal map is vector data, not colour: sampling it through sRGB
       // would bend every normal it encodes.
@@ -432,6 +501,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     useEffect(() => {
       let cancelled = false;
       loadedImageRef.current = null;
+      setInkFootprint(null);
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
@@ -441,6 +511,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         tattooTexture.colorSpace = THREE.SRGBColorSpace;
         tattooTexture.needsUpdate = true;
         setImageAspect(img.naturalWidth / Math.max(1, img.naturalHeight));
+        setInkFootprint(footprintFromImage(img));
       };
       img.onerror = () => { if (!cancelled) onPlacementStatus?.('The design could not be loaded. Please upload it again.'); };
       img.src = resolveTattooSource(uploadedImage);
@@ -453,11 +524,12 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       () => new THREE.ShaderMaterial({
         vertexShader, fragmentShader,
         uniforms: {
-          skinDetailMap: { value: null }, skinDetailStrength: { value: 0 }, skinDetailScale: { value: 1 },
           skinTexture: { value: null }, normalMap: { value: null }, normalMapStrength: { value: 1 },
+          skinDetailMap: { value: null }, skinDetailStrength: { value: SKIN_DETAIL.strength }, skinDetailScale: { value: SKIN_DETAIL.scale },
+          sleeveEnabled: { value: 0 }, sleeveShoulderTexture: { value: null }, sleeveChestTexture: { value: null },
           tattooTexture: { value: null }, tattooAspect: { value: 1 },
           tattooColor: { value: new THREE.Color('#ffffff') }, tattooOpacity: { value: 1 },
-          tattooScale: { value: TATTOO_BASE_SIZE }, tattooRotation: { value: 0 }, tattooVisible: { value: 0 },
+          tattooScale: { value: TATTOO_BASE_SIZE }, tattooRotation: { value: 0 }, tattooVisible: { value: 0 }, tattooWrap: { value: 0 },
           ...createSkinLightUniforms(resolveStudioLightRig([])),
           uIsolateRegion: { value: -1 }, uHighlightRegion: { value: -1 }, uHighlightRegion2: { value: -1 },
         },
@@ -465,11 +537,14 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       }), []
     );
     useEffect(() => {
-      shaderMaterial.uniforms.skinDetailMap.value = detailMap;
+      shaderMaterial.uniforms.sleeveShoulderTexture.value = sleeveShoulderTexture;
+      shaderMaterial.uniforms.sleeveChestTexture.value = sleeveChestTexture;
       shaderMaterial.uniforms.skinTexture.value = skinTexture;
       shaderMaterial.uniforms.normalMap.value = normalMap;
+      shaderMaterial.uniforms.skinDetailMap.value = detailMap;
       shaderMaterial.uniforms.tattooTexture.value = tattooTexture;
-    }, [shaderMaterial, skinTexture, normalMap, tattooTexture, detailMap]);
+    }, [shaderMaterial, skinTexture, normalMap, tattooTexture, detailMap, sleeveShoulderTexture, sleeveChestTexture]);
+    useEffect(() => { shaderMaterial.uniforms.skinDetailStrength.value = performanceMode ? 0 : SKIN_DETAIL.strength; }, [shaderMaterial, performanceMode]);
     useEffect(() => () => shaderMaterial.dispose(), [shaderMaterial]);
     const shadowMaterials = useMemo(() => createBodyShadowMaterials(shaderMaterial.uniforms.uIsolateRegion), [shaderMaterial]);
     useEffect(() => () => { shadowMaterials.depth.dispose(); shadowMaterials.distance.dispose(); }, [shadowMaterials]);
@@ -481,7 +556,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         isolateRegion === null ? -1 : REGION_INDEX[isolateRegion];
     }, [shaderMaterial, isolateRegion]);
 
-    const highlightA = highlightRegions?.[0] ?? null;
+    const highlightA = highlightRegions?.[0] ?? (interactionMode === 'model' && editingEnabled ? hoveredRegion : null);
     const highlightB = highlightRegions?.[1] ?? null;
     useEffect(() => {
       shaderMaterial.uniforms.uHighlightRegion.value =
@@ -491,22 +566,68 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     }, [shaderMaterial, highlightA, highlightB]);
 
     const requestedSize = TATTOO_BASE_SIZE * THREE.MathUtils.clamp(Number.isFinite(decalScale) ? decalScale : 1, 0.1, 3);
-    const aspectRatio = Math.min(imageAspect, 1 / imageAspect);
-    const safeSize = chartRef.current ? chartRef.current.maxSize * Math.SQRT2 / Math.hypot(1, aspectRatio) : requestedSize;
-    const size = AUTO_FIT_TATTOO_SIZE ? Math.min(requestedSize, safeSize) : requestedSize;
+    // Saved designs keep their explicit size; only interactive changes are
+    // constrained. Invalid old placements offer an explicit Fit action.
+    const size = requestedSize;
     const rotationRad = THREE.MathUtils.degToRad(Number.isFinite(decalRotation) ? decalRotation % 360 : 0);
+    const placementInput = useRef({ inkFootprint, size, imageAspect, rotationRad });
+    placementInput.current = { inkFootprint, size, imageAspect, rotationRad };
+    const sleeve = anchorRef.current?.sleeve;
+    const wrap = anchorRef.current?.wrap;
+    const periodicTattoo = !!(wrap || sleeve);
     useEffect(() => {
-      if (!hasPlacedRef.current) return;
-      onPlacementStatus?.(size < requestedSize - 0.001
-        ? 'Size limited here to keep the design smooth. Move to a broader area for a larger tattoo.'
-        : requestedSize > safeSize + 0.001
-          ? 'This size exceeds the recommended area. Edges may be clipped near folds. Move the design or reduce its size.'
-          : 'Placed on the skin. Click to move, or hold ⌘ / Ctrl and drag.');
-    }, [size, requestedSize, safeSize, chartVersion, onPlacementStatus]);
+      const wrapping = periodicTattoo ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+      if (tattooTexture.wrapS !== wrapping) {
+        tattooTexture.wrapS = wrapping;
+        // Pending images upload in onload. Section edits need no texture upload.
+        if (tattooTexture.image) tattooTexture.needsUpdate = true;
+      }
+    }, [tattooTexture, periodicTattoo]);
+    const assessment = useMemo(() => domainRef.current && inkFootprint
+      ? assessPlacement(domainRef.current, inkFootprint, size, imageAspect, rotationRad) : null,
+      // chartVersion invalidates the spatial index stored in domainRef.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [inkFootprint, size, imageAspect, rotationRad, chartVersion]);
+    const fittedScale = useMemo(() => assessment && !assessment.valid && domainRef.current && inkFootprint
+      ? fitPlacement(value => assessPlacement(domainRef.current!, inkFootprint, value * TATTOO_BASE_SIZE, imageAspect, rotationRad), decalScale) : null,
+      [assessment, inkFootprint, imageAspect, rotationRad, decalScale]);
+    const boundsStatus = useMemo<PlacementBoundsStatus | null>(() => {
+      const bounds = anchorRef.current?.bounds;
+      if (!hasPlaced || !bounds || anchorRef.current?.wrap || anchorRef.current?.sleeve) return null;
+      return { ...(assessment ?? { outside: 0, distorted: 0, valid: false, empty: false }), region: bounds.region,
+        locked: !bounds.allowAcrossRegions, ready: !!assessment, canFit: fittedScale !== null, conservative: !!inkFootprint?.conservative, limitMessage: boundsLimitMessage };
+    // The selected anchor's region is updated with its chart revision.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [assessment, fittedScale, hasPlaced, inkFootprint, chartVersion, boundsLimitMessage]);
+    useEffect(() => { onBoundsStatus?.(boundsStatus); }, [boundsStatus, onBoundsStatus]);
+    useEffect(() => {
+      if (!assessment) return;
+      onPlacementStatus?.(boundsLimitMessage || (!assessment.valid ? 'The design exceeds this area. Use Fit to area, move it, or allow placement across regions.'
+        : 'Drag the tattoo to move it. Drag bare skin to orbit.'));
+    }, [assessment, onPlacementStatus, boundsLimitMessage]);
+
+    const limitScale = useCallback((value: number) => {
+      const next = THREE.MathUtils.clamp(Number.isFinite(value) ? value : decalScale, .1, 3);
+      if (!domainRef.current || !hasPlacedRef.current) return next;
+      if (!inkFootprint) return decalScale;
+      const result = limitPlacement(v => assessPlacement(domainRef.current!, inkFootprint, v * TATTOO_BASE_SIZE, imageAspect, rotationRad), decalScale, next, .05);
+      setBoundsLimitMessage(Math.abs(result - next) > .001 ? 'Size limited here. Move to a broader spot, or allow across regions.' : '');
+      return result;
+    }, [decalScale, inkFootprint, imageAspect, rotationRad]);
+    const limitRotation = useCallback((value: number) => {
+      if (!Number.isFinite(value)) return decalRotation;
+      if (!domainRef.current || !hasPlacedRef.current) return value;
+      if (!inkFootprint) return decalRotation;
+      const delta = ((value - decalRotation + 540) % 360 + 360) % 360 - 180;
+      const result = limitPlacement(v => assessPlacement(domainRef.current!, inkFootprint, size, imageAspect, THREE.MathUtils.degToRad(v)), decalRotation, decalRotation + delta, 5);
+      setBoundsLimitMessage(Math.abs(result - decalRotation - delta) > .001 ? 'Rotation limited to keep the design inside this area.' : '');
+      return result === decalRotation + delta ? value : result;
+    }, [decalRotation, inkFootprint, size, imageAspect]);
+    const fitToArea = useCallback(() => { if (fittedScale !== null) { setBoundsLimitMessage(''); onDecalScaleChange?.(fittedScale); } }, [fittedScale, onDecalScaleChange]);
 
     useFrame(() => {
-      shaderMaterial.uniforms.skinDetailStrength.value = skinDetailSettings.enabled ? skinDetailSettings.strength : 0;
-      shaderMaterial.uniforms.skinDetailScale.value = skinDetailSettings.scale;
+      shaderMaterial.uniforms.sleeveEnabled.value = anchorRef.current?.sleeve ? 1 : 0;
+      shaderMaterial.uniforms.tattooWrap.value = anchorRef.current?.wrap || anchorRef.current?.sleeve ? 1 : 0;
       shaderMaterial.uniforms.tattooScale.value = size;
       shaderMaterial.uniforms.tattooRotation.value = rotationRad;
       shaderMaterial.uniforms.tattooAspect.value = imageAspect;
@@ -566,21 +687,12 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       const source = mesh.geometry as THREE.BufferGeometry;
       const geo = source.index ? source.toNonIndexed() : source.clone();
       ensureUVs(geo);
-      // Bind the detail to the undeformed body, in nominal metres (1.75 m figure).
-      // The chart stays attached during pose and measurement deformation.
       group.updateMatrixWorld(true);
-      const rest = new Float32Array(geo.attributes.position.count * 3);
-      const normals = new Float32Array(rest.length);
-      const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
-      const point = new THREE.Vector3();
-      for (let i = 0; i < geo.attributes.position.count; i++) {
-        point.fromBufferAttribute(geo.attributes.position, i).applyMatrix4(mesh.matrixWorld).multiplyScalar(1.75 / TARGET_BODY_HEIGHT).toArray(rest, i * 3);
-        point.fromBufferAttribute(geo.attributes.normal, i).applyNormalMatrix(normalMatrix).toArray(normals, i * 3);
-      }
-      geo.setAttribute('aSkinRest', new THREE.BufferAttribute(rest, 3));
-      geo.setAttribute('aSkinNormal', new THREE.BufferAttribute(normals, 3));
+      bindSkinRestCoordinates(geo, mesh.matrixWorld);
+      for (const name of ['aSleeveShoulder', 'aSleeveChest']) geo.setAttribute(name, new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 4), 4));
       geo.setAttribute('aTattooUv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
       geo.setAttribute('aTattooMask', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count), 1));
+      geo.setAttribute('aTattooBoundary', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(1), 1));
       geo.setAttribute('aFocusMask', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(1), 1));
       geo.setAttribute('aClothingMask', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(-1), 1));
       referenceGeoRef.current = geo.clone();
@@ -718,17 +830,53 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       onFrameRegion(regionFraming(isolateRegion));
     }, [cloneGroup, isolateRegion, regionFraming, onFrameRegion]);
 
-    const applyAnchor = useCallback((anchor: SurfaceAnchor, notify = true): boolean => {
+    const applyAnchor = useCallback((anchor: SurfaceAnchor, notify = true, changingBoundary = false): boolean => {
+      const { inkFootprint, size, imageAspect, rotationRad } = placementInput.current;
       const mesh = bodyMeshRef.current;
       const reference = referenceGeoRef.current;
       const topology = topologyRef.current;
       if (!mesh || !reference || !topology || anchor.bodyMeshId !== bodyDef.id) return false;
       mesh.updateWorldMatrix(true, false);
-      const chart = buildSurfaceChart(topology, reference, mesh.matrixWorld, anchor);
+      const masks = regionMasksRef.current;
+      if (!masks) return false;
+      if (anchor.sleeve) {
+        const composition = buildSleeveComposition(reference, topology, masks, mesh.matrixWorld, bodyDef.id, anchor.sleeve);
+        if (!composition) { onPlacementStatus?.('This sleeve could not fit the selected body. Return to regular placement to continue.'); return false; }
+        mesh.userData.sleeveComposition = composition;
+        chartRef.current = attachSleeveToGeometry(mesh.geometry, composition);
+        domainRef.current = null;
+        anchorRef.current = composition.anchor;
+        hasPlacedRef.current = true; setHasPlaced(true); setBoundsLimitMessage(''); setChartVersion(v => v + 1);
+        onPlacementStatus?.('Sleeve test: select a section to adjust it. Drag bare skin to orbit.');
+        if (notify) { setDecalVisible(true); onPlacementChange?.(composition.anchor); }
+        return true;
+      }
+      mesh.userData.sleeveComposition = null;
+      const wrapped = anchor.wrap ? buildWrapChart(reference, masks, anchor.wrap) : null;
+      const chart = anchor.wrap ? wrapped?.chart : buildSurfaceChart(topology, reference, mesh.matrixWorld, anchor);
       if (!chart || chart.maxSize < 0.045) {
-        onPlacementStatus?.('This area is too folded for a clean placement. Try a flatter spot nearby.');
+        onPlacementStatus?.(anchor.wrap ? 'This band would reach the shoulder or elbow. Try a narrower band or move it toward the middle of the upper arm.' : 'This area is too folded for a clean placement. Try a flatter spot nearby.');
         return false;
       }
+      // Dragging retains the original area. An explicit click may target a new
+      // area; restored scenes retain the area/override saved with their anchor.
+      const bounds = anchor.bounds ?? (notify && isDragging.current ? anchorRef.current?.bounds : undefined)
+        ?? { region: isolateRef.current ?? areaAtAnchor(masks, anchor, mesh.geometry), allowAcrossRegions: anchorRef.current?.bounds?.allowAcrossRegions ?? false };
+      const boundary = bounds.allowAcrossRegions ? undefined : masks[bounds.region];
+      const domain = anchor.wrap ? null : createPlacementDomain(reference, mesh.matrixWorld, chart, boundary);
+      if (domain && notify && !changingBoundary && hasPlacedRef.current && inkFootprint) {
+        const next = assessPlacement(domain, inkFootprint, size, imageAspect, rotationRad);
+        const before = domainRef.current ? assessPlacement(domainRef.current, inkFootprint, size, imageAspect, rotationRad) : null;
+        if (!next.valid && (before?.valid || !before || next.outside + next.distorted >= before.outside + before.distorted)) {
+          onPlacementStatus?.('This placement would lose or stretch part of the design. Reduce its size or use Fit to area first.');
+          setBoundsLimitMessage('Move limited here. Reduce the size or move to a broader spot.');
+          return false;
+        }
+      }
+      mesh.geometry.setAttribute('aTattooBoundary', new THREE.BufferAttribute(boundary?.slice() ?? new Float32Array(chart.mask.length).fill(1), 1));
+      domainRef.current = domain;
+      setBoundsLimitMessage('');
+      const placed = wrapped ? { ...anchor, ...wrapped.anchor } : { ...anchor, bounds };
       mesh.geometry.setAttribute('aTattooUv', new THREE.BufferAttribute(chart.uv, 2));
       const mask = chart.mask.slice();
       for (let face = 0; face < chart.faceMask.length; face++) {
@@ -736,16 +884,44 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       }
       mesh.geometry.setAttribute('aTattooMask', new THREE.BufferAttribute(mask, 1));
       chartRef.current = chart;
-      anchorRef.current = anchor;
+      anchorRef.current = placed;
       hasPlacedRef.current = true;
       setHasPlaced(true);
       setChartVersion((v) => v + 1);
+      if (placed.wrap) onPlacementStatus?.('360° band: use Position and Band height to adjust it. Drag bare skin to orbit.');
       if (notify) {
         setDecalVisible(true);
-        onPlacementChange?.(anchor);
+        onPlacementChange?.(placed);
       }
       return true;
     }, [bodyDef.id, onPlacementStatus, onPlacementChange, setDecalVisible]);
+
+    const setWrap = useCallback((value: WrapSettings | null): boolean => {
+      const current = anchorRef.current;
+      if (!value && !current) return false;
+      const anchor: SurfaceAnchor = { ...(current ?? { bodyMeshId: bodyDef.id, faceIndex: 0, barycentric: [1, 0, 0] as [number, number, number] }), sleeve: undefined, wrap: value ?? undefined };
+      if (value) anchor.bounds = { region: value.region, allowAcrossRegions: false };
+      const success = applyAnchor(anchor, true, true);
+      if (success && value) onPlacementStatus?.('360° band: use Position and Band height to adjust it. Drag bare skin to orbit.');
+      return success;
+    }, [applyAnchor, bodyDef.id, onPlacementStatus]);
+
+    const setSleeve = useCallback((value: SleeveSettings | null): boolean => {
+      const current = anchorRef.current;
+      if (!value && !current) return false;
+      return applyAnchor({ ...(current ?? { bodyMeshId: bodyDef.id, faceIndex: 0, barycentric: [1, 0, 0] as [number, number, number] }), wrap: undefined, sleeve: value ?? undefined }, true, true);
+    }, [applyAnchor, bodyDef.id]);
+    const getSleeveFraming = useCallback((section?: SleeveSectionId): TattooFraming | null => {
+      const mesh = bodyMeshRef.current, composition = mesh?.userData.sleeveComposition as SleeveComposition | undefined;
+      if (!anchorRef.current?.sleeve || !mesh || !composition) return null;
+      mesh.updateWorldMatrix(true, false);
+      return sleeveFraming(mesh.geometry, mesh.matrixWorld, composition, section);
+    }, []);
+
+    const setAreaLock = useCallback((locked: boolean) => {
+      const anchor = anchorRef.current;
+      if (anchor?.bounds) applyAnchor({ ...anchor, bounds: { ...anchor.bounds, allowAcrossRegions: !locked } }, true, true);
+    }, [applyAnchor]);
 
     useEffect(() => {
       if (!cloneGroup) return;
@@ -757,6 +933,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       if (desired && applyAnchor(desired, false)) return;
       anchorRef.current = null;
       chartRef.current = null;
+      domainRef.current = null;
       hasPlacedRef.current = false;
       setHasPlaced(false);
       const mask = bodyMeshRef.current?.geometry.getAttribute('aTattooMask') as THREE.BufferAttribute | undefined;
@@ -770,7 +947,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     const mouse = useRef(new THREE.Vector2());
 
     /** Pick the same face that the isolation shader actually displays. */
-    const pick = useCallback((event: Pick<PointerEvent, 'clientX' | 'clientY'>) => {
+    const pick = useCallback((event: Pick<PointerEvent, 'clientX' | 'clientY'>, selectCovered = false) => {
       pickBlockedRef.current = false;
       const rect = gl.domElement.getBoundingClientRect();
       if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return null;
@@ -783,6 +960,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         const appearance = appearanceHit(hit.object);
         if (appearance === 'hidden') continue;
         if (appearance) {
+          if (selectCovered) continue;
           if (helperDistance < hit.distance) return null;
           pickBlockedRef.current = true; return null;
         }
@@ -803,8 +981,8 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         }
         if (helperDistance < hit.distance) return null;
         const clothing = clothingCoverageRef.current, hair = hairCoverageRef.current;
-        if ((clothing && clothingCoversTriangle(clothing, hit.faceIndex, bary)) ||
-          (hair && hair[indices[0]] * bary.x + hair[indices[1]] * bary.y + hair[indices[2]] * bary.z >= .5)) {
+        if (!selectCovered && ((clothing && clothingCoversTriangle(clothing, hit.faceIndex, bary)) ||
+          (hair && hair[indices[0]] * bary.x + hair[indices[1]] * bary.y + hair[indices[2]] * bary.z >= .5))) {
           pickBlockedRef.current = true; return null;
         }
         const r = reg ? regionAtTriangle(indices.map((i) => reg.getX(i)), bary) : 0;
@@ -828,7 +1006,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         for (const x of positions) {
           const hit = pick({ clientX: rect.left + rect.width * x, clientY: rect.top + rect.height * y });
           if (hit && applyAnchor(hit.anchor)) {
-            onPlacementStatus?.('Placed on the skin. Click to reposition, or hold ⌘ / Ctrl and drag.');
+            onPlacementStatus?.('Drag the tattoo to move it. Drag bare skin to orbit.');
             return true;
           }
         }
@@ -838,28 +1016,43 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     }, [gl, camera, editingEnabled, pick, applyAnchor, onPlacementStatus]);
 
     useImperativeHandle(ref, () => ({
-      placeInView,
+      placeInView, setWrap, setSleeve, getSleeveFraming,
+      limitScale, limitRotation, setAreaLock, fitToArea,
       getPlacement: () => ({
         imageSource: resolveTattooSource(uploadedImage),
         imageReady: loadedImageRef.current === resolveTattooSource(uploadedImage),
         center: [0, 0], scaleUV: 0, rotationRad, hasPlaced: hasPlacedRef.current && loadedImageRef.current === (resolveTattooSource(uploadedImage)),
         visible: hasPlacedRef.current && visible && loadedImageRef.current === (resolveTattooSource(uploadedImage)),
+        bounds: assessment ?? undefined,
         surface: bodyMeshRef.current && chartRef.current ? {
-          geometry: bodyMeshRef.current.geometry, size, aspect: imageAspect,
+          geometry: bodyMeshRef.current.geometry, size, aspect: imageAspect, wrap: !!(anchorRef.current?.wrap || anchorRef.current?.sleeve), sleeve: !!anchorRef.current?.sleeve,
           color: decalColor, opacity: decalOpacity,
         } : undefined,
       }),
       getRegionFraming: () => regionFraming(isolateRegion),
       getMeasurementGuide: (key) => bodyMeshRef.current ? measurementGuide(bodyMeshRef.current, key) : null,
-      getTattooFraming: () => {
+      getTattooFraming: (join = false) => {
         const mesh = bodyMeshRef.current, anchor = anchorRef.current;
         if (!mesh || !anchor || !hasPlacedRef.current || loadedImageRef.current !== resolveTattooSource(uploadedImage)) return null;
         mesh.updateWorldMatrix(true, false);
-        return tattooFramingFromGeometry(mesh.geometry, mesh.matrixWorld, anchor, {
-          size, aspect: imageAspect, rotationRad, hairCoverage: hairCoverageRef.current,
+        if (anchor.sleeve) return getSleeveFraming();
+        let framingAnchor = anchor;
+        if (join && anchor.wrap) {
+          const uv = mesh.geometry.getAttribute('aTattooUv'), mask = mesh.geometry.getAttribute('aTattooMask');
+          let best = Infinity;
+          for (let i = 0; i < uv.count; i += 3) {
+            if (mask.getX(i) < .5) continue;
+            const u = ((uv.getX(i) + uv.getX(i + 1) + uv.getX(i + 2)) / 3 % 1 + 1) % 1;
+            const v = (uv.getY(i) + uv.getY(i + 1) + uv.getY(i + 2)) / 3;
+            const score = Math.min(u, 1 - u) + Math.abs(v);
+            if (score < best) { best = score; framingAnchor = { ...anchor, faceIndex: i / 3, barycentric: [1 / 3, 1 / 3, 1 / 3] }; }
+          }
+        }
+        return tattooFramingFromGeometry(mesh.geometry, mesh.matrixWorld, framingAnchor, {
+          size, aspect: imageAspect, rotationRad, wrap: !!anchor.wrap, hairCoverage: hairCoverageRef.current,
         });
       },
-    }), [placeInView, size, imageAspect, decalColor, decalOpacity, rotationRad, uploadedImage, visible, regionFraming, isolateRegion]);
+    }), [placeInView, setWrap, setSleeve, getSleeveFraming, size, imageAspect, decalColor, decalOpacity, rotationRad, uploadedImage, visible, regionFraming, isolateRegion, assessment, limitScale, limitRotation, setAreaLock, fitToArea]);
 
     const setOrbitEnabled = useCallback(
       (enabled: boolean) => {
@@ -871,8 +1064,23 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     );
 
     const onPointerDown = useCallback((e: PointerEvent) => {
+      if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+        const gesture = touchGesture.current;
+        gesture.pointers.add(e.pointerId);
+        if (gesture.pointers.size > 1 || gesture.blocked) {
+          gesture.blocked = true;
+          pointerStart.current = null;
+          isDragging.current = false;
+          pendingMove.current = null;
+          if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+          dragFrame.current = null;
+          setOrbitEnabled(true);
+          return;
+        }
+      }
+      if ((anchorRef.current?.wrap || anchorRef.current?.sleeve) && interactionMode === 'tattoo') return;
       if (!editingEnabled) return;
-      if (e.button === 2) {
+      if (e.button === 2 && interactionMode === 'tattoo') {
         const hit = pick(e);
         if (hit?.region && onRegionPress) {
           e.preventDefault();
@@ -883,8 +1091,13 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       }
       if (e.button !== 0 || !e.isPrimary) return;
       pointerStart.current = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false };
-      if (e.metaKey || e.ctrlKey) {
-        const hit = pick(e);
+      grabOffset.current = { x: 0, y: 0 };
+      if (interactionMode === 'model') return;
+      const hit = pick(e), mesh = bodyMeshRef.current;
+      const onInk = hit && mesh && hasPlacedRef.current && visible
+        && isTattooHit(mesh.geometry, hit.anchor, size, imageAspect, rotationRad);
+      // Fingers always navigate; Pencil and mouse retain precise ink dragging.
+      if ((e.pointerType !== 'touch' || fingerPlacement) && (e.metaKey || e.ctrlKey || onInk)) {
         if (!hit) {
           if (pickBlockedRef.current) onPlacementStatus?.('This area is covered. Use Focus or remove the clothing or hair to place a tattoo.');
           return;
@@ -892,9 +1105,14 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         isDragging.current = true;
         setOrbitEnabled(false);
         gl.domElement.setPointerCapture(e.pointerId);
-        applyAnchor(hit.anchor);
+        if (onInk && mesh && anchorRef.current && !e.metaKey && !e.ctrlKey) {
+          // Preserve the grab point instead of snapping the tattoo centre to it.
+          const point = tattooAnchorPoint(mesh, anchorRef.current, new THREE.Vector3()).project(camera);
+          const rect = gl.domElement.getBoundingClientRect();
+          grabOffset.current = { x: rect.left + (point.x + 1) * rect.width / 2 - e.clientX, y: rect.top + (1 - point.y) * rect.height / 2 - e.clientY };
+        } else applyAnchor(hit.anchor);
       }
-    }, [pick, onRegionPress, setOrbitEnabled, applyAnchor, gl, editingEnabled, onPlacementStatus]);
+    }, [pick, onRegionPress, setOrbitEnabled, applyAnchor, gl, editingEnabled, interactionMode, onPlacementStatus, size, imageAspect, rotationRad, visible, camera, fingerPlacement]);
 
     const onPointerMove = useCallback((e: PointerEvent) => {
       if (!editingEnabled) return;
@@ -906,23 +1124,37 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
           dragFrame.current = null;
           const event = pendingMove.current;
           if (event && isDragging.current) {
-            const hit = pick(event);
+            const hit = pick({ clientX: event.clientX + grabOffset.current.x, clientY: event.clientY + grabOffset.current.y });
             if (hit) applyAnchor(hit.anchor);
           }
         });
         return;
       }
-      if (!onHoverRegion || e.buttons !== 0) return;
-      const region = e.target === gl.domElement ? pick(e)?.region ?? null : null;
-      if (region !== hoverRef.current) { hoverRef.current = region; onHoverRegion(region); }
-    }, [pick, applyAnchor, gl, onHoverRegion, editingEnabled]);
+      if (e.buttons !== 0) return;
+      const region = interactionMode === 'model' && e.target === gl.domElement ? pick(e, true)?.region ?? null : null;
+      gl.domElement.style.cursor = region ? 'pointer' : '';
+      if (region !== hoverRef.current) { hoverRef.current = region; setHoveredRegion(region); onHoverRegion?.(region); }
+    }, [pick, applyAnchor, gl, onHoverRegion, editingEnabled, interactionMode]);
 
     const finishPointer = useCallback((e?: PointerEvent) => {
+      const gesture = touchGesture.current;
+      if (e) gesture.pointers.delete(e.pointerId);
+      else gesture.pointers.clear();
+      const blocked = gesture.blocked;
+      if (gesture.pointers.size === 0) gesture.blocked = false;
       const start = pointerStart.current;
       if (e && start && e.pointerId !== start.id) return;
-      if (editingEnabled && e?.type === 'pointerup' && e.button === 0 && start) {
-        if (isDragging.current || !start.moved) {
-          const hit = pick(e);
+      if (!blocked && editingEnabled && e?.type === 'pointerup' && e.button === 0 && start) {
+        if (interactionMode === 'model') {
+          if (!start.moved) {
+            const hit = pick(e, true);
+            if (hit?.region) {
+              onRegionPress?.(hit.region, e.clientX, e.clientY, e.pointerId);
+              onFrameRegion?.(regionFraming(hit.region));
+            }
+          }
+        } else if (isDragging.current ? start.moved : !start.moved) {
+          const hit = pick({ clientX: e.clientX + grabOffset.current.x, clientY: e.clientY + grabOffset.current.y });
           if (hit) applyAnchor(hit.anchor);
           else if (pickBlockedRef.current) onPlacementStatus?.('This area is covered. Use Focus or remove the clothing or hair to place a tattoo.');
         }
@@ -934,14 +1166,16 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       pointerStart.current = null;
       isDragging.current = false;
       setOrbitEnabled(true);
-    }, [pick, applyAnchor, gl, setOrbitEnabled, editingEnabled, onPlacementStatus]);
+    }, [pick, applyAnchor, gl, setOrbitEnabled, editingEnabled, onPlacementStatus, interactionMode, onRegionPress, onFrameRegion, regionFraming]);
 
     useEffect(() => {
       if (editingEnabled) return;
       finishPointer();
       hoverRef.current = null;
+      setHoveredRegion(null);
+      gl.domElement.style.cursor = '';
       onHoverRegion?.(null);
-    }, [editingEnabled, finishPointer, onHoverRegion]);
+    }, [editingEnabled, finishPointer, onHoverRegion, gl]);
 
     useEffect(() => {
       const el = gl.domElement;
@@ -966,7 +1200,18 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     }, [onPointerDown, onPointerMove, finishPointer, gl]);
 
     if (!cloneGroup) return null;
-    return <primitive object={cloneGroup} />;
+    return <>
+      <primitive object={cloneGroup} />
+      {feedback && <FeedbackScene {...feedback} mesh={bodyMeshRef} bodyMeshId={bodyDef.id} pick={pick} />}
+      {showTattooControls && editingEnabled && interactionMode === 'tattoo' && hasPlaced && visible && onDecalScaleChange && onDecalRotationChange && <TattooViewportControls
+        onHide={onHideTattooControls}
+        mesh={bodyMeshRef} anchor={anchorRef} scale={decalScale} rotation={decalRotation}
+        onScale={value => onDecalScaleChange(limitScale(value))} onRotation={value => onDecalRotationChange(limitRotation(value))}
+        customTitle={sleeve ? 'Sleeve composition' : undefined}
+        wrapControls={sleeve ? <SleeveTattooControls compact value={sleeve} onStart={() => setSleeve(DEFAULT_SLEEVE)} onChange={setSleeve} onExit={() => setSleeve(null)} onView={onSleeveView} /> : wrap ? <WrapTattooControls compact value={wrap} onSample={() => setWrap(DEFAULT_WRAP)} onChange={value => { if (setWrap(value) && value.region !== wrap.region) onWrapRegion?.(value.region); }} onExit={() => setWrap(null)} onView={onWrapView} /> : undefined}
+        boundsControls={<TattooBoundsControls status={boundsStatus} onLock={setAreaLock} onFit={fitToArea} />}
+      />}
+    </>;
   }
 );
 

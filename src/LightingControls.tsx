@@ -1,3 +1,4 @@
+import MoreControls from './MoreControls';
 import { useId, useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import AdjustmentControl from './AdjustmentControl';
 import { LIGHTING_PRESETS, resolveRig, type LightDefinition, type LightingPresetKey } from './config/lightingPresets';
@@ -5,6 +6,7 @@ import { LIGHT_COLOR_CHOICES, STUDIO_LIGHT_LIMITS, lightLabel, lightPlacement, l
 import './studio-light-controls.css';
 
 interface LightingControlsProps {
+  compact?: boolean;
   lights: LightDefinition[];
   selectedIndex: number | null;
   onSelectLight: (i: number) => void;
@@ -21,7 +23,7 @@ function compass(angle: number): string {
   return ['Front', 'Front right', 'Right', 'Back right', 'Back', 'Back left', 'Left', 'Front left'][sector];
 }
 
-export default function LightingControls({ lights, selectedIndex, onSelectLight, onChange, onReset, preset, onPresetChange, showGuides = true, onShowGuidesChange }: LightingControlsProps) {
+export default function LightingControls({ compact = false, lights, selectedIndex, onSelectLight, onChange, onReset, preset, onPresetChange, showGuides = true, onShowGuidesChange }: LightingControlsProps) {
   const id = useId(), mapRef = useRef<SVGSVGElement>(null), dragRef = useRef<{ index: number; pointer: number } | null>(null);
   const selected = selectedLightIndex(lights, selectedIndex), light = selected == null ? null : lights[selected];
   const placement = light ? lightPlacement(light) : null;
@@ -71,9 +73,7 @@ export default function LightingControls({ lights, selectedIndex, onSelectLight,
       resetValue={initial * (percent ? 100 : 1)} onChange={next => control(key, next / (percent ? 100 : 1))}
       hint={key === 'brightness' ? undefined : display} />;
   };
-  return <div className="studio-light-controls">
-    <div className="sl-heading"><div><h3>Lighting</h3></div><button type="button" className="sl-text-button" onClick={onReset}>Reset setup</button></div>
-    <label className="sl-preset" htmlFor={`${id}-preset`}><span>Lighting preset{custom && <strong className="sl-custom-status">Custom</strong>}</span><select className="ep-select" id={`${id}-preset`} value={custom ? 'custom' : preset} onChange={(event) => onPresetChange(event.currentTarget.value as LightingPresetKey)}>{custom && <option value="custom" disabled>Custom · {LIGHTING_PRESETS[preset].name}</option>}{Object.entries(LIGHTING_PRESETS).map(([key, value]) => <option key={key} value={key}>{value.name}</option>)}</select></label>
+  const advanced = <>
     {!lights.length ? <p className="sl-hint">Choose a look to add your studio lights.</p> : <>
       <div className="sl-light-list" aria-label="Studio lights">{lights.map((entry, index) => <button key={index} type="button" className={`sl-light-chip ${index === selected ? 'is-selected' : ''} ${entry.enabled === false ? 'is-off' : ''}`} aria-pressed={index === selected} onClick={() => onSelectLight(index)}><span className="sl-light-dot" style={{ backgroundColor: entry.color }} />{lightLabel(lights, index)}{entry.enabled === false && <small>Off</small>}</button>)}</div>
       <div className="sl-map-wrap">
@@ -113,5 +113,10 @@ export default function LightingControls({ lights, selectedIndex, onSelectLight,
       </div>}
     </>}
     {onShowGuidesChange && <label className="sl-toggle sl-guides"><input type="checkbox" checked={showGuides} onChange={(event) => onShowGuidesChange(event.currentTarget.checked)} /><span>Show lights in the studio</span></label>}
+  </>;
+  return <div className="studio-light-controls">
+    <div className="sl-heading"><div><h3>Lighting</h3></div><button type="button" className="sl-text-button" onClick={onReset}>Reset setup</button></div>
+    <label className="sl-preset" htmlFor={`${id}-preset`}><span>Lighting preset{custom && <strong className="sl-custom-status">Custom</strong>}</span><select className="ep-select" id={`${id}-preset`} value={custom ? 'custom' : preset} onChange={(event) => onPresetChange(event.currentTarget.value as LightingPresetKey)}>{custom && <option value="custom" disabled>Custom · {LIGHTING_PRESETS[preset].name}</option>}{Object.entries(LIGHTING_PRESETS).map(([key, value]) => <option key={key} value={key}>{value.name}</option>)}</select></label>
+    {compact ? <MoreControls id="lighting" summary={custom ? 'Custom rig applied' : 'Light positions & settings'}>{advanced}</MoreControls> : advanced}
   </div>;
 }

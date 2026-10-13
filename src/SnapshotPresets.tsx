@@ -6,6 +6,6 @@ export default function SnapshotPresets({ selected, onSelect }: { selected: Cine
       <img src={`/renders/presets/${p.id}.jpg`} alt="" loading="lazy" />
       <span className="snapshot-preset-name">{p.name}</span><span className="snapshot-preset-description">{p.description}</span>
     </button>)}</div>
-    <p className="snapshot-controls-hint">Start with a look, then fine-tune below. Ink detail deliberately crops closer.</p>
+    <p className="snapshot-controls-hint">Start with a look, then fine-tune below. Skin detail deliberately crops closer.</p>
   </section>;
 }

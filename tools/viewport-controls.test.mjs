@@ -24,12 +24,12 @@ try {
 } finally { await fs.rm(temporary, { force: true }); }
 const noop = () => {};
 const common = { cameras: real.CAMERA_PRESETS, cameraPreset: 'front', onCameraChange: noop, region: null,
-  onRegionChange: noop, onHighlightRegions: noop, onFit: noop, onCleanView: noop,
+  onRegionChange: noop, onHighlightRegions: noop, onFit: noop,
   performanceMode: false, onPerformanceChange: noop };
 for (const region of [null, ...real.BODY_REGIONS.map(part => part.id)]) {
   const html = renderToStaticMarkup(React.createElement(real.ViewportControls, { ...common, region }));
   assert.ok(html.includes('aria-label="Viewport controls"'));
-  assert.ok(html.includes('Clean view') && html.includes('Viewport settings') && html.includes('Faster preview'));
+  assert.ok(!html.includes('Clean view') && html.includes('Viewport settings') && html.includes('Faster preview'));
   assert.ok(html.includes('Blender renders keep their selected quality.'));
   assert.equal((html.match(/<select\b/g) ?? []).length, 2);
   for (const camera of Object.values(real.CAMERA_PRESETS)) assert.ok(html.includes(camera.name));
@@ -73,7 +73,7 @@ const props = { ...common,
   onCameraChange: value => { calls.push(['camera', value]); props.cameraPreset = value; },
   onRegionChange: value => { calls.push(['region', value]); props.region = value; },
   onHighlightRegions: value => calls.push(['highlight', value]),
-  onFit: () => calls.push(['fit']), onCleanView: () => calls.push(['clean']),
+  onFit: () => calls.push(['fit']),
   onPerformanceChange: value => { calls.push(['performance', value]); props.performanceMode = value; },
 };
 const flatten = (node, all = []) => {
@@ -123,7 +123,7 @@ try {
   props.region = 'armLeft'; select('-focus').props.onChange({ currentTarget: { value: 'full' } });
   assert.equal(props.region, null); assert.deepEqual(calls.at(-1), ['highlight', []]);
   select('-focus').props.onMouseEnter(); assert.deepEqual(calls.at(-1), ['highlight', []]);
-  button('Clean view').props.onClick(); assert.deepEqual(calls.at(-1), ['clean']);
+  assert.equal(button('Clean view'), undefined);
   const beforePerformance = { region: props.region, camera: props.cameraPreset, cameras: structuredClone(props.cameras) };
   for (const enabled of [true, false]) {
     nodes().find(node => node.type === 'input' && node.props.type === 'checkbox').props.onChange({ currentTarget: { checked: enabled } });
@@ -147,4 +147,4 @@ try {
   delete globalThis.__viewportHooks;
   if (originalDocument === undefined) delete globalThis.document; else globalThis.document = originalDocument;
 }
-console.log(`Viewport controls passed: real markup, ${Object.keys(real.CAMERA_PRESETS).length} views, six focus regions, shortcuts, fit, clean view, preview-only settings, outside/Escape dismissal, focus restoration and inert state.`);
+console.log(`Viewport controls passed: real markup, ${Object.keys(real.CAMERA_PRESETS).length} views, six focus regions, shortcuts, fit, preview-only settings, outside/Escape dismissal, focus restoration and inert state.`);

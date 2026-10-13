@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 server/.venv
+.focus-venv/
 dist
 dist-ssr
 *.local
@@ -72,3 +73,10 @@ __pycache__/
 *.pyc
 smartink-live/portfolio-v1/
 smartink-live/contract_smoke.json
+
+# Local Xcode state
+native/ipad/**/xcuserdata/
+native/ipad/DerivedData/
+
+# Generated, configuration-specific iPad web bundle
+native/ipad/Bundled/

@@ -190,6 +190,10 @@ export async function renderContract(
       opts?.onStatusChange?.('done', 'Render saved to history.');
       return URL.createObjectURL(blob);
     }
+    if (typeof window !== 'undefined' && window.smartInkNativeHost === true) {
+      const { renderOnIPad } = await import('../ipad/nativeRender');
+      return await renderOnIPad(contract, inkLayer, { ...opts, signal: lifetime.signal });
+    }
     opts?.onStatusChange?.('uploading', 'Sending shot to render server...');
     opts?.onStatusChange?.('rendering', 'Rendering with Cycles...');
     const res = await fetch(`${RENDER_URL}/render-v2`, { method: 'POST', body: form, signal: lifetime.signal, ...(opts?.onPreview ? { headers: { Accept: 'application/x-ndjson' } } : {}) });
