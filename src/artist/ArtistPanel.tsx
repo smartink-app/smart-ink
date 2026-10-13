@@ -79,7 +79,7 @@ export default function ArtistPanel({ owner, scenes, onOpenProject, initialBooki
   const newAppointment = (clientId = '') => { setClientPreview(false); setBooking(blankBooking(selectedDate < dateKey() ? shiftDate(dateKey(), 1) : selectedDate, clientId)); };
   return <section className="artist-panel" aria-label="Artist workspace">
     <header className="artist-heading">
-      <div><p className="focus-eyebrow">The work around the artwork</p><h1>Your artist desk.</h1><p>A little less admin. More time for the ink.</p></div>
+      <div><h1>Artist desk</h1><p>Manage requests, appointments and client conversations.</p></div>
       <button className="focus-primary" onClick={() => newAppointment()}><FiPlus aria-hidden />New appointment</button>
     </header>
     <div className="artist-demo-note"><span><strong>Demo workspace</strong> · Fictional clients. Changes stay on this device; messages and bookings are not sent.</span><button onClick={() => { setClientPreview(true); setBooking(blankBooking(shiftDate(dateKey(), 2), '', true)); }}>Try client request <FiArrowUpRight aria-hidden /></button></div>

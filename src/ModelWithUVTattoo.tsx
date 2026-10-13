@@ -327,6 +327,9 @@ interface ModelWithUVTattooProps {
   visible?: boolean;
   /** Photo mode keeps camera navigation available while blocking edits. */
   editingEnabled?: boolean;
+  showTattooControls?: boolean;
+  onHideTattooControls?: () => void;
+  fingerPlacement?: boolean;
   /** Model mode selects anatomy; it never places or moves ink. */
   interactionMode?: 'tattoo' | 'model';
   onDecalScaleChange?: (value: number) => void;
@@ -378,6 +381,9 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       setDecalVisible,
       visible = true,
       editingEnabled = true,
+      showTattooControls = true,
+      onHideTattooControls,
+      fingerPlacement = false,
       interactionMode = 'tattoo',
       onDecalScaleChange,
       onDecalRotationChange,
@@ -433,6 +439,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     const [hasPlaced, setHasPlaced] = useState(false);
     const hasPlacedRef = useRef(false);
     const isDragging = useRef(false);
+    const touchGesture = useRef({ pointers: new Set<number>(), blocked: false });
     const isolateRef = useRef<BodyRegionId | null>(isolateRegion);
     const hoverRef = useRef<BodyRegionId | null>(null);
     const [hoveredRegion, setHoveredRegion] = useState<BodyRegionId | null>(null);
@@ -1057,6 +1064,20 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     );
 
     const onPointerDown = useCallback((e: PointerEvent) => {
+      if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+        const gesture = touchGesture.current;
+        gesture.pointers.add(e.pointerId);
+        if (gesture.pointers.size > 1 || gesture.blocked) {
+          gesture.blocked = true;
+          pointerStart.current = null;
+          isDragging.current = false;
+          pendingMove.current = null;
+          if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+          dragFrame.current = null;
+          setOrbitEnabled(true);
+          return;
+        }
+      }
       if ((anchorRef.current?.wrap || anchorRef.current?.sleeve) && interactionMode === 'tattoo') return;
       if (!editingEnabled) return;
       if (e.button === 2 && interactionMode === 'tattoo') {
@@ -1075,7 +1096,8 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       const hit = pick(e), mesh = bodyMeshRef.current;
       const onInk = hit && mesh && hasPlacedRef.current && visible
         && isTattooHit(mesh.geometry, hit.anchor, size, imageAspect, rotationRad);
-      if (e.metaKey || e.ctrlKey || onInk) {
+      // Fingers always navigate; Pencil and mouse retain precise ink dragging.
+      if ((e.pointerType !== 'touch' || fingerPlacement) && (e.metaKey || e.ctrlKey || onInk)) {
         if (!hit) {
           if (pickBlockedRef.current) onPlacementStatus?.('This area is covered. Use Focus or remove the clothing or hair to place a tattoo.');
           return;
@@ -1090,7 +1112,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
           grabOffset.current = { x: rect.left + (point.x + 1) * rect.width / 2 - e.clientX, y: rect.top + (1 - point.y) * rect.height / 2 - e.clientY };
         } else applyAnchor(hit.anchor);
       }
-    }, [pick, onRegionPress, setOrbitEnabled, applyAnchor, gl, editingEnabled, interactionMode, onPlacementStatus, size, imageAspect, rotationRad, visible, camera]);
+    }, [pick, onRegionPress, setOrbitEnabled, applyAnchor, gl, editingEnabled, interactionMode, onPlacementStatus, size, imageAspect, rotationRad, visible, camera, fingerPlacement]);
 
     const onPointerMove = useCallback((e: PointerEvent) => {
       if (!editingEnabled) return;
@@ -1115,9 +1137,14 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     }, [pick, applyAnchor, gl, onHoverRegion, editingEnabled, interactionMode]);
 
     const finishPointer = useCallback((e?: PointerEvent) => {
+      const gesture = touchGesture.current;
+      if (e) gesture.pointers.delete(e.pointerId);
+      else gesture.pointers.clear();
+      const blocked = gesture.blocked;
+      if (gesture.pointers.size === 0) gesture.blocked = false;
       const start = pointerStart.current;
       if (e && start && e.pointerId !== start.id) return;
-      if (editingEnabled && e?.type === 'pointerup' && e.button === 0 && start) {
+      if (!blocked && editingEnabled && e?.type === 'pointerup' && e.button === 0 && start) {
         if (interactionMode === 'model') {
           if (!start.moved) {
             const hit = pick(e, true);
@@ -1176,7 +1203,8 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
     return <>
       <primitive object={cloneGroup} />
       {feedback && <FeedbackScene {...feedback} mesh={bodyMeshRef} bodyMeshId={bodyDef.id} pick={pick} />}
-      {editingEnabled && interactionMode === 'tattoo' && hasPlaced && visible && onDecalScaleChange && onDecalRotationChange && <TattooViewportControls
+      {showTattooControls && editingEnabled && interactionMode === 'tattoo' && hasPlaced && visible && onDecalScaleChange && onDecalRotationChange && <TattooViewportControls
+        onHide={onHideTattooControls}
         mesh={bodyMeshRef} anchor={anchorRef} scale={decalScale} rotation={decalRotation}
         onScale={value => onDecalScaleChange(limitScale(value))} onRotation={value => onDecalRotationChange(limitRotation(value))}
         customTitle={sleeve ? 'Sleeve composition' : undefined}

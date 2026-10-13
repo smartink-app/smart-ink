@@ -9,11 +9,15 @@ const { outputFiles } = await build({ stdin: { contents: "export * from './src/r
       ? 'export const useId=()=>"tattoo-inspector";export const useRef=v=>globalThis.__tattooHooks.ref(v);export const useState=v=>globalThis.__tattooHooks.state(v);export const useEffect=()=>{};'
       : 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";' }));
     b.onResolve({ filter: /^react-icons\/fa$/ }, () => ({ path: 'icons', namespace: 'stub' }));
+    // Account gating is tested separately; this panel harness has no Vite env
+    // or hosted auth connection, but keeps the real artwork library code.
+    b.onResolve({ filter: /auth\/betaAuthService$/ }, () => ({ path: 'auth', namespace: 'stub' }));
     b.onResolve({ filter: /\/utils\/tattooUpload$/ }, () => ({ path: 'upload', namespace: 'stub' }));
     b.onResolve({ filter: /^\.\/(PoseControls|AppearanceControls|StudioControls|CharacterBuilderSections|LightingControls|AdjustmentControl|MoreControls)$/ }, a => ({ path: a.path, namespace: 'stub' }));
     b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.path === 'icons'
       ? 'export const FaUpload="upload",FaUndo="undo",FaRegImage="image";'
-      : a.path === 'upload' ? 'export const readTattooPng=(...args)=>globalThis.__readTattoo(...args);' : 'export default ()=>null;' }));
+      : a.path === 'auth' ? 'export const subscribeSession=cb=>{cb({session:{userId:"panel-test",email:"panel@example.invalid"}});return()=>{};};'
+        : a.path === 'upload' ? 'export const readTattooPng=(...args)=>globalThis.__readTattoo(...args);' : 'export default ()=>null;' }));
   } }] });
 const m = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
 assert.equal(m.DEFAULT_TATTOO_SOURCE, '/logo.png');

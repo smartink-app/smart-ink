@@ -134,7 +134,7 @@ function bindingNames(name) {
   return ts.isIdentifier(name) ? [name.text] : name.elements.flatMap((entry) => ts.isOmittedExpression(entry) ? [] : bindingNames(entry.name));
 }
 // Include UI state touched by loadScene so its callback can finish in the harness.
-const retainedNames = new Set(`currentScene showDashboard inspectorTab artworkOpen sidebarCollapsed cameraPreset sceneSaves saveState saveTimer navigating stageScene flushPendingSave afterSaving
+const retainedNames = new Set(`currentScene clientReview clientProjectId clientRole reviewOpen reviewCamera showDashboard inspectorTab artworkOpen sidebarCollapsed cameraPreset sceneSaves saveState saveTimer navigating stageScene flushPendingSave afterSaving
   uploadedImage decalRotation decalScale decalColor decalOpacity decalVisible surfacePlacement placementStatus photoMode background studio lightingPreset lights selectedLight
   decalPosition decalNormal cameraState bodyMeshId skinToneId poseId bodyShape bodyFit measureOpen bodyPose bodyAppearance isolateRegion hoverRegion panelRegions shapeMenu lookId qualityTier finalSamples
   canvasContainerRef loadScene handleBodyMeshChange`.split(/\s+/));
@@ -151,6 +151,10 @@ const harnessSource = `export function createComponent(deps) {
  ${cameraPresets.getText(syntax)}
  return function Component() {
  const [snapshot,setSnapshot] = useState({open:false});
+ const initialClientProject = undefined;
+ // Feedback actions are external to these save checks. Keep the actual review
+ // state above so the production autosave guards still run unchanged.
+ const review = {cancel(){},setReplies(){},setRole(){}};
  ${extracted.join('\n')}
  return {snapshot,setSnapshot,cameraState,setCameraState,currentScene,showDashboard,saveState,decalScale,lights,surfacePlacement,decalPosition,decalNormal,decalVisible,bodyMeshId,
  bodyPose,setBodyPose,bodyAppearance,setBodyAppearance,studio,setStudio,setDecalScale,setLights,stageScene,flushPendingSave,afterSaving,loadScene,handleBodyMeshChange,canvasContainerRef,sceneSaves};

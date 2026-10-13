@@ -1,13 +1,13 @@
 /* Focus studio: shared presentation only. Scene colors are independent of UI theme. */
 :root, :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg-primary: #15181d; --bg-secondary: #1e232b; --bg-card: #242a33;
-  --bg-card-hover: #303844; --bg-sidebar: #1b2027; --bg-input: #20262f;
-  --border-color: #3a4351; --border-subtle: #2b333f;
-  --text-primary: #eef2f8; --text-secondary: #b2bdcd; --text-muted: #919fb3;
-  --accent-blue: #b9caf1; --accent-purple: #b9caf1; --accent-green: #97d5b4;
-  --cta-blue: #b9caf1; --cta-blue-hover: #cfdbf6; --on-accent: #182641;
-  --selection: #b9caf11a; --selection-border: #b9caf16b;
+  --bg-primary: #0a0a0a; --bg-secondary: #111111; --bg-card: #161616;
+  --bg-card-hover: #202020; --bg-sidebar: #111111; --bg-input: #101010;
+  --border-color: #353438; --border-subtle: #252427;
+  --text-primary: #f4f3f5; --text-secondary: #b4b2b8; --text-muted: #929096;
+  --accent-blue: #c2b6ff; --accent-purple: #c2b6ff; --accent-green: #c2b6ff;
+  --cta-blue: #c2b6ff; --cta-blue-hover: #d2c9ff; --on-accent: #211b38;
+  --selection: #c2b6ff1a; --selection-border: #c2b6ff6b;
   --focus-error: #ffa9b0; --focus-success: #a5dfbd;
   --shadow-glow: 0 16px 48px #0004, 0 2px 8px #0003; --rail-width: 80px;
   --ep-accent: var(--accent-blue); --ep-border: var(--border-color);
@@ -16,22 +16,22 @@
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg-primary: #f4f5f8; --bg-secondary: #fff; --bg-card: #fff;
-  --bg-card-hover: #e8edf5; --bg-sidebar: #eef1f6; --bg-input: #f6f8fb;
-  --border-color: #c8d1df; --border-subtle: #dce2eb;
-  --text-primary: #242c39; --text-secondary: #536073; --text-muted: #657184;
-  --accent-blue: #3d5fb9; --accent-purple: #3d5fb9; --accent-green: #237844;
-  --cta-blue: #3d5fb9; --cta-blue-hover: #2c4c9e; --on-accent: #fff;
-  --selection: #385ac80d; --selection-border: #385ac866;
+  --bg-primary: #f5f6f3; --bg-secondary: #fff; --bg-card: #fff;
+  --bg-card-hover: #e8eee8; --bg-sidebar: #eef1eb; --bg-input: #f7f8f5;
+  --border-color: #c8d0c8; --border-subtle: #dce2d9;
+  --text-primary: #202820; --text-secondary: #526052; --text-muted: #647064;
+  --accent-blue: #356349; --accent-purple: #356349; --accent-green: #237844;
+  --cta-blue: #356349; --cta-blue-hover: #284e38; --on-accent: #fff;
+  --selection: #3563490d; --selection-border: #35634966;
   --focus-error: #ae263b; --focus-success: #247141;
-  --shadow-glow: 0 16px 48px #1826411a, 0 2px 8px #1826410a;
+  --shadow-glow: 0 16px 48px #211b381a, 0 2px 8px #211b380a;
 }
 html[data-theme] .editor-app-root {
   --ep-accent: var(--accent-blue); --ep-border: var(--border-color);
   --ep-surface: var(--bg-input); --ep-surface-hover: var(--bg-card-hover);
 }
-html[data-theme="dark"] .editor-app-root { --text-secondary: #b2bdcd; --text-muted: #919fb3; }
-html[data-theme="light"] .editor-app-root { --text-secondary: #536073; --text-muted: #657184; }
+html[data-theme="dark"] .editor-app-root { --text-secondary: #b4b2b8; --text-muted: #929096; }
+html[data-theme="light"] .editor-app-root { --text-secondary: #526052; --text-muted: #647064; }
 html[data-theme] [hidden] { display: none !important; }
 body { margin: 0; }
 button, input, select, textarea { font-family: inherit; }
@@ -91,7 +91,7 @@ html[data-theme] :is(.ep-select, .sl-preset select) { padding: 10px; min-height:
 html[data-theme] :is(.ep-btn,.ep-pill,.tool-btn--ghost,.tool-btn--export,.editor-output-trigger,.btn-open,.btn-modal-cancel) { color: var(--text-secondary); background: transparent; border: 1px solid var(--border-color); box-shadow: none; }
 html[data-theme] :is(.ep-btn,.ep-pill,.btn-open,.tool-btn--ghost):hover:not(:disabled) { background: var(--bg-card-hover); color: var(--text-primary); }
 html[data-theme] :is(.ep-btn,.ep-pill)[aria-pressed="true"] { color: var(--accent-blue); background: var(--selection); border-color: var(--selection-border); box-shadow: none; }
-html[data-theme] .ep-tattoo-artwork .ep-preview { height: 112px; min-height: 112px; border: 0; background: #e8e6e1; border-radius: 10px; }
+html[data-theme] .ep-tattoo-artwork .ep-preview { height: 112px; min-height: 112px; border: 0; background-color: #d8d7d3; background-image: conic-gradient(#bcbdb9 25%, transparent 0 50%, #bcbdb9 0 75%, transparent 0); background-size: 20px 20px; border-radius: 10px; }
 html[data-theme] .ep-preview img { max-height: 100%; object-fit: contain; }
 html[data-theme] .ep-tattoo-actions { display: grid; grid-template-columns: 1fr 1fr; }
 html[data-theme] .ep-tattoo-actions > :first-child { grid-column: 1 / -1; }
@@ -159,7 +159,7 @@ html[data-theme] .empty-scenes { min-height: 320px; border: 1px dashed var(--bor
 .empty-scenes h3 { color: var(--text-primary); font-size: 24px; font-weight: 500; margin: 0; letter-spacing: -.025em; }
 .empty-scenes p { max-width: 320px; font-size: 13px; line-height: 1.6; margin: 0 0 10px; }
 .focus-empty-icon { display: grid; place-items: center; width: 44px; height: 44px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; font-size: 20px; margin-bottom: 7px; }
-.focus-library-page { max-width: 950px; }
+.focus-library-page { max-width: none; }
 html[data-theme] .focus-library-page .tattoo-library-grid { grid-template-columns: repeat(auto-fill,minmax(165px,1fr)); }
 html[data-theme] :is(.tattoo-library-search,.tattoo-library-filters,.tattoo-asset-select,.tattoo-library-upload) { background: var(--bg-input); border-color: var(--border-color); color: var(--text-primary); }
 html[data-theme] .tattoo-asset-art { background: #e8e6e1; }

@@ -30,7 +30,7 @@ function initialGateView(): { view: GateView; inviteCode: string | null } {
   if (params.get('view') === 'client') return { view: 'client', inviteCode: null }
   if (params.get('view') === 'moodboard') return { view: 'moodboard', inviteCode: null }
   if (params.get('view') === 'artists') return { view: 'artists', inviteCode: null }
-  return { view: 'landing', inviteCode: null }
+  return { view: window.smartInkNativeHost ? 'login' : 'landing', inviteCode: null }
 }
 
 function App() {
@@ -58,7 +58,7 @@ function App() {
 
   // Signed out from another tab or via "sign out everywhere".
   useEffect(() => {
-    if (betaAuth.ready && gateView === 'app' && !betaAuth.session) setGateView('landing')
+    if (betaAuth.ready && gateView === 'app' && !betaAuth.session) setGateView(window.smartInkNativeHost ? 'login' : 'landing')
   }, [betaAuth.ready, betaAuth.session, gateView])
 
   const clearInviteQuery = useCallback(() => {
@@ -100,7 +100,7 @@ function App() {
     returnToMoodboard.current = false
     clearInviteQuery()
     clearAccessError()
-    setGateView('landing')
+    setGateView(window.smartInkNativeHost ? 'login' : 'landing')
   }, [clearInviteQuery, clearAccessError])
 
   const exploreArtists = () => {
@@ -144,7 +144,7 @@ function App() {
   }
 
   if (gateView === 'landing') {
-    return <LandingPage signedIn={!!betaAuth.session} onExploreArtists={exploreArtists} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
+    return <LandingPage signedIn={!!betaAuth.session} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
   }
 
   if (gateView === 'artists') {
@@ -156,7 +156,7 @@ function App() {
   if (gateView === 'moodboard' && betaAuth.session) {
     return <Suspense fallback={<div className="app-loading">Gathering your inspiration…</div>}>
       <MoodboardPortal key={betaAuth.session.userId ?? betaAuth.session.email} owner={betaAuth.session.userId ?? betaAuth.session.email}
-        pending={pendingInspiration} onCollected={() => setPendingInspiration(null)} onArtists={exploreArtists}
+        onHome={goHome} pending={pendingInspiration} onCollected={() => setPendingInspiration(null)} onArtists={exploreArtists}
         onStudio={() => { returnToClient.current = false; returnToMoodboard.current = false; setWorkspaceSection('projects'); enterApp() }}
         onClientSpace={openClientSpace}
         onDesk={() => { returnToClient.current = false; returnToMoodboard.current = false; setWorkspaceSection('artist'); enterApp() }} />
@@ -212,12 +212,12 @@ function App() {
 
   const session = betaAuth.session
   if (!session) {
-    return <LandingPage signedIn={!!betaAuth.session} onExploreArtists={exploreArtists} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
+    return <LandingPage signedIn={!!betaAuth.session} onNavigateToLogin={() => betaAuth.session ? enterApp() : setGateView('login')} />
   }
 
   return (
     <Suspense fallback={<div className="app-loading">Loading Smart Ink…</div>}>
-      <Workspace initialSection={workspaceSection} initialClientProject={clientProjectId} onMoodboard={() => openMoodboard()} session={session} onHome={goHome} onSignOut={(opts) => void signOut(opts)} />
+      <Workspace initialSection={workspaceSection} initialClientProject={clientProjectId} onMoodboard={() => openMoodboard()} onExplore={exploreArtists} session={session} onHome={goHome} onSignOut={(opts) => void signOut(opts)} />
     </Suspense>
   )
 }

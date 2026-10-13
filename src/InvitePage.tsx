@@ -1,4 +1,3 @@
-import { ThemeToggle } from './Theme';
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   getInvite,
@@ -109,7 +108,7 @@ export default function InvitePage({ code, onBack, onAuthenticated }: InvitePage
   };
 
   return (
-    <div className="beta-gate-page"><ThemeToggle className="auth-theme-toggle" />
+    <div className="beta-gate-page">
       <div className="beta-gate-card">
         <button type="button" className="beta-link-btn" onClick={onBack}>
           ← Back

@@ -41,7 +41,7 @@ const HAND_FACE_TURN = 0;
  * the hand loom and the forearm fall away behind it.
  */
 const CAMERA_FOV = 46;
-const CAMERA_DISTANCE = 4.3;
+const CAMERA_DISTANCE = 4.9;
 /**
  * The camera sits slightly to the right and almost level with the wrist.
  * This keeps the reaching fingertips readable without hiding the forearm.
@@ -65,7 +65,7 @@ const LIMB_PITCH = -0.85;
  * two vertical lines down the middle of the panel — so it runs a little off
  * true and crosses the divider instead.
  */
-const LIMB_TILT = -0.25;
+const LIMB_TILT = -0.42;
 /**
  * Depth of field. The aperture is in the bokeh shader's own units — a coefficient
  * on the depth difference from the focus plane — and the blur is capped so the

@@ -7,9 +7,9 @@ const landingSource = await fs.readFile('src/LandingPage.tsx','utf8');
 const requestForm = landingSource.slice(landingSource.indexOf('const RequestAccessForm:'), landingSource.indexOf('const LandingPage:'));
 let lazyId = 0;
 globalThis.__focusLazy = () => `Lazy${lazyId++}`;
-const stubNames = /^(\.\/)(client\/ClientProjectSpace|artist\/ArtistPanel|discovery\/ArtistDiscovery|moodboard\/MoodboardPortal|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryModal|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
+const stubNames = /^(\.\/)(client\/ClientProjectSpace|artist\/ArtistPanel|discovery\/ArtistDiscovery|moodboard\/MoodboardPortal|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryPage|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
 const { outputFiles } = await build({
-  stdin: { contents: `export {default as Dashboard} from './src/ScenesDashboard'; export {default as App} from './src/App'; export {default as Rail} from './src/StudioRail'; export {default as More} from './src/MoreControls'; export {ThemeToggle,ThemeRoot} from './src/Theme'; export {usePreference} from './src/usePreference'; export {RequestAccessForm} from 'focus-request-form';`, resolveDir: root },
+  stdin: { contents: `export {default as Dashboard} from './src/ScenesDashboard'; export {default as App} from './src/App'; export {default as Rail} from './src/StudioRail'; export {default as More} from './src/MoreControls'; export {ThemeRoot} from './src/Theme'; export {usePreference} from './src/usePreference'; export {RequestAccessForm} from 'focus-request-form';`, resolveDir: root },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', logLevel: 'silent',
   plugins: [{ name: 'focus-production-handlers', setup(b) {
     b.onResolve({filter:/^focus-request-form$/},()=>({path:'request',namespace:'request'}));
@@ -21,7 +21,7 @@ const { outputFiles } = await build({
       export const useState=v=>globalThis.__focusHooks.state(v),useRef=v=>globalThis.__focusHooks.ref(v),useEffect=(f,d)=>globalThis.__focusHooks.effect(f,d),useMemo=(f,d)=>globalThis.__focusHooks.memo(f,d),useCallback=(f,d)=>globalThis.__focusHooks.memo(()=>f,d),useId=()=>globalThis.__focusHooks.memo(()=>"focus-test",[]),useSyncExternalStore=(...a)=>globalThis.__focusHooks.external(...a),lazy=()=>globalThis.__focusLazy(),Suspense="Suspense"; export default {};
     ` : 'export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="Fragment";' }));
     b.onResolve({ filter: /^react-icons\/fi$/ }, a => ({ path: a.path, namespace: 'icons' }));
-    b.onLoad({ filter: /.*/, namespace: 'icons' }, () => ({ contents: 'export const FiUsers="users",FiCalendar="calendar",FiGrid="grid",FiEdit3="edit",FiImage="image",FiAperture="aperture",FiUser="user",FiMoon="moon",FiSun="sun",FiSearch="search",FiPlus="plus",FiArrowUpRight="arrow",FiEdit2="edit",FiTrash2="trash";' }));
+    b.onLoad({ filter: /.*/, namespace: 'icons' }, () => ({ contents: 'export const FiSidebar="sidebar",FiMessageSquare="message",FiCompass="compass",FiUsers="users",FiCalendar="calendar",FiGrid="grid",FiEdit3="edit",FiImage="image",FiAperture="aperture",FiUser="user",FiMoon="moon",FiSun="sun",FiSearch="search",FiPlus="plus",FiArrowUpRight="arrow",FiEdit2="edit",FiTrash2="trash";' }));
     b.onResolve({ filter: stubNames }, a => ({ path: a.path.slice(2), namespace: 'component' }));
     b.onLoad({ filter: /.*/, namespace: 'component' }, a => ({ contents: `export default ${JSON.stringify(a.path)};` }));
     b.onResolve({ filter: /\/sceneStorage$/ }, () => ({ path: 'store', namespace: 'data' }));
@@ -52,7 +52,7 @@ function harness(component, props = {}) {
     external(subscribe,read) { const i=cursor++; slots[i]??={cleanup:subscribe(()=>{})}; return read(); },
   };
   const render=()=>{cursor=0;globalThis.__focusHooks=hooks;tree=component(props);pending.splice(0).forEach(fn=>fn());return nodes(tree);};
-  return { render, get tree(){return tree;}, async settle(){for(let i=0;i<4;i++){await tick();render();}}, unmount(){slots.forEach(slot=>slot?.cleanup?.());}, button(label){const match=render().find(n=>n.type==='button'&&text(n)===label);assert.ok(match,`Button: ${label}`);return match;} };
+  return { render, get tree(){return tree;}, async settle(){for(let i=0;i<4;i++){await tick();render();}}, unmount(){slots.forEach(slot=>slot?.cleanup?.());}, button(label){const match=render().find(n=>n.type==='button'&&text(n).trim()===label);assert.ok(match,`Button: ${label}`);return match;} };
 }
 const savedGlobals = new Map(['window','document','localStorage'].map(key=>[key,globalThis[key]]));
 const events = new EventTarget(), storage = new Map(); let writesFail=false, readsFail=false;
@@ -61,23 +61,20 @@ globalThis.document={documentElement:{dataset:{}},getElementById:()=>null};
 globalThis.window={addEventListener:events.addEventListener.bind(events),removeEventListener:events.removeEventListener.bind(events),dispatchEvent:events.dispatchEvent.bind(events),confirm:()=>true,location:{href:'http://local/',search:''},history:{replaceState(_,__,url){window.location={href:new URL(url,'http://local/').href,search:new URL(url,'http://local/').search};}},setTimeout};
 const session={email:'test@example.invalid',displayName:'Test artist',userId:'local-test',method:'email'};
 try {
-  // Real persistent preference code: dark default, reloads, cross-tab, and quota failures.
-  const theme=harness(api.ThemeToggle);assert.equal(theme.render()[0].props['aria-label'],'Switch to light mode');
-  theme.render()[0].props.onClick();assert.equal(storage.get('smartink:focus:theme'),'light');assert.equal(theme.render()[0].props['aria-label'],'Switch to dark mode');
-  const rootTheme=harness(api.ThemeRoot,{children:'app'});rootTheme.render();assert.equal(document.documentElement.dataset.theme,'light');
-  writesFail=true;theme.render()[0].props.onClick();assert.equal(theme.render()[0].props['aria-label'],'Switch to light mode','A quota error cannot trap the toggle on its old stored value');
-  writesFail=false;storage.set('smartink:focus:theme','light');const crossTab=new Event('storage');Object.defineProperty(crossTab,'key',{value:'smartink:focus:theme'});window.dispatchEvent(crossTab);assert.equal(theme.render()[0].props['aria-label'],'Switch to dark mode');
+  // The beta always opens in dark mode, even with an old saved light preference.
+  storage.set('smartink:focus:theme','light');
+  const rootTheme=harness(api.ThemeRoot,{children:'app'});rootTheme.render();assert.equal(document.documentElement.dataset.theme,'dark');
   readsFail=true;const more=harness(api.More,{id:'tattoo',summary:'80% opacity',children:{type:'AdjustmentControl',props:{value:.8}}});
   let disclosure=more.render()[0];assert.equal(disclosure.props.open,false);assert.ok(text(disclosure).includes('80% opacity'));
   disclosure.props.onToggle({currentTarget:{open:true}});assert.equal(more.render()[0].props.open,true);
   more.render()[0].props.onToggle({currentTarget:{open:false}});assert.equal(more.render().find(n=>n.type==='AdjustmentControl').props.value,.8,'Closing disclosure preserves the actual adjustment child and value');
   more.unmount();const remounted=harness(api.More,{id:'tattoo',children:'controls'});assert.equal(remounted.render()[0].props.open,false);readsFail=false;
-  theme.unmount();rootTheme.unmount();remounted.unmount();
+  rootTheme.unmount();remounted.unmount();
 
-  const railCalls=[];const rail=harness(api.Rail,{active:'studio',onNavigate:id=>railCalls.push(id),onHome:()=>railCalls.push('home'),studioAvailable:false});
+  const railCalls=[];const rail=harness(api.Rail,{active:'studio',onNavigate:id=>railCalls.push(id),onHome:()=>railCalls.push('home'),onExplore:()=>railCalls.push('explore'),studioAvailable:false});
   assert.equal(rail.button('Studio').props.disabled,true);
-  for(const label of ['Projects','Artwork','Renders','Client space','Artist desk','Account'])rail.button(label).props.onClick();
-  assert.deepEqual(railCalls,['projects','artwork','renders','client','artist','account']);
+  for(const label of ['Projects','Artwork','Renders','Clients','Explore','Account'])rail.button(label).props.onClick();
+  assert.deepEqual(railCalls,['projects','artwork','renders','artist','explore','account']);
   rail.unmount();
 
   // Creation waits for storage, cannot duplicate on double click, and keeps input on failure.
@@ -97,6 +94,29 @@ try {
   library.render().find(n=>n.type==='TattooLibrary').props.onChoose('data:image/png;base64,sample');
   library.button('Create project').props.onClick();await library.settle();assert.ok(text(library.tree).includes('Storage unavailable'));assert.equal(opened.length,0);assert.ok(library.render().some(n=>n.type==='FocusDialog'));
   failCreate=false;library.button('Create project').props.onClick();await library.settle();assert.equal(created.at(-1).decalImage,'data:image/png;base64,sample','Retry keeps chosen artwork');resolveCreate();await library.settle();assert.equal(opened.length,1);library.unmount();
+
+  // Search real saved names, recover from no matches, and navigate renders as a page.
+  globalThis.__focusStore.load=async()=>[
+    {id:'rose',name:'Beta rose study',createdAt:1,updatedAt:1},
+    {id:'moth',name:'Lunar moth',createdAt:2,updatedAt:2}
+  ];
+  const searchDashboard=harness(api.Dashboard,{session,onSignOut:()=>{},onSelectScene:()=>{}});
+  searchDashboard.render();await searchDashboard.settle();
+  const searchInput=()=>searchDashboard.render().find(n=>n.type==='input'&&n.props['aria-label']==='Search projects');
+  searchInput().props.onChange({target:{value:' ROSE beta '}});
+  searchDashboard.render();assert.ok(text(searchDashboard.tree).includes('1 of 2 projects'));
+  assert.ok(!text(searchDashboard.tree).includes('Lunar moth'));
+  searchInput().props.onChange({target:{value:'unmatched'}});searchDashboard.render();
+  assert.ok(text(searchDashboard.tree).includes('No matching projects'));
+  searchDashboard.button('Show all projects').props.onClick();searchDashboard.render();
+  assert.ok(text(searchDashboard.tree).includes('Lunar moth'));
+  searchDashboard.render().find(n=>n.type===api.Rail).props.onNavigate('renders');
+  assert.ok(searchDashboard.render().some(n=>n.type==='RenderHistoryPage'));
+  assert.ok(!searchDashboard.render().some(n=>n.type==='FocusDialog'));
+  searchDashboard.render().find(n=>n.type==='RenderHistoryPage').props.onOpenStudio();
+  searchDashboard.button('Start from a template').props.onClick();
+  assert.equal(searchDashboard.render().find(n=>n.type==='input'&&n.props.placeholder?.startsWith('e.g.')).props.value,'Rose placement study');
+  searchDashboard.unmount();
 
   // Private beta routing: old sample URLs and guessed app URLs cannot expose an editor.
   let authenticated=0;
@@ -177,12 +197,12 @@ try {
   const unavailable=harness(api.RequestAccessForm,{source:'test',buttonLabel:'Request invite'});await unavailable.render().find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
   unavailable.render();assert.equal(recordedUnconfigured,0);assert.ok(text(unavailable.tree).includes('temporarily unavailable'));unavailable.unmount();globalThis.__focusRequests.record=previousRecord;delete globalThis.__focusMode;
 
-  // The public marketing page must not download an interactive/sample studio.
+  // Marketing may load the requested hero visualizer, but never the working studio.
   const landingBuild=await build({entryPoints:['src/LandingPage.tsx'],outdir:'/tmp/focus-landing-audit',bundle:true,write:false,metafile:true,format:'esm',platform:'browser',logLevel:'silent'});
-  for(const name of Object.keys(landingBuild.metafile.inputs))assert.doesNotMatch(name,/src\/(PublicDemo|Workspace|ModelWithUVTattoo|landing\/HeroPreview)|node_modules\/(three|@react-three)\//,`Public marketing must not include the editor or 3D engine: ${name}`);
+  for(const name of Object.keys(landingBuild.metafile.inputs))assert.doesNotMatch(name,/src\/(PublicDemo|Workspace|ModelWithUVTattoo)/,`Public marketing must not include the working editor: ${name}`);
   assert.doesNotMatch(await fs.readFile('src/App.tsx','utf8'),/import\(['"]\.\/PublicDemo['"]\)/,'The old sample editor is absent from the app entry graph');
   const css=await fs.readFile('src/focus-studio.css','utf8');assert.ok(css.includes('[hidden] { display: none !important; }'),'Hidden advanced/tab panels must win against flex rules');
-  console.log('Focus UI passed: dark/light and storage failure, cross-tab theme, persistent disclosure/value retention, rail navigation, async/double-click project creation, library-to-project/retry, private routing and legacy URLs, invite/admin gate preservation, rejected/lost sessions, waitlist delivery failure/retry and a static marketing dependency graph.');
+  console.log('Focus UI passed: dark beta theme, storage failure, persistent disclosure/value retention, rail navigation, async/double-click project creation, library-to-project/retry, private routing and legacy URLs, invite/admin gate preservation, rejected/lost sessions, waitlist delivery failure/retry and an isolated marketing dependency graph.');
 } finally {
   for(const [key,value] of savedGlobals){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}
   for(const key of ['__focusHooks','__focusLazy','__focusStore','__focusAuth','__focusRequests','__focusMode'])delete globalThis[key];

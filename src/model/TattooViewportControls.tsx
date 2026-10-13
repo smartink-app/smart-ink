@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { tattooAnchorPoint } from './tattooHit';
 import type { SurfaceAnchor } from '../render/surfacePlacement';
 import './viewportCards.css';
+import PrecisionScrubber from './PrecisionScrubber';
 
 interface Props {
   mesh: RefObject<THREE.Mesh | null>;
@@ -16,12 +17,15 @@ interface Props {
   boundsControls?: ReactNode;
   wrapControls?: ReactNode;
   customTitle?: string;
+  onHide?: () => void;
 }
 
 /** HTML keeps the small on-model controls sharp and keyboard-accessible. */
-export default function TattooViewportControls({ mesh, anchor, scale, rotation, onScale, onRotation, boundsControls, wrapControls, customTitle }: Props) {
+export default function TattooViewportControls({ mesh, anchor, scale, rotation, onScale, onRotation, boundsControls, wrapControls, customTitle, onHide }: Props) {
   const { gl, camera } = useThree(), card = useRef<HTMLDivElement>(null);
   const position = useRef(new THREE.Vector3()), normal = useRef(new THREE.Vector3()), toCamera = useRef(new THREE.Vector3());
+  const turn = rotation % 360;
+  const displayRotation = turn > 180 ? turn - 360 : turn < -180 ? turn + 360 : turn;
   const [collapsed, setCollapsed] = useState(false);
   useFrame(() => {
     if (!card.current || !mesh.current || !anchor.current) return;
@@ -50,10 +54,11 @@ export default function TattooViewportControls({ mesh, anchor, scale, rotation, 
     element.style.top = `${Math.max(12, Math.min(y, height - element.offsetHeight - 62))}px`;
   });
   return <Html calculatePosition={() => [0, 0, 0]} zIndexRange={[8, 8]} style={{ pointerEvents: 'none' }}><div ref={card} className="tattoo-transform-card" role="group" aria-label="Tattoo adjustments" style={{ position: 'absolute', visibility: 'hidden' }} onPointerDown={event => event.stopPropagation()}>
-    <header><span>{customTitle ?? (wrapControls ? '360° armband' : 'Your tattoo')}</span><button className="tattoo-transform-toggle" type="button" aria-expanded={!collapsed} aria-label={collapsed ? 'Show tattoo adjustments' : 'Minimize tattoo adjustments'} onClick={() => setCollapsed(value => !value)}>{collapsed ? '+' : '−'}</button></header>
-    {!collapsed && (wrapControls || <><p>Drag the design to move it.<br />Drag bare skin to orbit the model.</p>
-      <div className="tattoo-transform-row"><span>Size</span><button type="button" aria-label="Make tattoo smaller" onClick={() => onScale(THREE.MathUtils.clamp(scale - .05, .1, 3))}>−</button><output aria-label="Tattoo size">{Math.round(scale * 100)}%</output><button type="button" aria-label="Make tattoo larger" onClick={() => onScale(THREE.MathUtils.clamp(scale + .05, .1, 3))}>+</button></div>
-      <div className="tattoo-transform-row"><span>Rotate</span><button type="button" aria-label="Rotate tattoo counterclockwise" onClick={() => onRotation((rotation - 5 + 360) % 360)}>↶</button><output aria-label="Tattoo rotation">{Math.round(rotation)}°</output><button type="button" aria-label="Rotate tattoo clockwise" onClick={() => onRotation((rotation + 5) % 360)}>↷</button></div>
+    <header><span>{customTitle ?? (wrapControls ? '360° armband' : 'Your tattoo')}</span><button className="tattoo-transform-toggle" type="button" aria-expanded={onHide ? undefined : !collapsed} aria-label={onHide ? 'Hide tattoo controls and tips' : collapsed ? 'Show tattoo adjustments' : 'Minimize tattoo adjustments'} title={onHide ? 'Hide controls and tips · restore from the toolbar' : undefined} onClick={() => onHide ? onHide() : setCollapsed(value => !value)}>{collapsed ? '+' : '−'}</button></header>
+    {!collapsed && (wrapControls || <><p className="tattoo-pointer-help">Drag the design to move it.<br />Drag bare skin to orbit the model.</p><p className="tattoo-touch-help">Drag to orbit. Pinch to zoom.<br />Tap skin to place; drag ink with Pencil.</p>
+      <PrecisionScrubber label="Size" value={scale * 100} min={10} max={300} unit="%" onChange={value => onScale(value / 100)} />
+      <PrecisionScrubber label="Rotation" value={displayRotation} min={-180} max={180} unit="°" onChange={onRotation} />
+      <p className="tattoo-scrub-help">Drag a value ↔ · Hold Shift for precision</p>
       {boundsControls}
     </>)}
   </div></Html>;

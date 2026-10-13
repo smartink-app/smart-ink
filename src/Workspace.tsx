@@ -1,6 +1,16 @@
+import { setNativeDraftOwner, cacheSceneImages } from './ipad/nativeDraftStore'
+import { supabaseSceneStore } from './storage/supabaseSceneStore'
+import { authMode } from './auth/betaAuthService'
+import { useNativeStudio, boundedNumber, shortName, blobBase64 } from './ipad/useNativeStudio'
+import './ipad/nativeStudio.css'
+import { loadScenes, addScene, getScene, deleteScene } from './sceneStorage'
+import { listRenderHistory, getRenderImageBlob } from './renderHistoryStorage'
+import { BODY_SHAPE_PARAMS } from './render/bodyShape'
+import { regionDef } from './render/bodyRegions'
 import FeedbackPanel, { FeedbackToolbar } from './feedback/FeedbackPanel'
 import { useReview } from './feedback/useReview'
 import type { FeedbackLocation } from './feedback/model'
+import { useNativeArtwork } from './ipad/useNativeArtwork'
 import RevealPanel from './RevealPanel'
 import { revealCamera, type RevealPreset } from './render/reveal'
 import BodyRegionCard from './model/BodyRegionCard'
@@ -28,8 +38,8 @@ import LightHandles from './LightHandles'
 import StudioBackdrop from './StudioBackdrop'
 import { DEFAULT_STUDIO, normalizeStudio, studioForExport, type StudioSettings } from './render/studioSettings'
 import TopMenuBar, { type InspectorTab } from './TopMenuBar'
-import EditorOutputMenu from './EditorOutputMenu'
 import ViewportControls from './ViewportControls'
+import { FiSidebar } from 'react-icons/fi'
 import { FaUndo, FaRedo } from 'react-icons/fa'
 import { useEditorHistory } from './hooks/useEditorHistory'
 import { bindEditorHistory } from './services/editorHistoryBindings'
@@ -47,7 +57,6 @@ import EditorLeftPanel from './EditorLeftPanel'
 import StudioRail, { type StudioSection } from './StudioRail'
 import FocusDialog from './FocusDialog'
 import AccountSettings from './AccountSettings'
-import { FiSidebar } from 'react-icons/fi'
 import type { SceneData } from './types'
 import { updateScene } from './sceneStorage'
 import { downloadFiles, downloadBlob } from './utils/sceneExporter'
@@ -68,7 +77,6 @@ import type { RenderContract } from './render/contract'
 import { FINAL_SAMPLES, REGISTRY, findById } from './render/registry'
 import { migrateScene } from './sceneStorage'
 import { addRenderHistory } from './renderHistoryStorage'
-import RenderHistoryModal from './RenderHistoryModal'
 import { captureThumbnail } from './storage/dataUrl'
 import { DEFAULT_BODY_POSE, normalizePose, poseFromPreset, BODY_POSE_PRESETS, type BodyPose } from './render/bodyPose'
 import { levelFocusDirection } from './render/focusCamera'
@@ -135,6 +143,7 @@ function LoadingSignal({ onChange }: { onChange: (loading: boolean) => void }) {
 interface WorkspaceProps {
   initialClientProject?: string;
   onMoodboard?: () => void;
+  onExplore?: () => void;
   initialSection?: StudioSection;
   session: BetaSession
   /** Leave the workspace for the landing page. */
@@ -159,7 +168,11 @@ function sampleTrackStyle(samples: number): CSSProperties {
   };
 }
 
-export default function Workspace({ session, onHome, onSignOut, initialSection = 'projects', initialClientProject, onMoodboard }: WorkspaceProps) {
+export default function Workspace({ session, onHome, onSignOut, initialSection = 'projects', initialClientProject, onMoodboard, onExplore }: WorkspaceProps) {
+  const nativeHost = window.smartInkNativeHost === true
+  useEffect(() => { if (nativeHost) setNativeDraftOwner(session.userId ?? session.email); return () => { if (nativeHost) setNativeDraftOwner(null) } }, [nativeHost, session.userId, session.email])
+  const nativeGesture = useRef(false)
+  const [fingerPlacement, setFingerPlacement] = useState(false)
   const [currentScene, setCurrentScene] = useState<SceneData | null>(null)
   const [clientReview, setClientReview] = useState<{ projectId: string; role: 'client' | 'artist'; versionId?: string } | null>(null)
   const [clientProjectId, setClientProjectId] = useState(initialClientProject)
@@ -317,8 +330,6 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
   const orbitControlsRef = useRef<OrbitControlsHandle>(null)
 
   // Export state
-  const [showExportModal, setShowExportModal] = useState(false)
-  const [showRenderHistory, setShowRenderHistory] = useState(false)
   const [exportPreset, setExportPreset] = useState<ExportPreset>('instagram')
   const [watermarkText, setWatermarkText] = useState('SMART INK')
   const [watermarkEnabled, setWatermarkEnabled] = useState(true)
@@ -445,7 +456,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
 
 
   useEffect(() => {
-    if (!showExportModal) return
+    if (!snapshot.open) return
     let cancelled = false
     const poll = () => {
       void getRenderServerStatus().then((status) => {
@@ -458,7 +469,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [showExportModal])
+  }, [snapshot.open])
 
   // History includes editable scene content, independently of camera movement,
   // panel navigation, rendering and Focus. Image strings are shared by entries.
@@ -482,9 +493,12 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
   }, [])
   const editHistory = useEditorHistory({ value: editValue, onRestore: restoreEdits,
     scopeId: currentScene?.id, enabled: Boolean(currentScene) && !showDashboard })
-  const historyBlocked = reviewOpen || accountMenuOpen || measureOpen || showDashboard || snapshot.open || showExportModal || showRenderHistory || modelLoading
+  const historyBlocked = reviewOpen || accountMenuOpen || measureOpen || showDashboard || snapshot.open || modelLoading
   const historyCommands = useRef({ ...editHistory, blocked: historyBlocked, gesturesBlocked: reviewOpen || measureOpen || showDashboard || modelLoading })
   historyCommands.current = { ...editHistory, blocked: historyBlocked, gesturesBlocked: reviewOpen || measureOpen || showDashboard || modelLoading }
+  // WebKit blur can arrive after a native slider begins. Its deferred finish must
+  // not split that slider into dozens of undo entries.
+  if (nativeHost) historyCommands.current.endGesture = () => { if (!nativeGesture.current) editHistory.endGesture() }
   useEffect(() => {
     const root = canvasContainerRef.current
     if (!root || showDashboard) return
@@ -968,6 +982,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       : 'Camera centered on the figure. Return to editing and click the skin to place the example tattoo, or render without ink.')
     const preset = cinematicPreset(initialLook)!
     setSnapshotCamera({ ...preset.adjustment })
+    if (nativeHost && shotFormat === 'view') setShotFormat('portrait')
     setSnapshotLook(initialLook)
     setShotBrightness(1); setShotBlur(initialLook === 'detail' ? .3 : 0)
     if (framing) {
@@ -1040,17 +1055,22 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       if (e.key === 'Escape') {
         if (snapshot.open) { closeSnapshot(); return }
         setAccountMenuOpen(false)
-        if (showRenderHistory) {
-          setShowRenderHistory(false)
-          return
-        }
         setPhotoMode(false)
-        setShowExportModal(false)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showRenderHistory, snapshot.open, closeSnapshot])
+  }, [snapshot.open, closeSnapshot])
+
+  const chooseNativeArtwork = useCallback((source: string) => {
+    setUploadedImage(source)
+    setDecalVisible(true)
+    setInspectorTab('tattoo')
+    setArtworkOpen(false)
+    setPanelRegions([])
+    uvPlacementRef.current?.placeInView()
+  }, [])
+  useNativeArtwork(Boolean(currentScene) && !historyBlocked && !photoMode && !measureLoading, currentScene?.id, chooseNativeArtwork)
 
   const openReview = () => afterSaving(() => {
     reviewCamera.current = structuredClone(orbitControlsRef.current?.freezeSnapshot(true) ?? cameraState)
@@ -1072,11 +1092,139 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
     setCameraState(structuredClone(location.camera)); setCameraRequestId(value => value + 1)
   }
 
+  useNativeStudio({
+    page: showDashboard ? 'projects' : 'editor', name: currentScene?.name ?? '', projectId: currentScene?.id,
+    email: session.email, cloud: authMode() === 'supabase', tab: snapshot.open ? 'shoot' : inspectorTab, loading: modelLoading,
+    blocked: historyBlocked, measuring: measureOpen, save: saveState.status,
+    canUndo: editHistory.canUndo, canRedo: editHistory.canRedo, fingerPlacement,
+    scale: decalScale, rotation: decalRotation, opacity: decalOpacity, visible: decalVisible,
+    bodyMeshId, skinToneId, bodyAppearance, poseId, fitted: !!bodyFit, region: shapeMenu ? regionDef(shapeMenu.region).label : 'Full body',
+    shape: bodyShape, shapeParams: BODY_SHAPE_PARAMS.filter(p => !shapeMenu || regionDef(shapeMenu.region).params.includes(p.key)),
+    shot: { open: snapshot.open, status: snapshot.status, quality: snapshot.quality, message: snapshot.message,
+      warning: snapshot.warning, elapsed: snapshotElapsed, look: snapshotLook, hasImage: !!snapshot.imageUrl,
+      progress: snapshot.progress, format: shotFormat, blur: shotBlur, camera: snapshotCamera },
+  }, async ({ action, value, key, id }) => {
+    if (action === 'projects') {
+      await flushPendingSave();
+      return (await loadScenes()).sort((a,b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
+        .map(({ id, name, thumbnail, updatedAt }) => ({ id, name, thumbnail, updatedAt: new Date(updatedAt).toISOString() }));
+    }
+    if (action === 'accountProjects' && authMode() === 'supabase') return (await supabaseSceneStore.loadScenes()).map(({ id, name, thumbnail, updatedAt }) => ({ id, name, thumbnail, updatedAt: new Date(updatedAt).toISOString() }));
+    if (action === 'importProject' && authMode() === 'supabase' && showDashboard && typeof id === 'string') {
+      const source = await supabaseSceneStore.getScene(id);
+      if (!source) throw new Error('Account project not found.');
+      const scene = await cacheSceneImages({ ...source, id: crypto.randomUUID(), createdAt: new Date(), updatedAt: new Date() });
+      await addScene(scene); loadScene(scene); return true;
+    }
+    if (action === 'publishCopy' && authMode() === 'supabase' && currentScene && !showDashboard && !snapshot.open && !measureOpen) {
+      await flushPendingSave();
+      const scene = await getScene(currentScene.id);
+      if (!scene) throw new Error('Save the project before copying it to your account.');
+      await supabaseSceneStore.addScene({ ...scene, id: crypto.randomUUID(), name: scene.name + ' · iPad copy', createdAt: new Date(), updatedAt: new Date() });
+      return true;
+    }
+    if (action === 'renders') return listRenderHistory();
+    if (action === 'renderImage') {
+      const blob = typeof id === 'string' ? await getRenderImageBlob(id) : null;
+      if (!blob) throw new Error('This image is unavailable.');
+      return blobBase64(blob);
+    }
+    if (action === 'save') { await flushPendingSave(); return true; }
+    if (action === 'gallery' || action === 'signOut') {
+      if (snapshot.open || measureOpen) throw new Error('Finish the current shoot or measurements first.');
+      await flushPendingSave();
+      if (action === 'signOut') onSignOut(); else setShowDashboard(true);
+      return true;
+    }
+    if (['create','open','rename','delete'].includes(action)) {
+      if (!showDashboard) throw new Error('Return to projects first.');
+      await flushPendingSave();
+      if (action === 'create') {
+        const scene: SceneData = { id: crypto.randomUUID(), name: shortName(value), model: 'FinalBaseMesh',
+          decalImage: null, decalRotation: 0, decalScale: 1, decalColor: '#ffffff', decalOpacity: 1,
+          decalVisible: false, decalPosition: null, decalNormal: null, lightingPreset: 'studio', background: 'dark',
+          studio: { mode: 'sweep', color: '#30343c', shadow: .4, showGuides: false }, thumbnail: null,
+          camera: { position: [6,4,6], target: [0,0,0], fov: 45 }, bodyMeshId: 'body_full', skinToneId: 'tone_03',
+          poseId: 'neutral', lookId: 'studio_softbox', qualityTier: 'preview', finalSamples: FINAL_SAMPLES.default,
+          createdAt: new Date(), updatedAt: new Date(), createdBy: session.userId ?? session.email };
+        await addScene(scene); loadScene(scene); return true;
+      }
+      const scene = typeof id === 'string' ? await getScene(id) : undefined;
+      if (!scene) throw new Error('Project not found.');
+      if (action === 'open') loadScene(scene);
+      if (action === 'rename') await updateScene({ ...scene, name: shortName(value), updatedAt: new Date() });
+      if (action === 'delete') await deleteScene(scene.id);
+      return true;
+    }
+    if (!currentScene || showDashboard || modelLoading) throw new Error('Wait for your project to open.');
+    if (action === 'closeShot') { closeSnapshot(); return true; }
+    if (action === 'shareShot') {
+      if (!snapshot.imageUrl) throw new Error('Render a photo first.');
+      return blobBase64(await fetch(snapshot.imageUrl).then(r => r.blob()));
+    }
+    if (action === 'shot') {
+      if (!snapshot.open) throw new Error('Open Shoot first.');
+      if (key === 'render') { void snapshotSession.render(); return true; }
+      if (key === 'cancel') snapshotSession.cancel();
+      if (key === 'adjust') snapshotSession.adjust();
+      if (['uploading','rendering'].includes(snapshot.status)) return true;
+      if (key === 'quality' && (value === 'quick' || value === 'detailed')) snapshotSession.setQuality(value);
+      if (key === 'look' && (value === 'editorial' || value === 'sculpted' || value === 'detail')) { snapshotSession.adjust(); applySnapshotPreset(value); }
+      if (key === 'format' && (value === 'view' || value === 'portrait' || value === 'square' || value === 'landscape')) { snapshotSession.adjust(); setShotFormat(value); }
+      if (key === 'azimuth' || key === 'elevation' || key === 'zoom') {
+        const limits = key === 'azimuth' ? [-55,55] : key === 'elevation' ? [-40,40] : [.65,1.8];
+        const next = boundedNumber(value, limits[0], limits[1]);
+        snapshotSession.adjust(); setSnapshotCamera(previous => ({ ...previous, [key]: next }));
+      }
+      if (key === 'blur') { snapshotSession.adjust(); setShotBlur(boundedNumber(value, 0, 1)); }
+      if (key === 'reveal' && (value === 'reveal' || value === 'orbit')) setRevealPreview(value);
+      return true;
+    }
+    if (historyBlocked || measureLoading) throw new Error('Finish the current action first.');
+    if (action === 'tab') {
+      setShapeMenu(null);
+      if (value === 'shoot') openSnapshot();
+      else if (value === 'tattoo' || value === 'figure') setInspectorTab(value);
+      return true;
+    }
+    if (action === 'undo') editHistory.undo();
+    else if (action === 'redo') editHistory.redo();
+    else if (action === 'gesture') {
+      if (value === true) { nativeGesture.current = true; editHistory.beginGesture(); }
+      else { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); editHistory.endGesture(); nativeGesture.current = false; }
+    }
+    else if (action === 'finger') setFingerPlacement(value === true);
+    else if (action === 'example' && ['botanical-rose','lunar-moth','ornamental-dagger'].includes(String(value))) chooseNativeArtwork(`/tattoos/${value}.png`);
+    else if (action === 'pose' && BODY_POSE_PRESETS.some(p => p.id === value)) { setPoseId(String(value)); setBodyPose(poseFromPreset(String(value))); }
+    else if (action === 'appearance' && ['top','bottom','hairStyle','hairTone'].includes(String(key))) setBodyAppearance(previous => normalizeAppearance({ ...previous, [String(key)]: value }));
+    else if (action === 'measure') await openMeasurement();
+    else if (action === 'scale') setDecalScale(boundedNumber(value, .1, 3));
+    else if (action === 'rotation') setDecalRotation(boundedNumber(value, 0, 360));
+    else if (action === 'opacity') setDecalOpacity(boundedNumber(value, 0, 1));
+    else if (action === 'visible') setDecalVisible(value === true);
+    else if (action === 'shape') {
+      if (bodyFit) throw new Error('Edit measurements to change this fitted body.');
+      if (!BODY_SHAPE_PARAMS.some(p => p.key === key)) throw new Error('Unknown body adjustment.');
+      handleShapeValueChange(key as BodyShapeKey, boundedNumber(value, -1, 1));
+    }
+    else if (action === 'resetShape' && !bodyFit) {
+      const keys = shapeMenu ? regionDef(shapeMenu.region).params : BODY_SHAPE_PARAMS.map(p => p.key);
+      setBodyShape(previous => ({ ...previous, ...Object.fromEntries(keys.map(k => [k,0])) }));
+    }
+    else if (action === 'body' && (value === 'body_full' || value === 'body_full_female')) { setBodyFit(null); setBodyMeshId(value); }
+    else if (action === 'skin' && ['tone_01','tone_03','tone_05','tone_07'].includes(String(value))) setSkinToneId(String(value));
+    else throw new Error('Unknown studio action.');
+    return true;
+  })
+
+  if (showDashboard && nativeHost) return <div aria-label="Your projects are shown in the iPad gallery" />
+
   if (showDashboard) {
     return (
       <div style={{ position: 'relative', width: '100%', minHeight: '100vh' }}>
         <ScenesDashboard
           initialSection={dashboardSection}
+          onExplore={onExplore ? () => afterSaving(onExplore) : undefined}
           initialClientProject={clientProjectId} initialClientRole={clientRole} initialVersionId={clientReview?.versionId} onMoodboard={onMoodboard}
           onReviewScene={(scene, projectId, role, versionId) => loadScene(scene, { projectId, role, versionId })}
           session={session}
@@ -1089,326 +1237,22 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
     )
   }
 
-  return (
-    <div className={`editor-app-root${reviewOpen ? ' editor-app-root--review' : ''}${measureOpen ? ' editor-app-root--measuring' : ''}${photoMode ? ' editor-app-root--photo' : ''}${snapshot.open ? ' editor-app-root--shooting' : ''}`} ref={canvasContainerRef}>
-      <StudioRail active={accountMenuOpen ? 'account' : artworkOpen ? 'artwork' : 'studio'}
-        onHome={() => afterSaving(onHome)} disabled={reviewOpen || snapshot.open || measureOpen || measureLoading}
-        onNavigate={section => {
-          if (section === 'projects' || section === 'artist' || section === 'client') afterSaving(() => { setDashboardSection(section); setShowDashboard(true) })
-          if (section === 'studio') { setArtworkOpen(false); setSidebarCollapsed(false) }
-          if (section === 'artwork') { setArtworkOpen(true); setSidebarCollapsed(false) }
-          if (section === 'renders') setShowRenderHistory(true)
-          if (section === 'account') afterSaving(() => setAccountMenuOpen(true))
-        }} />
-      <header className="editor-toolbar editor-toolbar--main" inert={reviewOpen || snapshot.open || measureOpen || measureLoading}>
-        <button type="button" className="focus-panel-toggle" onClick={() => setSidebarCollapsed(value => !value)} aria-expanded={!sidebarCollapsed} title={sidebarCollapsed ? 'Show editing controls' : 'Hide editing controls'}><FiSidebar aria-hidden /><span>Controls</span></button>
-        <div className="editor-toolbar-center editor-scene-heading">
-          <input key={currentScene?.id} className="editor-scene-name" aria-label="Scene name"
-            defaultValue={currentScene?.name ?? 'Untitled Scene'} maxLength={100}
-            onBlur={(event) => {
-              if (!currentScene) return
-              const name = event.currentTarget.value.trim() || currentScene.name
-              event.currentTarget.value = name
-              if (name === currentScene.name) return
-              stageScene({ ...(sceneSaves.peek(currentScene.id) ?? currentScene), name })
-              void flushPendingSave().catch(() => {})
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur() }
-              if (event.key === 'Escape') { event.stopPropagation(); event.currentTarget.value = currentScene?.name ?? ''; event.currentTarget.blur() }
-            }} />
-          <span className={`scene-save-status scene-save-status--${saveState.status}`} role="status" aria-live="polite">
-            {saveState.status === 'saved' ? 'Saved' : saveState.status === 'error' ? 'Not saved' : 'Saving…'}
-          </span>
-      {saveState.status === 'error' && <button type="button" className="tool-btn tool-btn--ghost" onClick={() => void flushPendingSave().catch(() => {})}>Retry save</button>}
-        </div>
-        <div className="editor-toolbar-actions editor-toolbar-actions--spread">
-          <div className="editor-history-controls" role="group" aria-label="Edit history">
-            <button type="button" className="tool-btn tool-btn--ghost" aria-label="Undo edit" title="Undo · ⌘ / Ctrl Z" disabled={historyBlocked || !editHistory.canUndo} onClick={editHistory.undo}><FaUndo aria-hidden="true" /><span>Undo</span></button>
-            <button type="button" className="tool-btn tool-btn--ghost" aria-label="Redo edit" title="Redo · ⌘ / Ctrl Shift Z" disabled={historyBlocked || !editHistory.canRedo} onClick={editHistory.redo}><FaRedo aria-hidden="true" /><span>Redo</span></button>
-          </div>
-          <button type="button" className="tool-btn tool-btn--primary" onClick={() => openSnapshot()} disabled={modelLoading || !canvasHostSized || renderBusy} title="Frame the tattoo and set up a Blender snapshot">Shoot</button>
-          <button type="button" className="tool-btn tool-btn--ghost" onClick={openReview} disabled={modelLoading || !canvasHostSized}>Feedback</button>
-          <EditorOutputMenu onExport={() => setShowExportModal(true)} onShare={() => setShowRenderHistory(true)} />
+  const panelStageLabel = artworkOpen ? 'Artwork' : inspectorTab === 'figure' ? 'Model' : inspectorTab === 'studio' ? 'Shoot' : 'Tattoo'
 
-        </div>
-      </header>
-
-      {reviewOpen && <FeedbackToolbar review={review} name={currentScene?.name ?? 'Untitled project'} onClose={closeReview} projectSpace={!!clientReview} />}
-      {measureError && <div className="editor-notice" role="alert">{measureError}<button type="button" className="ep-btn" onClick={() => setMeasureError('')}>Dismiss</button></div>}
-      {saveState.status === 'error' && <div className="editor-notice" role="alert">Your latest changes are still here. Saving failed; retry before leaving this page.</div>}
-      {photoMode && <div className="photo-mode-actions" inert={snapshot.open || measureOpen || measureLoading} style={snapshot.open ? { visibility: 'hidden' } : undefined}>
-        <button type="button" className="ep-btn" onClick={() => setPhotoMode(false)}>Exit Clean view · Esc</button>
-        <button type="button" className="ep-btn ep-btn--primary" onClick={() => openSnapshot()} disabled={modelLoading || !canvasHostSized || renderBusy}>Shoot</button>
-        <button type="button" className="ep-btn" onClick={() => setShowExportModal(true)}>Export</button>
-      </div>}
-      <div className="editor-body-row">
-        <div className="focus-control-panel" hidden={sidebarCollapsed}>
-          <div className="focus-panel-slot" hidden={!artworkOpen}>
-            <EditorLeftPanel backToEditing currentImage={uploadedImage}
-              onChooseArtwork={(source) => { setUploadedImage(source); setDecalVisible(true); setInspectorTab('tattoo'); setArtworkOpen(false); setPanelRegions([]); uvPlacementRef.current?.placeInView() }}
-              disabled={snapshot.open || measureOpen || measureLoading || modelLoading}
-              collapsed={false} onToggleCollapsed={() => setArtworkOpen(false)} />
-          </div>
-          <div className="focus-panel-slot" hidden={artworkOpen}>
-            <TopMenuBar
-              isWrap={!!(surfacePlacement?.wrap || surfacePlacement?.sleeve)}
-              isSleeve={!!surfacePlacement?.sleeve}
-              wrapControls={<>
-                {!surfacePlacement?.sleeve && <WrapTattooControls value={surfacePlacement?.wrap} onSample={startWrapSample} onChange={value => { if (uvPlacementRef.current?.setWrap(value) && value.region !== surfacePlacement?.wrap?.region) setIsolateRegion(value.region) }} onExit={() => uvPlacementRef.current?.setWrap(null)} onView={viewWrap} />}
-                <SleeveTattooControls value={surfacePlacement?.sleeve} onStart={startSleeveSample} onChange={value => uvPlacementRef.current?.setSleeve(value)} onExit={() => uvPlacementRef.current?.setSleeve(null)} onView={viewSleeve} />
-              </>}
-              tattooBoundsControls={<TattooBoundsControls status={tattooBounds} onLock={locked => uvPlacementRef.current?.setAreaLock(locked)} onFit={() => uvPlacementRef.current?.fitToArea()} />}
-              onBrowseArtwork={() => setArtworkOpen(true)}
-              onMeasureBody={() => void openMeasurement()} measuringLoading={measureLoading || modelLoading}
-              hasBodyFit={!!bodyFit} onClearBodyFit={() => setBodyFit(null)}
-              activeTab={inspectorTab} onTabChange={tab => { setInspectorTab(tab); setShapeMenu(null); setPanelRegions([]) }}
-              onShoot={openSnapshot}
-              disabled={snapshot.open || measureOpen || measureLoading}
-              key={currentScene?.id}
-              bodyMeshId={bodyMeshId}
-              onBodyMeshChange={handleBodyMeshChange}
-              skinToneId={skinToneId}
-              lookId={lookId}
-              lights={lights}
-              selectedLight={selectedLight}
-              lightingPreset={lightingPreset}
-              onLightingPresetChange={(preset) => { setLightingPreset(preset); setLights(resolveRig(preset)); setSelectedLight(1) }}
-              studio={studio}
-              background={background} onBackgroundChange={setBackground}
-              onStudioChange={(value) => setStudio(normalizeStudio(value))}
-              onSelectLight={setSelectedLight}
-              onLightsChange={setLights}
-              onSkinChange={setSkinToneId}
-              onLookChange={handleLookChange}
-              bodyShape={bodyShape}
-              poseId={poseId}
-              bodyPose={bodyPose}
-              bodyAppearance={bodyAppearance}
-              onAppearanceChange={(appearance) => setBodyAppearance(normalizeAppearance(appearance))}
-              onFramePose={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}
-              onPosePresetChange={handlePosePreset}
-              onBodyPoseChange={handleBodyPoseChange}
-              onBodyShapeChange={(shape) => setBodyShape(normalizeShape(shape))}
-              isolateRegion={isolateRegion}
-              onIsolateRegionChange={setIsolateRegion}
-              onHighlightRegions={setPanelRegions}
-              setUploadedImage={setUploadedImage}
-              uploadedImage={uploadedImage}
-              decalVisible={decalVisible}
-              hasPlacement={surfacePlacement !== null}
-              decalRotation={decalRotation}
-              decalScale={decalScale}
-              decalColor={decalColor}
-              decalOpacity={decalOpacity}
-              onDecalRotationChange={value => setDecalRotation(uvPlacementRef.current?.limitRotation(value) ?? value)}
-              onDecalScaleChange={value => setDecalScale(uvPlacementRef.current?.limitScale(value) ?? value)}
-              onDecalColorChange={setDecalColor}
-              onDecalOpacityChange={setDecalOpacity}
-              onDecalVisibleChange={setDecalVisible}
-              onDecalReset={handleResetDecal}
-              photoMode={photoMode}
-              setPhotoMode={handlePhotoModeChange}
-              cameraPreset={cameraPreset}
-              onCameraPresetChange={(preset) => handleCameraPresetChange(preset as CameraPresetKey)}
-              CAMERA_PRESETS={CAMERA_PRESETS}
-              performanceMode={performanceMode}
-              setPerformanceMode={setPerformanceMode}
-              onExport={() => setShowExportModal(true)}
-            />
-          </div>
-        </div>
-
-        <div className="editor-canvas-host">
-          {reviewOpen && <div className="feedback-view-tools" role="group" aria-label="Review camera">
-            <span>Explore the placement</span>
-            <button type="button" className="ep-btn" onClick={() => viewWrap(false)} disabled={!surfacePlacement}>Frame tattoo</button>
-            <button type="button" className="ep-btn" onClick={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}>Fit model</button>
-          </div>}
-          {!photoMode && !reviewOpen && <ViewportControls disabled={snapshot.open || measureOpen || measureLoading || modelLoading}
-            showPlacementTips={showPlacementTips} onPlacementTipsChange={togglePlacementTips}
-            cameraPreset={cameraPreset} cameras={CAMERA_PRESETS}
-            onCameraChange={(preset) => handleCameraPresetChange(preset as CameraPresetKey)}
-            region={isolateRegion} onRegionChange={setIsolateRegion} onHighlightRegions={setPanelRegions}
-            onFit={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}
-            onCleanView={() => handlePhotoModeChange(true)} performanceMode={performanceMode} onPerformanceChange={setPerformanceMode} />}
-          <div className="editor-canvas-stage">
-          <div
-            className="editor-canvas-bg"
-            style={{
-              background: studio.mode === 'sweep' ? studio.color : BACKGROUNDS[background].css,
-              transition: 'background 0.4s',
-            }}
-          />
-          <div className="editor-canvas-inner" ref={canvasHostRef} style={shotFrame ? { width: shotFrame.width, height: shotFrame.height, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' } : undefined}>
-            {canvasHostSized && (
-            <>
-            {/*
-              A loader or WebGL failure is rethrown by the Canvas and caught by
-              this boundary. Switching body mesh clears the error so the user
-              can recover without leaving the editor. Loading is handled by a
-              Suspense boundary *inside* the Canvas (see LoadingSignal).
-            */}
-            <ErrorBoundary
-              resetKeys={[isolateRegion, bodyMeshId]}
-              fallback={({ error, reset }) => (
-                <CrashScreen
-                  inline
-                  title="The 3D preview stopped"
-                  body="Try again, or go back to your scenes. Your latest edits will be saved before leaving."
-                  error={error}
-                  actions={[
-                    { label: 'Try again', onClick: reset, primary: true },
-                    {
-                      label: 'Back to scenes',
-                      onClick: () => afterSaving(() => {
-                        reset()
-                        setShowDashboard(true)
-                      }),
-                    },
-                  ]}
-                />
-              )}
-            >
-            <Canvas
-              className="editor-r3f-canvas"
-              camera={INITIAL_CANVAS_CAMERA}
-              shadows={!performanceMode}
-              dpr={performanceMode ? 0.7 : Math.min(2, window.devicePixelRatio)}
-              gl={{ preserveDrawingBuffer: true, antialias: true }}
-            >
-        <ExportRenderer onRendererReady={handleRendererReady} />
-        <CinematicLights
-          key={lightingPreset}
-          preset={lightingPreset}
-          lights={lights}
-          scale={LIGHTING_PRESETS[lightingPreset].threeIntensityScale}
-          performanceMode={performanceMode}
-        />
-        <StudioBackdrop studio={studio} isolateRegion={isolateRegion} performanceMode={performanceMode} />
-        {!reviewOpen && !photoMode && !snapshot.open && !measureOpen && studio.showGuides && <LightHandles lights={lights} selectedIndex={selectedLight} onSelect={setSelectedLight} />}
-        <Suspense fallback={<LoadingSignal onChange={setModelLoading} />}>
-          <ModelWithUVTattoo
-            key={`${currentScene?.id}:${bodyMeshId}`}
-            ref={uvPlacementRef}
-            uploadedImage={uploadedImage}
-            skinToneId={skinToneId}
-            bodyMeshId={bodyMeshId}
-            decalRotation={decalRotation}
-            decalScale={decalScale}
-            decalColor={decalColor}
-            decalOpacity={decalOpacity}
-            setDecalVisible={setDecalVisible}
-            visible={decalVisible}
-            initialPlacement={surfacePlacement}
-            onPlacementChange={setSurfacePlacement}
-            onWrapView={viewWrap}
-            onSleeveView={viewSleeve}
-            onWrapRegion={setIsolateRegion}
-            onPlacementStatus={setPlacementStatus}
-            onBoundsStatus={setTattooBounds}
-            lights={lights}
-            intensityScale={LIGHTING_PRESETS[lightingPreset].threeIntensityScale}
-            performanceMode={performanceMode}
-            bodyShape={bodyShape}
-            bodyFit={bodyFit}
-            bodyPose={measureOpen ? DEFAULT_BODY_POSE : bodyPose}
-            bodyAppearance={measureOpen ? DEFAULT_BODY_APPEARANCE : bodyAppearance}
-            isolateRegion={measureOpen ? null : isolateRegion}
-            highlightRegions={reviewOpen || photoMode || snapshot.open || measureOpen ? [] : highlightRegions}
-            editingEnabled={!reviewOpen && !photoMode && !snapshot.open && !measureOpen && inspectorTab !== 'studio'}
-            interactionMode={inspectorTab === 'figure' ? 'model' : 'tattoo'}
-            onDecalScaleChange={setDecalScale}
-            onDecalRotationChange={setDecalRotation}
-            onRegionPress={inspectorTab === 'figure' ? handleRegionPress : undefined}
-            onFrameRegion={measureOpen || reviewOpen ? undefined : handleFrameRegion}
-            feedback={reviewOpen ? {
-              threads: review.data.threads, selected: review.selected, draft: review.composer?.location ?? null, armed: review.armed,
-              onSelect: review.setSelected,
-              onMiss: () => review.setNotice('Choose a visible spot on the skin.'),
-              onPick: (anchor, label) => review.pick({ anchor, label, camera: structuredClone(orbitControlsRef.current?.freezeSnapshot() ?? cameraState) }),
-            } : undefined}
-          />
-        </Suspense>
-        {measureOpen && <MeasurementScene model={uvPlacementRef} step={measureStep} onFrame={frameMeasurement} />}
-        <OrbitControlsWithCmdLock
-          enabled={!snapshot.open && !measureOpen}
-          key={currentScene?.id}
-          ref={orbitControlsRef}
-          cameraState={cameraState}
-          cameraRequestId={cameraRequestId}
-          setCameraState={setCameraState}
-          onOrbitStart={handleOrbitStart}
-        />
-            </Canvas>
-            </ErrorBoundary>
-            </>
-            )}
-            {showPlacementTips && !reviewOpen && !modelLoading && !photoMode && !snapshot.open && !measureOpen && (
-              <div className="placement-help" role="status" aria-live="polite">
-                <strong>{inspectorTab === 'figure' ? 'Personalize the model' : inspectorTab === 'studio' ? 'Set the scene' : 'Place your tattoo'}</strong>
-                <span>{inspectorTab === 'figure' ? 'Click a body region to adjust it. Drag the background to orbit.' : inspectorTab === 'studio' ? 'Choose a shot on the left to open your photo studio.' : placementStatus}</span>
-              </div>
-            )}
-            {reviewOpen && <div className="feedback-viewport-hint">{review.armed ? 'Click skin to pin · drag to rotate' : 'Drag to explore · placement locked'}</div>}
-            {modelLoading && (
-              <div className="editor-canvas-loading" role="status">
-                Loading body mesh…
-              </div>
-            )}
-          </div>
-          {measureOpen && measureAsset && <MeasurementOverlay initial={bodyFit?.measurements} baseline={measureAsset.baseline}
-            onFocus={setMeasureStep} onClose={closeMeasurement} completeLabel="Fit my body"
-            onComplete={async values => { const result = await fitBody(bodyMeshId, values); setBodyFit(result.fit); closeMeasurement() }} />}
-          {snapshot.open && <SnapshotOverlay
-            mode={snapshot.mode} onAdjust={snapshotSession.adjust} previewing={!!revealPreview}
-            motionControls={<RevealPanel key={`${session.email}:${currentScene?.id}`} sceneKey={`${session.email}:${currentScene?.id}`} buildShot={() => currentShotBuilder.current({ snapshot: 'quick' })} hasTattoo={snapshotHasTattoo && decalVisible} previewing={!!revealPreview} onPreview={setRevealPreview} />}
-            presetControls={<SnapshotPresets selected={snapshotLook} onSelect={applySnapshotPreset} />}
-            cameraControls={<><ShotStyleControls format={shotFormat} onFormatChange={setShotFormat} blur={shotBlur} onBlurChange={setShotBlur} brightness={shotBrightness} onBrightnessChange={value => { setLights(previous => previous.map(light => ({ ...light, intensity: light.intensity * value / shotBrightness }))); setShotBrightness(value) }} studio={studio} onStudioChange={setStudio} /><SnapshotCameraControls adjustment={snapshotCamera} onChange={setSnapshotCamera}
-              onReset={() => setSnapshotCamera({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT })} hasTattoo={snapshotHasTattoo} /></>}
-            lightingControls={<>
-              <button type="button" className="snapshot-button" onClick={aimSnapshotLights} disabled={!snapshotHasTattoo}>Aim lights at tattoo</button>
-              <LightingControls lights={lights} selectedIndex={selectedLight} onSelectLight={setSelectedLight}
-                onChange={setLights} onReset={() => setLights(resolveRig(lightingPreset))}
-                preset={lightingPreset} onPresetChange={(preset) => { setLightingPreset(preset); setLights(resolveRig(preset)); setSelectedLight(1) }} />
-            </>}
-            framingHint={snapshotHasTattoo ? (decalVisible ? 'Camera anchored to your tattoo. Adjust the shot, then render.' : 'Camera anchored to the placement. The tattoo is hidden in this before view.') : snapshotFramingHint}
-            previewUrl={snapshot.previewUrl} progress={snapshot.progress}
-            status={snapshot.status} imageUrl={snapshot.imageUrl} message={snapshot.message}
-            elapsed={snapshotElapsed} quality={snapshot.quality} warning={snapshot.warning}
-            comparisonAvailable={snapshot.imageMatchesView && (!snapshot.aspect || Math.abs(viewportAspect / snapshot.aspect - 1) < 0.005)}
-            comparisonUnavailableReason={!snapshot.imageMatchesView ? 'This image is from the previous shot. Render the new camera and lighting to compare.' : undefined}
-            onQualityChange={snapshotSession.setQuality} onRender={() => void snapshotSession.render()}
-            onCancel={snapshotSession.cancel} onClose={closeSnapshot} onDownload={downloadSnapshot}
-          />}
-          </div>
-        </div>
-
-
-        {reviewOpen && <FeedbackPanel review={review} bodyMeshId={bodyMeshId} onView={viewFeedback} />}
-      </div>
-
-      {accountMenuOpen && <FocusDialog title="Your account" onClose={() => setAccountMenuOpen(false)}>
-        <AccountSettings session={session} onSignOut={() => afterSaving(() => onSignOut())} />
-        <button type="button" className="ep-btn" onClick={() => afterSaving(() => onSignOut({ everywhere: true }))}>Sign out everywhere</button>
-      </FocusDialog>}
-
-      {/* Export Modal */}
-      {showExportModal && (
-        <FocusDialog title="Export options" onClose={() => setShowExportModal(false)}>
-          <div className="modal-card">
+  const shootExportControls = (
+          <div className="shoot-export-controls">
             <div className="render-history-header">
-              <h2 id="export-title">Export image</h2>
+              <h2 id="export-title">Save &amp; share</h2>
               <button
                 type="button"
                 className="btn-modal-cancel"
-                onClick={() => setShowRenderHistory(true)}
+                onClick={() => afterSaving(() => { setDashboardSection('renders'); setShowDashboard(true) })}
               >
-                Render history
+                Open renders
               </button>
             </div>
             <label className="modal-label" htmlFor="export-preset">
-              Format for both exports
+              Quick export format
             </label>
             <select
               id="export-preset"
@@ -1430,7 +1274,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
                   checked={watermarkEnabled}
                   onChange={(e) => setWatermarkEnabled(e.target.checked)}
                 />
-                Add watermark to canvas image
+                Add watermark to quick export
               </label>
               {watermarkEnabled && (
                 <input
@@ -1446,19 +1290,17 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
             {exportError && <p className="editor-feedback-error" role="alert">{exportError}</p>}
             {historyWarning && <p className="editor-feedback-warning" role="status">{historyWarning}</p>}
             <div className="modal-actions">
-              <button type="button" className="btn-modal-cancel" onClick={() => setShowExportModal(false)}>
-                Cancel
-              </button>
               <button
                 type="button"
                 className="btn-modal-primary"
                 onClick={exportImage}
                 disabled={isExporting || modelLoading || !threeRenderer || !threeScene || !threeCamera}
               >
-                {isExporting ? 'Exporting…' : modelLoading || !threeRenderer || !threeScene || !threeCamera ? 'Loading…' : 'Download canvas image'}
+                {isExporting ? 'Exporting…' : modelLoading || !threeRenderer || !threeScene || !threeCamera ? 'Loading…' : 'Quick export'}
               </button>
             </div>
 
+            <details className="shoot-export-advanced"><summary>Advanced · Blender tools</summary>
             <div className="modal-blender-divider" />
             <label className="modal-label" htmlFor="quality-tier">
               Blender output quality
@@ -1649,7 +1491,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
                 </a>
               )}
             </div>
-            {renderBusy && <p className="modal-blender-hint" role="status">Rendering · {renderElapsed}s elapsed. You can keep this dialog open or return to editing.</p>}
+            {renderBusy && <p className="modal-blender-hint" role="status">Rendering · {renderElapsed}s elapsed. You can keep Shoot open or return to editing.</p>}
             {cloudRenderStatus === 'cancelled' && <p className="modal-blender-hint" role="status">{cloudRenderMessage}</p>}
             {cloudRenderStatus === 'error' && (
               <p style={{ color: 'var(--red-500, #ef4444)', fontSize: '13px', marginTop: '8px' }}>
@@ -1672,9 +1514,324 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
                 />
               </div>
             )}
+            </details>
           </div>
-        </FocusDialog>
-      )}
+  )
+
+  return (
+    <div className={`editor-app-root${reviewOpen ? ' editor-app-root--review' : ''}${measureOpen ? ' editor-app-root--measuring' : ''}${photoMode ? ' editor-app-root--photo' : ''}${snapshot.open ? ' editor-app-root--shooting' : ''}`} ref={canvasContainerRef}>
+      <StudioRail onFeedback={openReview} feedbackDisabled={modelLoading || !canvasHostSized} active={accountMenuOpen ? 'account' : artworkOpen ? 'artwork' : 'studio'}
+        onHome={() => afterSaving(onHome)} onExplore={onExplore ? () => afterSaving(onExplore) : undefined} disabled={reviewOpen || snapshot.open || measureOpen || measureLoading}
+        onNavigate={section => {
+          if (section === 'projects' || section === 'artist' || section === 'client') afterSaving(() => { setDashboardSection(section); setShowDashboard(true) })
+          if (section === 'studio') { setArtworkOpen(false); setSidebarCollapsed(false) }
+          if (section === 'artwork') { setArtworkOpen(true); setSidebarCollapsed(false) }
+          if (section === 'renders') afterSaving(() => { setDashboardSection('renders'); setShowDashboard(true) })
+          if (section === 'account') afterSaving(() => setAccountMenuOpen(true))
+        }} />
+      <header className="editor-toolbar editor-toolbar--main" inert={reviewOpen || snapshot.open || measureOpen || measureLoading}>
+        <div className="editor-project-tools">
+        <div className="editor-toolbar-center editor-scene-heading">
+          <input key={currentScene?.id} className="editor-scene-name" aria-label="Scene name"
+            defaultValue={currentScene?.name ?? 'Untitled Scene'} maxLength={100}
+            onBlur={(event) => {
+              if (!currentScene) return
+              const name = event.currentTarget.value.trim() || currentScene.name
+              event.currentTarget.value = name
+              if (name === currentScene.name) return
+              stageScene({ ...(sceneSaves.peek(currentScene.id) ?? currentScene), name })
+              void flushPendingSave().catch(() => {})
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur() }
+              if (event.key === 'Escape') { event.stopPropagation(); event.currentTarget.value = currentScene?.name ?? ''; event.currentTarget.blur() }
+            }} />
+          <span className={`scene-save-status scene-save-status--${saveState.status}`} role="status" aria-live="polite">
+            {saveState.status === 'saved' ? 'Saved' : saveState.status === 'error' ? 'Not saved' : 'Saving…'}
+          </span>
+      {saveState.status === 'error' && <button type="button" className="tool-btn tool-btn--ghost" onClick={() => void flushPendingSave().catch(() => {})}>Retry save</button>}
+        </div>
+        </div>
+        {!photoMode && !reviewOpen && <ViewportControls inline disabled={snapshot.open || measureOpen || measureLoading || modelLoading}
+            showPlacementTips={showPlacementTips} onPlacementTipsChange={togglePlacementTips}
+            cameraPreset={cameraPreset} cameras={CAMERA_PRESETS}
+            onCameraChange={(preset) => handleCameraPresetChange(preset as CameraPresetKey)}
+            region={isolateRegion} onRegionChange={setIsolateRegion} onHighlightRegions={setPanelRegions}
+            onFit={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}
+            performanceMode={performanceMode} onPerformanceChange={setPerformanceMode} />}
+        <div className="editor-toolbar-actions editor-toolbar-actions--spread">
+          <div className="editor-history-controls" role="group" aria-label="Edit history">
+            <button type="button" className="tool-btn tool-btn--ghost" aria-label="Undo edit" title="Undo · ⌘ / Ctrl Z" disabled={historyBlocked || !editHistory.canUndo} onClick={editHistory.undo}><FaUndo aria-hidden="true" /><span>Undo</span></button>
+            <button type="button" className="tool-btn tool-btn--ghost" aria-label="Redo edit" title="Redo · ⌘ / Ctrl Shift Z" disabled={historyBlocked || !editHistory.canRedo} onClick={editHistory.redo}><FaRedo aria-hidden="true" /><span>Redo</span></button>
+          </div>
+          <button type="button" className="tool-btn tool-btn--primary" onClick={() => openSnapshot()} disabled={modelLoading || !canvasHostSized || renderBusy} title="Frame the tattoo and set up a Blender snapshot">Shoot</button>
+
+        </div>
+      </header>
+
+      {reviewOpen && <FeedbackToolbar review={review} name={currentScene?.name ?? 'Untitled project'} onClose={closeReview} projectSpace={!!clientReview} />}
+      {measureError && <div className="editor-notice" role="alert">{measureError}<button type="button" className="ep-btn" onClick={() => setMeasureError('')}>Dismiss</button></div>}
+      {saveState.status === 'error' && <div className="editor-notice" role="alert">Your latest changes are still here. Saving failed; retry before leaving this page.</div>}
+      {photoMode && <div className="photo-mode-actions" inert={snapshot.open || measureOpen || measureLoading} style={snapshot.open ? { visibility: 'hidden' } : undefined}>
+        <button type="button" className="ep-btn" onClick={() => setPhotoMode(false)}>Exit Clean view · Esc</button>
+        <button type="button" className="ep-btn ep-btn--primary" onClick={() => openSnapshot()} disabled={modelLoading || !canvasHostSized || renderBusy}>Shoot</button>
+        <button type="button" className="ep-btn" onClick={() => openSnapshot()}>Shoot &amp; export</button>
+      </div>}
+      <div className="editor-body-row">
+        {!photoMode && !reviewOpen && !snapshot.open && !measureOpen && !measureLoading && <button type="button"
+          className={`panel-edge-toggle${sidebarCollapsed ? ' panel-edge-toggle--collapsed' : ''}`}
+          aria-label={sidebarCollapsed ? `Show ${panelStageLabel.toLowerCase()} controls` : 'Hide editing controls'}
+          aria-expanded={!sidebarCollapsed} aria-controls="studio-editing-panel"
+          title={sidebarCollapsed ? `Show ${panelStageLabel.toLowerCase()} controls` : 'Hide editing controls'}
+          onClick={() => setSidebarCollapsed(value => !value)}><FiSidebar aria-hidden="true" />{sidebarCollapsed && <><span className="panel-stage-dot" aria-hidden="true" /><span>{panelStageLabel}</span></>}</button>}
+        <div id="studio-editing-panel" className="focus-control-panel" hidden={sidebarCollapsed}>
+          <div className="focus-panel-slot" hidden={!artworkOpen}>
+            <EditorLeftPanel backToEditing currentImage={uploadedImage}
+              onChooseArtwork={(source) => { setUploadedImage(source); setDecalVisible(true); setInspectorTab('tattoo'); setArtworkOpen(false); setPanelRegions([]); uvPlacementRef.current?.placeInView() }}
+              disabled={snapshot.open || measureOpen || measureLoading || modelLoading}
+              collapsed={false} onToggleCollapsed={() => setArtworkOpen(false)} />
+          </div>
+          <div className="focus-panel-slot" hidden={artworkOpen}>
+            <TopMenuBar
+              isWrap={!!(surfacePlacement?.wrap || surfacePlacement?.sleeve)}
+              isSleeve={!!surfacePlacement?.sleeve}
+              wrapControls={<>
+                {!surfacePlacement?.sleeve && <WrapTattooControls value={surfacePlacement?.wrap} onSample={startWrapSample} onChange={value => { if (uvPlacementRef.current?.setWrap(value) && value.region !== surfacePlacement?.wrap?.region) setIsolateRegion(value.region) }} onExit={() => uvPlacementRef.current?.setWrap(null)} onView={viewWrap} />}
+                <SleeveTattooControls value={surfacePlacement?.sleeve} onStart={startSleeveSample} onChange={value => uvPlacementRef.current?.setSleeve(value)} onExit={() => uvPlacementRef.current?.setSleeve(null)} onView={viewSleeve} />
+              </>}
+              tattooBoundsControls={<TattooBoundsControls status={tattooBounds} onLock={locked => uvPlacementRef.current?.setAreaLock(locked)} onFit={() => uvPlacementRef.current?.fitToArea()} />}
+              onBrowseArtwork={() => setArtworkOpen(true)}
+              onMeasureBody={() => void openMeasurement()} measuringLoading={measureLoading || modelLoading}
+              hasBodyFit={!!bodyFit} onClearBodyFit={() => setBodyFit(null)}
+              activeTab={inspectorTab} onTabChange={tab => { setInspectorTab(tab); setShapeMenu(null); setPanelRegions([]) }}
+              onShoot={openSnapshot}
+              disabled={snapshot.open || measureOpen || measureLoading}
+              key={currentScene?.id}
+              bodyMeshId={bodyMeshId}
+              onBodyMeshChange={handleBodyMeshChange}
+              skinToneId={skinToneId}
+              lookId={lookId}
+              lights={lights}
+              selectedLight={selectedLight}
+              lightingPreset={lightingPreset}
+              onLightingPresetChange={(preset) => { setLightingPreset(preset); setLights(resolveRig(preset)); setSelectedLight(1) }}
+              studio={studio}
+              background={background} onBackgroundChange={setBackground}
+              onStudioChange={(value) => setStudio(normalizeStudio(value))}
+              onSelectLight={setSelectedLight}
+              onLightsChange={setLights}
+              onSkinChange={setSkinToneId}
+              onLookChange={handleLookChange}
+              bodyShape={bodyShape}
+              poseId={poseId}
+              bodyPose={bodyPose}
+              bodyAppearance={bodyAppearance}
+              onAppearanceChange={(appearance) => setBodyAppearance(normalizeAppearance(appearance))}
+              onFramePose={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}
+              onPosePresetChange={handlePosePreset}
+              onBodyPoseChange={handleBodyPoseChange}
+              onBodyShapeChange={(shape) => setBodyShape(normalizeShape(shape))}
+              isolateRegion={isolateRegion}
+              onIsolateRegionChange={setIsolateRegion}
+              onHighlightRegions={setPanelRegions}
+              setUploadedImage={setUploadedImage}
+              uploadedImage={uploadedImage}
+              decalVisible={decalVisible}
+              hasPlacement={surfacePlacement !== null}
+              decalRotation={decalRotation}
+              decalScale={decalScale}
+              decalColor={decalColor}
+              decalOpacity={decalOpacity}
+              onDecalRotationChange={value => setDecalRotation(uvPlacementRef.current?.limitRotation(value) ?? value)}
+              onDecalScaleChange={value => setDecalScale(uvPlacementRef.current?.limitScale(value) ?? value)}
+              onDecalColorChange={setDecalColor}
+              onDecalOpacityChange={setDecalOpacity}
+              onDecalVisibleChange={setDecalVisible}
+              onDecalReset={handleResetDecal}
+              photoMode={photoMode}
+              setPhotoMode={handlePhotoModeChange}
+              cameraPreset={cameraPreset}
+              onCameraPresetChange={(preset) => handleCameraPresetChange(preset as CameraPresetKey)}
+              CAMERA_PRESETS={CAMERA_PRESETS}
+              performanceMode={performanceMode}
+              setPerformanceMode={setPerformanceMode}
+              onExport={() => openSnapshot()}
+            />
+          </div>
+        </div>
+
+        <div className="editor-canvas-host">
+          {reviewOpen && <div className="feedback-view-tools" role="group" aria-label="Review camera">
+            <span>Explore the placement</span>
+            <button type="button" className="ep-btn" onClick={() => viewWrap(false)} disabled={!surfacePlacement}>Frame tattoo</button>
+            <button type="button" className="ep-btn" onClick={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}>Fit model</button>
+          </div>}
+
+          <div className="editor-canvas-stage">
+          <div
+            className="editor-canvas-bg"
+            style={{
+              background: studio.mode === 'sweep' ? studio.color : BACKGROUNDS[background].css,
+              transition: 'background 0.4s',
+            }}
+          />
+          <div className="editor-canvas-inner" ref={canvasHostRef} style={shotFrame ? { width: shotFrame.width, height: shotFrame.height, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' } : undefined}>
+            {canvasHostSized && (
+            <>
+            {/*
+              A loader or WebGL failure is rethrown by the Canvas and caught by
+              this boundary. Switching body mesh clears the error so the user
+              can recover without leaving the editor. Loading is handled by a
+              Suspense boundary *inside* the Canvas (see LoadingSignal).
+            */}
+            <ErrorBoundary
+              resetKeys={[isolateRegion, bodyMeshId]}
+              fallback={({ error, reset }) => (
+                <CrashScreen
+                  inline
+                  title="The 3D preview stopped"
+                  body="Try again, or go back to your scenes. Your latest edits will be saved before leaving."
+                  error={error}
+                  actions={[
+                    { label: 'Try again', onClick: reset, primary: true },
+                    {
+                      label: 'Back to scenes',
+                      onClick: () => afterSaving(() => {
+                        reset()
+                        setShowDashboard(true)
+                      }),
+                    },
+                  ]}
+                />
+              )}
+            >
+            <Canvas
+              className="editor-r3f-canvas"
+              camera={INITIAL_CANVAS_CAMERA}
+              shadows={!performanceMode}
+              dpr={performanceMode ? 0.7 : Math.min(2, window.devicePixelRatio)}
+              gl={{ preserveDrawingBuffer: true, antialias: true }}
+            >
+        <ExportRenderer onRendererReady={handleRendererReady} />
+        <CinematicLights
+          key={lightingPreset}
+          preset={lightingPreset}
+          lights={lights}
+          scale={LIGHTING_PRESETS[lightingPreset].threeIntensityScale}
+          performanceMode={performanceMode}
+        />
+        <StudioBackdrop studio={studio} isolateRegion={isolateRegion} performanceMode={performanceMode} />
+        {!reviewOpen && !photoMode && !snapshot.open && !measureOpen && studio.showGuides && <LightHandles lights={lights} selectedIndex={selectedLight} onSelect={setSelectedLight} />}
+        <Suspense fallback={<LoadingSignal onChange={setModelLoading} />}>
+          <ModelWithUVTattoo
+            fingerPlacement={nativeHost && fingerPlacement}
+            key={`${currentScene?.id}:${bodyMeshId}`}
+            ref={uvPlacementRef}
+            uploadedImage={uploadedImage}
+            skinToneId={skinToneId}
+            bodyMeshId={bodyMeshId}
+            decalRotation={decalRotation}
+            decalScale={decalScale}
+            decalColor={decalColor}
+            decalOpacity={decalOpacity}
+            setDecalVisible={setDecalVisible}
+            visible={decalVisible}
+            initialPlacement={surfacePlacement}
+            onPlacementChange={setSurfacePlacement}
+            onWrapView={viewWrap}
+            onSleeveView={viewSleeve}
+            onWrapRegion={setIsolateRegion}
+            onPlacementStatus={setPlacementStatus}
+            onBoundsStatus={setTattooBounds}
+            lights={lights}
+            intensityScale={LIGHTING_PRESETS[lightingPreset].threeIntensityScale}
+            performanceMode={performanceMode}
+            bodyShape={bodyShape}
+            bodyFit={bodyFit}
+            bodyPose={measureOpen ? DEFAULT_BODY_POSE : bodyPose}
+            bodyAppearance={measureOpen ? DEFAULT_BODY_APPEARANCE : bodyAppearance}
+            isolateRegion={measureOpen ? null : isolateRegion}
+            highlightRegions={reviewOpen || photoMode || snapshot.open || measureOpen ? [] : highlightRegions}
+            showTattooControls={showPlacementTips} onHideTattooControls={() => { togglePlacementTips(false); document.querySelector<HTMLButtonElement>('[data-tattoo-controls-toggle]')?.focus(); }}
+            editingEnabled={!reviewOpen && !photoMode && !snapshot.open && !measureOpen && inspectorTab !== 'studio'}
+            interactionMode={inspectorTab === 'figure' ? 'model' : 'tattoo'}
+            onDecalScaleChange={setDecalScale}
+            onDecalRotationChange={setDecalRotation}
+            onRegionPress={inspectorTab === 'figure' ? handleRegionPress : undefined}
+            onFrameRegion={measureOpen || reviewOpen ? undefined : handleFrameRegion}
+            feedback={reviewOpen ? {
+              threads: review.data.threads, selected: review.selected, draft: review.composer?.location ?? null, armed: review.armed,
+              onSelect: review.setSelected,
+              onMiss: () => review.setNotice('Choose a visible spot on the skin.'),
+              onPick: (anchor, label) => review.pick({ anchor, label, camera: structuredClone(orbitControlsRef.current?.freezeSnapshot() ?? cameraState) }),
+            } : undefined}
+          />
+        </Suspense>
+        {measureOpen && <MeasurementScene model={uvPlacementRef} step={measureStep} onFrame={frameMeasurement} />}
+        <OrbitControlsWithCmdLock
+          enabled={!snapshot.open && !measureOpen}
+          key={currentScene?.id}
+          ref={orbitControlsRef}
+          cameraState={cameraState}
+          cameraRequestId={cameraRequestId}
+          setCameraState={setCameraState}
+          onOrbitStart={handleOrbitStart}
+        />
+            </Canvas>
+            </ErrorBoundary>
+            </>
+            )}
+            {showPlacementTips && !reviewOpen && !modelLoading && !photoMode && !snapshot.open && !measureOpen && (
+              <div className="placement-help" role="status" aria-live="polite">
+                <strong>{inspectorTab === 'figure' ? 'Personalize the model' : inspectorTab === 'studio' ? 'Set the scene' : 'Place your tattoo'}</strong>
+                <span>{inspectorTab === 'figure' ? 'Click a body region to adjust it. Drag the background to orbit.' : inspectorTab === 'studio' ? 'Choose a shot on the left to open your photo studio.' : placementStatus}</span>
+              </div>
+            )}
+            {reviewOpen && <div className="feedback-viewport-hint">{review.armed ? 'Click skin to pin · drag to rotate' : 'Drag to explore · placement locked'}</div>}
+            {modelLoading && (
+              <div className="editor-canvas-loading" role="status">
+                Loading body mesh…
+              </div>
+            )}
+          </div>
+          {measureOpen && measureAsset && <MeasurementOverlay initial={bodyFit?.measurements} baseline={measureAsset.baseline}
+            onFocus={setMeasureStep} onClose={closeMeasurement} completeLabel="Fit my body"
+            onComplete={async values => { const result = await fitBody(bodyMeshId, values); setBodyFit(result.fit); closeMeasurement() }} />}
+          {snapshot.open && <SnapshotOverlay
+            renderDisabled={renderBusy || isExporting}
+            exportControls={shootExportControls}
+            onOpenRenders={() => afterSaving(() => { closeSnapshot(); setDashboardSection('renders'); setShowDashboard(true) })}
+            mode={snapshot.mode} onAdjust={snapshotSession.adjust} previewing={!!revealPreview}
+            motionControls={<RevealPanel key={`${session.email}:${currentScene?.id}`} sceneKey={`${session.email}:${currentScene?.id}`} buildShot={() => currentShotBuilder.current({ snapshot: 'quick' })} hasTattoo={snapshotHasTattoo && decalVisible} previewing={!!revealPreview} onPreview={setRevealPreview} />}
+            presetControls={<SnapshotPresets selected={snapshotLook} onSelect={applySnapshotPreset} />}
+            cameraControls={<><ShotStyleControls format={shotFormat} onFormatChange={setShotFormat} blur={shotBlur} onBlurChange={setShotBlur} brightness={shotBrightness} onBrightnessChange={value => { setLights(previous => previous.map(light => ({ ...light, intensity: light.intensity * value / shotBrightness }))); setShotBrightness(value) }} studio={studio} onStudioChange={setStudio} /><SnapshotCameraControls adjustment={snapshotCamera} onChange={setSnapshotCamera}
+              onReset={() => setSnapshotCamera({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT })} hasTattoo={snapshotHasTattoo} /></>}
+            lightingControls={<>
+              <button type="button" className="snapshot-button" onClick={aimSnapshotLights} disabled={!snapshotHasTattoo}>Aim lights at tattoo</button>
+              <LightingControls lights={lights} selectedIndex={selectedLight} onSelectLight={setSelectedLight}
+                onChange={setLights} onReset={() => setLights(resolveRig(lightingPreset))}
+                preset={lightingPreset} onPresetChange={(preset) => { setLightingPreset(preset); setLights(resolveRig(preset)); setSelectedLight(1) }} />
+            </>}
+            framingHint={snapshotHasTattoo ? (decalVisible ? 'Camera anchored to your tattoo. Adjust the shot, then render.' : 'Camera anchored to the placement. The tattoo is hidden in this before view.') : snapshotFramingHint}
+            previewUrl={snapshot.previewUrl} progress={snapshot.progress}
+            status={snapshot.status} imageUrl={snapshot.imageUrl} message={snapshot.message}
+            elapsed={snapshotElapsed} quality={snapshot.quality} warning={snapshot.warning}
+            comparisonAvailable={snapshot.imageMatchesView && (!snapshot.aspect || Math.abs(viewportAspect / snapshot.aspect - 1) < 0.005)}
+            comparisonUnavailableReason={!snapshot.imageMatchesView ? 'This image is from the previous shot. Render the new camera and lighting to compare.' : undefined}
+            onQualityChange={snapshotSession.setQuality} onRender={() => void snapshotSession.render()}
+            onCancel={snapshotSession.cancel} onClose={closeSnapshot} onDownload={downloadSnapshot}
+          />}
+          </div>
+        </div>
+
+
+        {reviewOpen && <FeedbackPanel review={review} bodyMeshId={bodyMeshId} onView={viewFeedback} />}
+      </div>
+
+      {accountMenuOpen && <FocusDialog title="Your account" onClose={() => setAccountMenuOpen(false)}>
+        <AccountSettings session={session} onSignOut={() => afterSaving(() => onSignOut())} />
+        <button type="button" className="ep-btn" onClick={() => afterSaving(() => onSignOut({ everywhere: true }))}>Sign out everywhere</button>
+      </FocusDialog>}
 
       {shapeMenu && !photoMode && !reviewOpen && (
         <BodyRegionCard
@@ -1688,9 +1845,6 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
         />
       )}
 
-      {showRenderHistory && (
-        <RenderHistoryModal onClose={() => setShowRenderHistory(false)} />
-      )}
 
     </div>
   )

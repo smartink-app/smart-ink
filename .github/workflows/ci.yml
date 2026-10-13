@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, beta]
+    branches: [main, beta, studio-test]
   pull_request:
-    branches: [main, beta]
+    branches: [main, beta, studio-test]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -32,13 +32,22 @@ jobs:
         run: npm run lint
 
       - name: Editor and rendering regression tests
-        run: npm run test:demo
+        run: npm run test:phase1
 
       - name: RunPod frontend regression tests
         run: node tools/runpod-render-service.test.mjs
 
-      - name: Password login access checks
-        run: node tools/password-login.test.mjs
+      - name: Workspace and preview feature checks
+        run: |
+          npm run test:artist
+          npm run test:client
+          npm run test:versions
+          npm run test:feedback
+          npm run test:discovery
+          npm run test:moodboard
+          node tools/tattoo-library.test.mjs
+          node tools/beta-admin.test.mjs
+          npm run test:ipad
 
       - uses: denoland/setup-deno@v2
         with:
@@ -51,8 +60,8 @@ jobs:
         run: npm run build
 
       # The production bundle once reached 207 MB because public/ pulled the
-      # whole Blender working tree into dist/. It is ~16 MB now (four body
-      # meshes plus the app); fail if it creeps past 25 MB.
+      # whole Blender working tree into dist/. The app includes body meshes
+      # and hero assets; fail if it creeps past 25 MB.
       - name: Report and limit dist size
         run: |
           echo "## Build output" >> "$GITHUB_STEP_SUMMARY"

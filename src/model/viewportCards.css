@@ -43,3 +43,10 @@
 .sleeve-section-tabs { display: flex; gap: 4px; }
 .sleeve-section-tabs button { flex: 1; border: 1px solid #737c934f; border-radius: 7px; color: inherit; background: #80889918; padding: 7px 3px; font: inherit; }
 .sleeve-section-tabs button[aria-pressed=true] { background: #bcc9ea; color: #151923; }
+
+.tattoo-touch-help { display: none; }
+@media (pointer: coarse) {
+  .tattoo-pointer-help { display: none; }
+  .tattoo-touch-help { display: block; }
+  .tattoo-transform-card button { min-width: 44px; min-height: 44px; }
+}

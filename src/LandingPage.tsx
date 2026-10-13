@@ -1,4 +1,3 @@
-import { ThemeToggle } from './Theme';
 import React, { useId, useState, type FormEvent } from 'react';
 import { authMode, requestBetaAccess } from './auth/betaAuthService';
 import type { RequestAccessResult } from './auth/types';
@@ -8,10 +7,10 @@ import {
   submitWaitlistRequest,
 } from './auth/waitlistSubmit';
 import './landing/phase-one-landing.css';
+import HeroPreview from './landing/HeroPreview';
 
 interface LandingPageProps {
   onNavigateToLogin: () => void;
-  onExploreArtists?: () => void;
   signedIn?: boolean;
 }
 
@@ -140,7 +139,7 @@ const RequestAccessForm: React.FC<{ source: string; buttonLabel: string }> = ({
   );
 };
 
-const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, onExploreArtists, signedIn = false }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, signedIn = false }) => {
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 
   return (
@@ -150,11 +149,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, onExploreA
         <a className="landing-brand" href="#top"><span className="landing-mark" aria-hidden />Smart Ink</a>
         <nav className="landing-nav-links" aria-label="Discover Smart Ink">
           <a href="#workflow">How it works</a>
-          <a href="#render">The studio</a>
+          <a href="#render">Preview the results</a>
         </nav>
         <div className="landing-nav-actions">
-          {onExploreArtists && <button type="button" className="landing-discover-button" onClick={onExploreArtists}>Find an artist</button>}
-          <ThemeToggle />
+
           <button type="button" className="btn-quiet" onClick={onNavigateToLogin}>{signedIn ? 'Open studio' : 'Log in'}</button>
           {!signedIn && <button type="button" className="btn-primary btn-primary--sm" onClick={() => scrollTo('request')}>Request access</button>}
         </div>
@@ -172,11 +170,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin, onExploreA
             </div>
             <p className="phase-access-note">Private beta. Approved artists get the full studio.</p>
           </div>
-          <figure className="phase-hero-art">
-            <span className="phase-image-tag">PLACEMENT / FOREARM</span>
-            <img src="/renders/hero-arm.webp" alt="An ornamental eye tattoo projected onto a curved forearm, rendered in Smart Ink." width="1400" height="1300" fetchPriority="high" decoding="async" />
-            <figcaption><span>Created with Smart Ink</span><span>3D tattoo visualisation</span></figcaption>
-          </figure>
+          <div className="phase-hero-visualizer">
+            <HeroPreview />
+          </div>
         </section>
 
         <section className="phase-workflow" id="workflow" aria-labelledby="workflow-title">

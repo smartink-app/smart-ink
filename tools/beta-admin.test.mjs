@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+let states=[],cursor=0,calls=[];
+globalThis.adminHooks={state(v){const n=cursor++; if(!(n in states))states[n]=v;return [states[n],v=>{states[n]=typeof v==='function'?v(states[n]):v;}];}};
+globalThis.adminSend=async code=>{calls.push(code);return {sent:true};};
+const result=await build({entryPoints:['src/BetaAdminPage.tsx'],bundle:true,write:false,format:'esm',platform:'node',jsx:'automatic',plugins:[{name:'admin-fixture',setup(b){
+ b.onResolve({filter:/^react(?:\/jsx-runtime)?$/},a=>({path:a.path,namespace:'mock'}));
+ b.onLoad({filter:/.*/,namespace:'mock'},a=>({contents:a.path==='react'?'export const useState=v=>globalThis.adminHooks.state(v),useEffect=()=>{};':'export const jsx=(type,props)=>({type,props}),jsxs=jsx,Fragment="Fragment";'}));
+ b.onResolve({filter:/auth\/betaAuthService$/},()=>({path:'auth',namespace:'auth'}));
+ b.onLoad({filter:/.*/,namespace:'auth'},()=>({contents:'export const approveWaitlistEntry=async()=>{},createInvite=async()=>{},inviteUrl=c=>"https://example.invalid/?invite="+c,revokeAccess=async()=>{},sendInviteEmail=c=>globalThis.adminSend(c);'}));
+}}]});
+const {default:Admin}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+const props={mode:'supabase',unlocked:true,session:{email:'owner@example.invalid'},waitlist:[{id:'a',email:'artist@example.invalid',status:'waitlisted',createdAt:1},{id:'b',email:'owner@example.invalid',status:'active',createdAt:2}],invites:[{code:'OPEN',email:'artist@example.invalid',createdAt:1,expiresAt:Date.now()+86400000},{code:'OLD',email:'old@example.invalid',createdAt:1,expiresAt:1}],activeEmails:['owner@example.invalid'],onRefresh:async()=>{}};
+const nodes=x=>Array.isArray(x)?x.flatMap(nodes):x?.props?[x,...nodes(x.props.children)]:[];
+const text=x=>Array.isArray(x)?x.map(text).join(''):x?.props?text(x.props.children):x??'';
+const render=()=>{cursor=0;return Admin(props)};
+const button=(tree,label)=>nodes(tree).find(n=>n.type==='button'&&text(n).startsWith(label));
+let tree=render();assert.match(text(tree),/artist@example.invalid/);
+button(tree,'Invite links').props.onClick();tree=render();assert.match(text(tree),/OLD/);
+nodes(tree).find(n=>n.props['aria-label']==='Invitation status').props.onChange({target:{value:'open'}});tree=render();assert.doesNotMatch(text(tree),/OLD/);
+await button(tree,'Resend email').props.onClick();tree=render();assert.deepEqual(calls,['OPEN']);assert.match(text(tree),/Invitation sent/);
+nodes(tree).find(n=>n.props['aria-label']==='Search beta records').props.onChange({target:{value:'nothing'}});tree=render();assert.match(text(tree),/No matching records/);
+button(tree,'Clear search').props.onClick();tree=render();button(tree,'Active').props.onClick();tree=render();assert.equal(button(tree,'Revoke access').props.disabled,true);
+props.unlocked=false;tree=render();assert.doesNotMatch(text(tree),/artist@example.invalid/);
+console.log('Admin: search, invitation status filtering, resend, own-access protection and locked data visibility passed.');

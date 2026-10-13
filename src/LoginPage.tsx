@@ -1,4 +1,3 @@
-import { ThemeToggle } from './Theme';
 import { useState, type FormEvent } from 'react';
 import {
   authMode,
@@ -24,6 +23,7 @@ type Busy = 'google' | 'code' | 'verify' | 'password' | null;
 
 export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvite, notice }: LoginPageProps) {
   const mode = authMode();
+  const nativeHost = typeof window !== 'undefined' && window.smartInkNativeHost === true;
   const unconfigured = mode === 'unconfigured';
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -89,10 +89,10 @@ export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvi
   };
 
   return (
-    <div className="login-page"><ThemeToggle className="auth-theme-toggle" />
+    <div className="login-page">
       <div className="login-left">
         <div className="login-card">
-          {onBackToLanding && (
+          {onBackToLanding && !nativeHost && (
             <button
               type="button"
               className="btn-login"
@@ -138,6 +138,7 @@ export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvi
           <button
             type="button"
             className="btn-google"
+            hidden={nativeHost}
             onClick={handleGoogle}
             disabled={busy !== null || unconfigured}
           >

@@ -7,7 +7,6 @@ import CinematicLights from './CinematicLights';
 import ErrorBoundary from './ErrorBoundary';
 import CrashScreen from './CrashScreen';
 import AdjustmentControl from './AdjustmentControl';
-import { ThemeToggle } from './Theme';
 import { LIGHTING_PRESETS, resolveRig, type LightingPresetKey } from './config/lightingPresets';
 import { REGISTRY } from './render/registry';
 import { BODY_REGIONS, type BodyRegionId } from './render/bodyRegions';
@@ -54,7 +53,7 @@ export default function PublicDemo({ onHome, onRequestAccess }: { onHome: () => 
     <aside className="studio-rail demo-rail">
       <button type="button" className="studio-rail-brand" onClick={onHome} aria-label="Smart Ink home"><img src="/brand-droplet.svg" alt="" /></button>
       <span className="demo-rail-label"><FiEdit3 aria-hidden />Live demo</span>
-      <ThemeToggle />
+
     </aside>
     <header className="editor-toolbar editor-toolbar--main">
       <button type="button" className="ep-btn ep-btn--ghost" onClick={onHome}><FiArrowLeft aria-hidden />Home</button>

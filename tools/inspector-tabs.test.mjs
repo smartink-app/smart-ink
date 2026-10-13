@@ -6,10 +6,18 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 const root = fileURLToPath(new URL('../', import.meta.url));
+// Exercise the real inspector/library without importing Vite configuration or
+// contacting hosted auth. Authentication and library isolation have their own tests.
+const approvedSession = { name: 'approved-panel-session', setup(builder) {
+  builder.onResolve({ filter: /auth\/betaAuthService$/ }, () => ({ path: 'auth', namespace: 'test-session' }));
+  builder.onLoad({ filter: /.*/, namespace: 'test-session' }, () => ({
+    contents: 'export const subscribeSession=cb=>{cb({session:{userId:"inspector-test",email:"inspector@example.invalid"}});return()=>{};};',
+  }));
+} };
 const { outputFiles } = await build({
   stdin: { contents: "export { default as TopMenuBar } from './src/TopMenuBar';", resolveDir: root },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
-  plugins: [{ name: 'inspector-handlers', setup(builder) {
+  plugins: [approvedSession, { name: 'inspector-handlers', setup(builder) {
     builder.onResolve({ filter: /^react(?:\/jsx-runtime)?$/ }, args => ({ path: args.path, namespace: 'hooks' }));
     builder.onLoad({ filter: /.*/, namespace: 'hooks' }, args => ({ contents: args.path === 'react'
       ? 'export const useId=()=>globalThis.__inspector.id();export const useRef=v=>globalThis.__inspector.ref(v);export const useState=v=>globalThis.__inspector.state(v);export const useEffect=(fn,deps)=>globalThis.__inspector.effect(fn,deps);'
@@ -186,7 +194,7 @@ try {
     export {DEFAULT_STUDIO} from './src/render/studioSettings';
     export {resolveRig} from './src/config/lightingPresets';`, resolveDir: root },
     outfile: temporary, bundle: true, format: 'esm', platform: 'node', jsx: 'automatic',
-    external: ['react', 'react/jsx-runtime'], loader: { '.css': 'empty' }, logLevel: 'silent' });
+    external: ['react', 'react/jsx-runtime'], loader: { '.css': 'empty' }, plugins: [approvedSession], logLevel: 'silent' });
   real = await import(pathToFileURL(temporary));
 } finally { await fs.rm(temporary, { force: true }); }
 for (const variant of [

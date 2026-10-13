@@ -1,6 +1,6 @@
+import ExploreNav from './ExploreNav';
 import { useState } from 'react';
 import { FiArrowUpRight, FiArrowRight, FiBookmark, FiMapPin, FiSearch, FiX } from 'react-icons/fi';
-import { ThemeToggle } from '../Theme';
 import FocusDialog from '../FocusDialog';
 import { ARTIST_CITIES, ARTIST_STYLES, DEMO_ARTISTS, filterArtists, type DemoArtist, type PortfolioImage } from './artists';
 import './discovery.css';
@@ -28,7 +28,7 @@ export default function ArtistDiscovery({ onHome, onStudio, onMoodboard, signedI
   const filtering = query || style !== 'All styles' || city || openOnly || savedOnly;
   return <div className="discover-page">
     <a className="discover-skip" href="#discover-main">Skip to artists</a>
-    <header className="discover-header"><button className="discover-brand" onClick={onHome} aria-label="Smart Ink home"><img src="/brand-droplet.svg" alt="" />Smart Ink</button><span className="discover-nav-label">Discover artists</span><div><button className="discover-studio-button" onClick={() => onMoodboard()}>Moodboard</button><ThemeToggle /><button className="discover-studio-button" onClick={onStudio}>{signedIn ? 'Open studio' : 'Artist login'}<FiArrowUpRight aria-hidden /></button></div></header>
+    <ExploreNav active="artists" onHome={onHome} onArtists={() => {}} onMoodboards={() => onMoodboard()} onStudio={onStudio} signedIn={signedIn} />
     <main id="discover-main">
       <section className="discover-hero" aria-labelledby="discover-title"><p className="discover-eyebrow"><span />A connection before the ink</p><h1 id="discover-title">Find your artist.<br /><span>Make it personal.</span></h1><p className="discover-intro">A style that speaks to you. An artist who gets it.<br />Explore the work and find the person behind your next piece.</p><div className="discover-search-bar"><label className="discover-search"><FiSearch aria-hidden /><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Artist, studio or style" aria-label="Search artists" /></label><label className="discover-location"><FiMapPin aria-hidden /><select value={city} onChange={e => setCity(e.target.value)} aria-label="Artist location"><option value="">All locations</option>{ARTIST_CITIES.map(c => <option key={c}>{c}</option>)}</select></label></div></section>
       <section className="discover-collection" aria-label="Artist portfolios">

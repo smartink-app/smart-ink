@@ -11,7 +11,7 @@ import ClientProjectSpace from './client/ClientProjectSpace';
 import type { ProjectRole } from './client/model';
 import FocusDialog from './FocusDialog';
 import TattooLibrary from './TattooLibrary';
-import RenderHistoryModal from './RenderHistoryModal';
+import RenderHistoryPage from './RenderHistoryPage';
 import { FiSearch, FiPlus, FiArrowUpRight, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import './dashboard.css';
 import TemplatePreviewRenderer from './TemplatePreviewRenderer';
@@ -27,9 +27,10 @@ interface Props {
   initialClientProject?: string; initialClientRole?: ProjectRole; initialVersionId?: string;
   onReviewScene?: (scene: SceneData, projectId: string, role: ProjectRole, versionId?: string) => void;
   onMoodboard?: () => void;
+  onExplore?: () => void;
 }
 
-export default function ScenesDashboard({ onSelectScene, onOpenLanding, session, onSignOut, onResume, initialSection = 'projects', initialClientProject, initialClientRole = 'client', initialVersionId, onReviewScene, onMoodboard }: Props) {
+export default function ScenesDashboard({ onSelectScene, onOpenLanding, session, onSignOut, onResume, initialSection = 'projects', initialClientProject, initialClientRole = 'client', initialVersionId, onReviewScene, onMoodboard, onExplore }: Props) {
   const clientDraft = useRef(false);
   const receiveClientDraft = useCallback((dirty: boolean) => { clientDraft.current = dirty; }, []);
   const canLeaveClient = () => !clientDraft.current || window.confirm('Leave without saving your message draft?');
@@ -38,7 +39,6 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
   const [artistBooking, setArtistBooking] = useState<string | undefined>();
   const [section, setSection] = useState<StudioSection>(initialSection);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
-  const [rendersOpen, setRendersOpen] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [draftArtwork, setDraftArtwork] = useState<string | null>(null);
   const [template, setTemplate] = useState('blank');
@@ -111,10 +111,10 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
   };
 
   const filteredScenes = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = searchQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     const recent = [...scenes].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    if (!q) return recent;
-    return recent.filter((s) => s.name.toLowerCase().includes(q));
+    if (!q.length) return recent;
+    return recent.filter((s) => q.every(term => s.name.toLocaleLowerCase().includes(term)));
   }, [scenes, searchQuery]);
 
   const handleNewScene = () => {
@@ -217,32 +217,40 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
 
   return (
     <div className="dashboard">
-      <StudioRail active={rendersOpen ? 'renders' : section} studioAvailable={!!onResume} onHome={() => { if (canLeaveClient()) onOpenLanding?.(); }}
+      <StudioRail active={section} studioAvailable={!!onResume} onHome={() => { if (canLeaveClient()) onOpenLanding?.(); }}
+        onExplore={onExplore ? () => { if (canLeaveClient()) onExplore(); } : undefined}
         onNavigate={next => {
-          if (next === section && next !== 'renders') return;
+          if (next === section) return;
           if (!canLeaveClient()) return;
           if (next === 'studio') { onResume?.(); return; }
-          if (next === 'renders') { setRendersOpen(true); return; }
           setSection(next);
         }} />
-      <div className="main-content focus-dashboard-content">
+      <div key={section} className="main-content focus-dashboard-content workspace-page-enter">
         {authMode() === 'demo' && <p className="focus-local-note">Local preview · Projects and uploads are saved in this browser.</p>}
-        {section === 'client' ? <ClientProjectSpace key={session.userId ?? session.email} owner={session.userId ?? session.email} feedbackOwner={session.email} scenes={scenes} scenesLoading={loading} scenesError={loadError ? error : ''}
+        {(section === 'client' || section === 'artist') && <div className="workspace-area-nav">
+          <p className="focus-eyebrow">Clients <span>Preview</span></p>
+          <nav aria-label="Client workspace views">
+            <button type="button" aria-current={section === 'artist' ? 'page' : undefined} onClick={() => { if (canLeaveClient()) setSection('artist'); }}>Artist desk</button>
+            <button type="button" aria-current={section === 'client' ? 'page' : undefined} onClick={() => setSection('client')}>Client space</button>
+          </nav>
+        </div>}
+        {section === 'renders' ? <RenderHistoryPage studioAvailable={!!onResume} onOpenStudio={() => onResume ? onResume() : setSection('projects')} /> : section === 'client' ? <ClientProjectSpace key={session.userId ?? session.email} owner={session.userId ?? session.email} feedbackOwner={session.email} scenes={scenes} scenesLoading={loading} scenesError={loadError ? error : ''}
           onDirtyChange={receiveClientDraft} initialProjectId={clientProjectId} initialRole={clientRole} initialVersionId={clientProjectId === initialClientProject ? initialVersionId : undefined} onMoodboard={() => onMoodboard?.()}
           onDesk={id => { setArtistBooking(id); setSection('artist'); }}
           onReview={(scene, projectId, role, versionId) => { if (versionId) onReviewScene?.(scene, projectId, role, versionId); else if (!unavailable) onReviewScene?.(scene, projectId, role); }} />
           : section === 'artist' ? <ArtistPanel key={session.userId ?? session.email} owner={session.userId ?? session.email} scenes={scenes} initialBookingId={artistBooking} onOpenProject={openScene}
             onClientSpace={id => { setClientProjectId(id); setClientRole('artist'); setSection('client'); }} /> : section === 'account' ? <AccountSettings session={session} onSignOut={onSignOut} /> : section === 'artwork' ? <>
-          <header className="focus-page-heading"><div><p className="focus-eyebrow">Your collection</p><h1>Artwork</h1><p>Keep your designs close. Choose one to start a project.</p></div></header>
-          <div className="focus-library-page"><TattooLibrary currentImage={draftArtwork} onChoose={source => { setDraftArtwork(source); setNewProjectOpen(true); }} /></div>
+          <header className="focus-page-heading"><div><p className="focus-eyebrow">Your collection</p><h1>Artwork</h1><p>Designs ready to place on the body. Upload, browse, and start a project.</p></div>{onMoodboard && <button type="button" className="ep-btn" onClick={onMoodboard}>Open moodboards <FiArrowUpRight aria-hidden /></button>}</header><p className="artwork-context">Looking for inspiration? Keep references and ideas in Moodboards; keep your ready-to-use designs here.</p>
+          <div className="focus-library-page"><TattooLibrary context="library" currentImage={draftArtwork} onChoose={source => { setDraftArtwork(source); setProjectName(''); setNewProjectOpen(true); }} /></div>
         </> : <>
         <header className="focus-page-heading">
           <div><p className="focus-eyebrow">Your workspace</p><h1>Projects</h1><p>A space for every idea. Pick up where you left off.</p></div>
-          <button type="button" className="focus-primary" onClick={() => { setDraftArtwork(null); setProjectName(''); setNewProjectOpen(true); }} disabled={unavailable}><FiPlus aria-hidden />New project</button>
+          <button type="button" className="focus-primary" onClick={() => { setDraftArtwork(null); setTemplate('blank'); setProjectName(''); setNewProjectOpen(true); }} disabled={unavailable}><FiPlus aria-hidden />New project</button>
         </header>
+        <div className="project-template-entry"><div><strong>Start with a little direction.</strong><p>Try a body template with starter artwork, then make it your own.</p></div><button type="button" className="ep-btn" disabled={unavailable} onClick={() => { setTemplate('arm'); setDraftArtwork('/tattoos/botanical-rose.png'); setProjectName('Rose placement study'); setNewProjectOpen(true); }}>Start from a template <FiArrowUpRight aria-hidden /></button></div>
         <div className="focus-project-tools">
-          <span>{loading ? 'Loading projects…' : `${scenes.length} ${scenes.length === 1 ? 'project' : 'projects'}`}</span>
-          <label className="search-box"><FiSearch aria-hidden /><input type="search" placeholder="Search projects" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} aria-label="Search projects" /></label>
+          <span role="status">{loading ? 'Loading projects…' : searchQuery.trim() ? `${filteredScenes.length} of ${scenes.length} projects` : `${scenes.length} ${scenes.length === 1 ? 'project' : 'projects'}`}</span>
+          <label className="search-box"><FiSearch aria-hidden /><input type="search" placeholder={scenes.length ? "Search projects" : "Create a project to start searching"} disabled={!scenes.length || loading} value={searchQuery} onChange={event => setSearchQuery(event.target.value)} aria-label="Search projects" /></label>{searchQuery && <button type="button" className="ep-btn" onClick={() => setSearchQuery('')}>Clear search</button>}
         </div>
 
         {error && (
@@ -262,10 +270,10 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
               <>
                 <span className="focus-empty-icon" aria-hidden><FiEdit2 /></span>
                 <h3>Start with an idea.</h3><p>Choose a body, place your artwork, and explore how it feels.</p>
-                <button type="button" className="focus-primary" onClick={() => setNewProjectOpen(true)}><FiPlus aria-hidden />Create your first project</button>
+                <button type="button" className="focus-primary" onClick={() => { setTemplate('blank'); setDraftArtwork(null); setProjectName(''); setNewProjectOpen(true); }}><FiPlus aria-hidden />Create your first project</button>
               </>
             ) : (
-              <>No projects match your search.</>
+              <><h3>No matching projects.</h3><p>No project names match “{searchQuery.trim()}”. Try another name.</p><button type="button" className="ep-btn" onClick={() => setSearchQuery('')}>Show all projects</button></>
             )}
           </div>
         ) : (
@@ -334,7 +342,7 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
         </>}
       </div>
       {newProjectOpen && <FocusDialog title="New project" wide onClose={() => { if (!busy) setNewProjectOpen(false); }}>
-        <p className="focus-muted">Choose a starting view. Every body and setting stays editable.</p>
+        <p className="focus-muted">Choose a starting view. Every body and setting stays editable.</p>{draftArtwork && <div className="project-artwork-preview"><img src={draftArtwork} alt="Artwork for this project" /><p>Your artwork is ready. Click the skin in the studio to place it.</p></div>}
         <label className="focus-name-label">Project name<input value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="e.g. Rose sleeve exploration" maxLength={100} disabled={!!busy} /></label>
         <section className="template-section" aria-labelledby="templates-title">
           <h2 id="templates-title">Start with a view</h2>
@@ -355,7 +363,6 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
         {error && <p role="alert" className="focus-error">{error}</p>}
         <footer className="focus-dialog-actions"><button type="button" className="ep-btn" onClick={() => setNewProjectOpen(false)} disabled={!!busy}>Cancel</button><button type="button" className="focus-primary" onClick={handleNewScene} disabled={unavailable}>{busy === 'create' ? 'Creating…' : 'Create project'}</button></footer>
       </FocusDialog>}
-      {rendersOpen && <RenderHistoryModal onClose={() => setRendersOpen(false)} />}
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import FocusDialog from './FocusDialog';
 import { useCallback, useEffect, useState } from 'react';
 import { REGISTRY, findById } from './render/registry';
 import {
@@ -11,16 +10,17 @@ import {
   type RenderHistoryEntry,
 } from './renderHistoryStorage';
 
-interface RenderHistoryModalProps {
-  onClose: () => void;
+interface RenderHistoryPageProps {
+  onOpenStudio: () => void;
+  studioAvailable?: boolean;
 }
 
 function formatSource(entry: RenderHistoryEntry): string {
   if (entry.source === 'cycles') {
     const tier = entry.qualityTier === 'final' ? 'Final' : 'Preview';
-    return `Cycles · ${tier}`;
+    return `Photo · ${tier}`;
   }
-  return entry.exportPreset ? `Canvas · ${entry.exportPreset}` : 'Canvas export';
+  return entry.exportPreset ? `Export · ${entry.exportPreset}` : 'Image export';
 }
 
 function formatMeta(entry: RenderHistoryEntry): string {
@@ -33,7 +33,7 @@ function formatMeta(entry: RenderHistoryEntry): string {
   return parts.join(' · ');
 }
 
-export default function RenderHistoryModal({ onClose }: RenderHistoryModalProps) {
+export default function RenderHistoryPage({ onOpenStudio, studioAvailable = false }: RenderHistoryPageProps) {
   const [entries, setEntries] = useState<RenderHistoryEntry[]>([]);
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -117,14 +117,6 @@ export default function RenderHistoryModal({ onClose }: RenderHistoryModalProps)
     };
   }, [entries]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   const selected = entries.find((e) => e.id === selectedId) ?? null;
   const selectedUrl = selected ? thumbUrls[selected.id] : null;
 
@@ -156,19 +148,20 @@ export default function RenderHistoryModal({ onClose }: RenderHistoryModalProps)
   };
 
   return (
-    <FocusDialog title="Renders" wide onClose={onClose}>
-      <div className="modal-card render-history-card">
+    <section className="renders-page" aria-label="Saved renders">
+      <header className="focus-page-heading"><div><p className="focus-eyebrow">Your output</p><h1>Renders</h1><p>Your finished images, ready to review, download and share.</p></div><button type="button" className="focus-primary" onClick={onOpenStudio}>{studioAvailable ? 'Back to studio' : 'Open projects'}</button></header>
+      <div className="render-history-card">
         <p className="render-history-desc">
           {shareable
-            ? 'Cycles renders and canvas exports are saved to your account (up to 100). Share gives you a read-only link for a client.'
-            : 'Cycles renders and canvas exports from this browser are saved locally (up to 40). Share links need the hosted backend.'}
+            ? 'Photos and exported images are saved to your account (up to 100). Create a viewing link when you’re ready to share.'
+            : 'Photos and exported images stay in this browser (up to 40). Online sharing is available with a hosted account.'}
         </p>
 
         {loading && <p className="render-history-empty">Loading…</p>}
         {error && <p className="render-history-error" role="alert">{error} <button type="button" onClick={() => void refresh()}>Retry</button></p>}
         {imageWarning && <p className="editor-feedback-warning" role="status">{imageWarning} <button type="button" onClick={() => void refresh()}>Reload images</button></p>}
         {!loading && !error && entries.length === 0 && (
-          <p className="render-history-empty">No renders yet. Export an image or run a Cycles render to build history.</p>
+          <div className="empty-scenes"><h2>Your next finished piece belongs here.</h2><p>Open a project, then open Shoot to create a photo or save a quick export.</p><button type="button" className="focus-primary" onClick={onOpenStudio}>{studioAvailable ? 'Back to studio' : 'Browse projects'}</button></div>
         )}
 
         {!loading && !error && entries.length > 0 && (
@@ -184,12 +177,12 @@ export default function RenderHistoryModal({ onClose }: RenderHistoryModalProps)
                   <span>{formatMeta(selected)}</span>
                 </div>
                 <div className="render-history-preview-actions">
-                  <button type="button" className="btn-modal-primary" onClick={() => handleDownload(selected)}>
+                  <button type="button" className="focus-primary" onClick={() => handleDownload(selected)}>
                     Download
                   </button>
                   <button
                     type="button"
-                    className="btn-modal-cancel"
+                    className="ep-btn"
                     disabled={!shareable || sharing}
                     title={shareable ? 'Copy a read-only link' : 'Share links need the hosted backend'}
                     onClick={() => void handleShare(selected)}
@@ -198,7 +191,7 @@ export default function RenderHistoryModal({ onClose }: RenderHistoryModalProps)
                   </button>
                   <button
                     type="button"
-                    className="btn-modal-cancel"
+                    className="ep-btn"
                     disabled={mutating}
                     onClick={() => void handleDelete(selected.id)}
                   >
@@ -244,7 +237,7 @@ export default function RenderHistoryModal({ onClose }: RenderHistoryModalProps)
             </div>
 
             <div className="render-history-footer">
-              <button type="button" className="btn-modal-cancel" disabled={mutating}
+              <button type="button" className="ep-btn" disabled={mutating}
                   onClick={() => void handleClearAll()}>
                 Clear all
               </button>
@@ -252,6 +245,6 @@ export default function RenderHistoryModal({ onClose }: RenderHistoryModalProps)
           </>
         )}
       </div>
-    </FocusDialog>
+    </section>
   );
 }

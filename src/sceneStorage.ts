@@ -1,3 +1,4 @@
+import { nativeDraftStore } from './ipad/nativeDraftStore';
 /**
  * Scene persistence, picked by the same switch as the beta gate: the hosted
  * store when Supabase is configured, the browser-local one otherwise. The
@@ -12,6 +13,7 @@ import type { SceneData } from './types';
 export { migrateScene } from './storage/sceneStoreTypes';
 
 function store(): SceneStore {
+  if (typeof window !== 'undefined' && window.smartInkNativeHost === true && authMode() === 'supabase') return nativeDraftStore;
   return authMode() === 'supabase' ? supabaseSceneStore : localSceneStore;
 }
 

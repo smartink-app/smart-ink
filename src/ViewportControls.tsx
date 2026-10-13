@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef } from 'react';
-import { FaExpand, FaSlidersH, FaRegEye } from 'react-icons/fa';
+import { FaExpand, FaSlidersH } from 'react-icons/fa';
 import { BODY_REGIONS, regionLabel, type BodyRegionId } from './render/bodyRegions';
 
 interface ViewportControlsProps {
   disabled?: boolean;
+  inline?: boolean;
   cameraPreset: string;
   cameras: Record<string, { name: string }>;
   onCameraChange: (preset: string) => void;
@@ -11,7 +12,6 @@ interface ViewportControlsProps {
   onRegionChange: (region: BodyRegionId | null) => void;
   onHighlightRegions: (regions: BodyRegionId[]) => void;
   onFit: () => void;
-  onCleanView: () => void;
   showPlacementTips: boolean;
   onPlacementTipsChange: (visible: boolean) => void;
   performanceMode: boolean;
@@ -19,8 +19,8 @@ interface ViewportControlsProps {
 }
 
 /** View choices stay beside the canvas; they do not change the figure itself. */
-export default function ViewportControls({ disabled = false, cameraPreset, cameras, onCameraChange,
-  region, onRegionChange, onHighlightRegions, onFit, onCleanView, performanceMode, onPerformanceChange, showPlacementTips, onPlacementTipsChange }: ViewportControlsProps) {
+export default function ViewportControls({ disabled = false, inline = false, cameraPreset, cameras, onCameraChange,
+  region, onRegionChange, onHighlightRegions, onFit, performanceMode, onPerformanceChange, showPlacementTips, onPlacementTipsChange }: ViewportControlsProps) {
   const id = useId(), settings = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const closeOutside = (event: PointerEvent) => {
@@ -29,7 +29,7 @@ export default function ViewportControls({ disabled = false, cameraPreset, camer
     document.addEventListener('pointerdown', closeOutside);
     return () => document.removeEventListener('pointerdown', closeOutside);
   }, []);
-  return <div className="viewport-tools" inert={disabled} aria-label="Viewport controls">
+  return <div className={`viewport-tools${inline ? ' viewport-tools--inline' : ''}`} inert={disabled} aria-label="Viewport controls">
     <div className="viewport-tools-row">
       <label className="viewport-field" htmlFor={`${id}-focus`}><span>Focus</span>
         <select id={`${id}-focus`} className="ep-select" value={region ?? 'full'}
@@ -40,7 +40,9 @@ export default function ViewportControls({ disabled = false, cameraPreset, camer
         </select>
       </label>
       <button type="button" className="ep-btn viewport-button" onClick={onFit} title={`Fit ${regionLabel(region).toLowerCase()} in the viewport`}><FaExpand aria-hidden="true" />Fit</button>
-      <button type="button" className="ep-btn viewport-button" onClick={onCleanView} title="Hide the panels and editing guides"><FaRegEye aria-hidden="true" />Clean view</button>
+      <button type="button" className="ep-btn viewport-button" data-tattoo-controls-toggle aria-pressed={showPlacementTips}
+        title={showPlacementTips ? 'Hide floating tattoo controls and placement tips' : 'Show floating tattoo controls and placement tips'}
+        onClick={() => onPlacementTipsChange(!showPlacementTips)}><FaSlidersH aria-hidden="true" />Tattoo controls</button>
       <details ref={settings} className="viewport-settings" onKeyDown={event => {
         if (event.key !== 'Escape' || !settings.current?.open) return;
         event.preventDefault(); event.stopPropagation(); settings.current.open = false;
@@ -60,11 +62,11 @@ export default function ViewportControls({ disabled = false, cameraPreset, camer
 
           <label><input type="checkbox" checked={performanceMode} onChange={event => onPerformanceChange(event.currentTarget.checked)} /><span>Faster preview</span></label>
           <p>Reduces preview detail and shadows. Blender renders keep their selected quality.</p>
-          <label><input type="checkbox" checked={showPlacementTips} onChange={event => onPlacementTipsChange(event.currentTarget.checked)} /><span>Show placement tips</span></label>
+
         </div>
       </details>
     </div>
-    {region && <div className="viewport-focus-status" role="status">
+    {region && !inline && <div className="viewport-focus-status" role="status">
       <strong>{regionLabel(region)}</strong><span>Other body areas and clothes are hidden.</span>
       <button type="button" className="ep-btn viewport-button" onClick={() => { onRegionChange(null); onHighlightRegions([]); }}>Return to full figure</button>
     </div>}

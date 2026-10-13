@@ -152,6 +152,7 @@ function modelPointerRelease(app, editingEnabled) {
     pick: () => { throw Error('Disabled editing must not pick'); },
     applyAnchor: () => { throw Error('Disabled editing must not place'); },
     gl: { domElement: { hasPointerCapture: () => false } }, onPlacementStatus: undefined,
+    touchGesture: { current: { pointers: new Set(), blocked: false } },
     pointerStart: { current: null }, pendingMove: { current: null }, dragFrame: { current: null }, isDragging: { current: false },
   };
   return new Function('scope', `with (scope) { return ${modelCode.code} }`)(scope);

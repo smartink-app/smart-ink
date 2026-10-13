@@ -1,4 +1,3 @@
-import { ThemeToggle } from './Theme';
 import { useState, type FormEvent } from 'react';
 import { getInvite } from './auth/betaAuthService';
 
@@ -33,7 +32,7 @@ export default function InviteCodeEntry({ onBack, onContinue }: InviteCodeEntryP
   };
 
   return (
-    <div className="beta-gate-page"><ThemeToggle className="auth-theme-toggle" />
+    <div className="beta-gate-page">
       <div className="beta-gate-card">
         <button type="button" className="beta-link-btn" onClick={onBack}>
           ← Back

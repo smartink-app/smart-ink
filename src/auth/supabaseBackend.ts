@@ -1,3 +1,4 @@
+import { rememberOfflineApproval, forgetOfflineApproval, hasOfflineApproval } from '../ipad/offlineAccess';
 /**
  * Hosted beta gate on Supabase. See supabase/migrations/*_beta_gate.sql for
  * the tables and RPCs this talks to, and docs/supabase-setup.md for wiring.
@@ -104,15 +105,21 @@ function sessionFromUser(user: User): BetaSession {
 async function resolveAccess(session: Session | null): Promise<SessionState> {
   if (!session?.user) return { session: null, accessError: null };
   const supabase = getSupabase();
-  const { data, error } = await supabase.rpc('my_access');
+  const { data, error, status: httpStatus } = await supabase.rpc('my_access');
   if (error) {
+    if (httpStatus === 0 && hasOfflineApproval(session.user.id, session.expires_at)) {
+      return { session: sessionFromUser(session.user), accessError: null };
+    }
+    forgetOfflineApproval(session.user.id);
     await supabase.auth.signOut();
     return { session: null, accessError: `Could not check beta access: ${error.message}` };
   }
   const status = typeof data === 'string' ? data : 'none';
   if (status === 'active') {
+    rememberOfflineApproval(session.user.id, session.expires_at);
     return { session: sessionFromUser(session.user), accessError: null };
   }
+  forgetOfflineApproval(session.user.id);
   await supabase.auth.signOut();
   return { session: null, accessError: accessMessage(status) };
 }
@@ -146,6 +153,7 @@ export const supabaseBackend: BetaAuthBackend = {
       // Supabase asks that no other client calls run inside this callback, so
       // the access check is deferred to the next tick.
       if (event === 'SIGNED_OUT' || !session) {
+        if (lastResolvedUser) forgetOfflineApproval(lastResolvedUser);
         lastResolvedUser = null;
         cb({ session: null, accessError: null });
         return;
@@ -158,10 +166,18 @@ export const supabaseBackend: BetaAuthBackend = {
         }, 0);
       }
     });
-    return () => data.subscription.unsubscribe();
+    const recheck = () => {
+      if (window.smartInkNativeHost === true) void supabase.auth.getSession().then(({ data }) => resolveAccess(data.session)).then(cb);
+    };
+    window.addEventListener('online', recheck);
+    return () => { window.removeEventListener('online', recheck); data.subscription.unsubscribe(); };
   },
 
   async signOut(opts) {
+    if (window.smartInkNativeHost === true) {
+      const { data } = await getSupabase().auth.getSession();
+      if (data.session) forgetOfflineApproval(data.session.user.id);
+    }
     const { error } = await getSupabase().auth.signOut({ scope: opts?.everywhere ? 'global' : 'local' });
     if (error) fail(error.message, 'Could not sign out.');
   },

@@ -33,9 +33,9 @@ function app(mode = 'tattoo') {
   const mesh = new THREE.Mesh(geometry), captured = [], placed = [], selected = [], framed = [];
   const camera = new THREE.PerspectiveCamera(45, 1, .01, 100); camera.position.set(0, 0, 4); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
   const scope = {
-    THREE, ...production, interactionMode: mode, editingEnabled: true, visible: true,
+    THREE, ...production, interactionMode: mode, editingEnabled: true, fingerPlacement: false, visible: true,
     bodyMeshRef: ref(mesh), anchorRef: ref(anchor), hasPlacedRef: ref(true), isDragging: ref(false),
-    pointerStart: ref(null), grabOffset: ref({ x: 0, y: 0 }), pendingMove: ref(null), dragFrame: ref(null),
+    touchGesture: ref({ pointers: new Set(), blocked: false }), pointerStart: ref(null), grabOffset: ref({ x: 0, y: 0 }), pendingMove: ref(null), dragFrame: ref(null),
     pickBlockedRef: ref(false), size: 1, imageAspect: 1, rotationRad: 0, camera,
     pick: event => { captured.push(event); return { region: 'torso', anchor }; },
     applyAnchor: value => placed.push(value), onRegionPress: (...args) => selected.push(args),
@@ -76,10 +76,45 @@ for (const modifier of [{}, { ctrlKey: true }, { metaKey: true }]) {
   assert.equal(a.placed.length, 0, 'Orbiting or modifier clicks never replace a periodic band with a local patch');
   assert.equal(a.scope.isDragging.current, false);
 }
+// A pinch starting on ink must never lock orbit or place ink on either lift.
+{
+  const a = app();
+  a.down({ pointerType: 'touch' });
+  assert.equal(a.scope.isDragging.current, false, 'Finger on ink is camera navigation');
+  a.down({ pointerType: 'touch', pointerId: 2, isPrimary: false });
+  a.up({ pointerType: 'touch', pointerId: 2 }); a.up({ pointerType: 'touch' });
+  assert.equal(a.placed.length, 0);
+  a.down({ pointerType: 'touch' }); a.up({ pointerType: 'touch' });
+  assert.equal(a.placed.length, 1, 'A fresh one-finger tap still places ink');
+}
+{
+  const a = app('model');
+  a.down({ pointerType: 'touch' }); a.down({ pointerType: 'touch', pointerId: 2, isPrimary: false });
+  a.up({ pointerType: 'touch' }); a.up({ pointerType: 'touch', pointerId: 2 });
+  assert.equal(a.selected.length, 0, 'Pinch release does not open body controls');
+}
+{
+  const a = app(); a.down({ pointerType: 'pen' });
+  assert.equal(a.scope.isDragging.current, true, 'Pencil can grab ink');
+  a.up({ type: 'pointercancel', pointerType: 'pen' });
+  assert.equal(a.placed.length, 0, 'Cancelled Pencil input never places ink');
+  assert.equal(a.scope.isDragging.current, false);
+}
 assert.equal(production.isTattooHit(geometry, anchor, 1, 1, 0), true);
 const right = { ...anchor, barycentric: [0, .8, .2] };
 assert.equal(production.isTattooHit(geometry, right, 1, .25, 0), false, 'Narrow tattoo leaves adjacent skin available for orbit');
 assert.equal(production.isTattooHit(geometry, { ...anchor, barycentric: [.1, .1, .8] }, 1, .25, Math.PI / 2), false, 'Rotation also rotates hit footprint');
+// Explicit finger placement retains the same multi-pointer cancellation rules.
+{
+  const a = app(); a.scope.fingerPlacement = true;
+  a.down({ pointerType: 'touch' });
+  assert.equal(a.scope.isDragging.current, true, 'Finger placement can grab ink');
+  a.down({ pointerType: 'touch', pointerId: 2, isPrimary: false });
+  assert.equal(a.scope.isDragging.current, false, 'Second finger returns control to orbit');
+  a.up({ pointerType: 'touch' }); a.up({ pointerType: 'touch', pointerId: 2 });
+  assert.equal(a.placed.length, 0, 'Pinch release never stamps artwork');
+}
+
 geometry.attributes.aTattooMask.setX(0, 0);
 assert.equal(production.isTattooHit(geometry, anchor, 1, 1, 0), false, 'Rejected faces cannot grab ink');
 

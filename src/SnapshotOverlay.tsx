@@ -22,6 +22,9 @@ export interface SnapshotOverlayProps {
   cameraControls?: ReactNode;
   lightingControls?: ReactNode;
   motionControls?: ReactNode;
+  exportControls?: ReactNode;
+  onOpenRenders?: () => void;
+  renderDisabled?: boolean;
   previewing?: boolean;
   framingHint?: string;
   warning?: string;
@@ -35,9 +38,9 @@ function elapsedLabel(seconds: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, progress, message, elapsed, quality, onQualityChange, onRender, onCancel, onClose, onDownload, onAdjust, presetControls, cameraControls, lightingControls, motionControls, previewing = false, framingHint, warning, comparisonAvailable = true, comparisonUnavailableReason }: SnapshotOverlayProps) {
+export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, progress, message, elapsed, quality, onQualityChange, onRender, onCancel, onClose, onDownload, onAdjust, presetControls, cameraControls, lightingControls, motionControls, exportControls, onOpenRenders, renderDisabled = false, previewing = false, framingHint, warning, comparisonAvailable = true, comparisonUnavailableReason }: SnapshotOverlayProps) {
   const id = useId(), [compare, setCompare] = useState(false);
-  const [panel, setPanel] = useState<'camera' | 'lighting' | 'motion'>('camera');
+  const [panel, setPanel] = useState<'camera' | 'lighting' | 'motion' | 'export'>('camera');
   const [panelOpen, setPanelOpen] = useState(() => typeof window === 'undefined' || !window.matchMedia?.('(max-width: 700px)').matches);
   const busy = status === 'uploading' || status === 'rendering';
   const [loadedFinal, setLoadedFinal] = useState<string | null>(null);
@@ -83,12 +86,12 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
     : failed ? 'Try again, or return to editing.' : cancelled ? hasImage ? 'Your previous snapshot is still available.' : 'You can try again whenever you’re ready.'
       : hasImage ? 'Compare it with the live view, or save the image.' : 'Render this view with studio lighting and shadows.');
   const renderLabel = composing ? 'Create photo' : failed || cancelled ? 'Try again' : hasImage ? 'Render again' : 'Render snapshot';
-  const choosePanel = (next: 'camera' | 'lighting' | 'motion') => { setPanel(next); setPanelOpen(true); };
+  const choosePanel = (next: 'camera' | 'lighting' | 'motion' | 'export') => { setPanel(next); setPanelOpen(true); };
+  const tabs: Array<'camera' | 'lighting' | 'motion' | 'export'> = ['camera', 'lighting', ...(motionControls ? ['motion' as const] : []), ...(exportControls ? ['export' as const] : [])];
   const panelKey = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (previewing) return;
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const tabs = motionControls ? ['camera','lighting','motion'] as const : ['camera','lighting'] as const;
     const next = tabs[event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length-1 : (tabs.indexOf(panel as 'camera') + (event.key === 'ArrowLeft' ? tabs.length-1 : 1)) % tabs.length];
     choosePanel(next);
     event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-panel="${next}"]`)?.focus();
@@ -96,6 +99,7 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
   return <section ref={containerRef} role="dialog" aria-modal="true" tabIndex={-1} onKeyDown={handleKeyDown} className={`snapshot-overlay ${showLive || composing ? 'snapshot-overlay--live' : ''} ${composing ? 'snapshot-overlay--compose' : ''}`} aria-labelledby={`${id}-title`} onPointerDown={event => event.stopPropagation()} onWheel={event => event.stopPropagation()}>
     <header className="snapshot-toolbar">
       <div className="snapshot-title"><span className="snapshot-title-icon" aria-hidden="true">▣</span><div><h2 id={`${id}-title`}>Shoot</h2><p>{composing ? 'Compose · live view' : showLive ? 'Live view · comparison' : hasImage ? 'Rendered studio image' : 'Studio render'}</p></div></div>
+      {onOpenRenders && <button type="button" className="snapshot-button" disabled={busy || previewing || renderDisabled} onClick={onOpenRenders}>Renders &amp; sharing</button>}
       <button ref={closeRef} type="button" className="snapshot-button snapshot-button--back" onClick={onClose}>Back to editing <span aria-hidden="true">↗</span></button>
     </header>
 
@@ -106,7 +110,7 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
       {!hasImage && !hasPreview && !composing && <div className="snapshot-empty">
         <div className={`snapshot-empty-icon ${busy ? 'snapshot-empty-icon--busy' : ''}`} aria-hidden="true">{busy ? <span className="snapshot-spinner" /> : failed ? '!' : '▣'}</div>
         <h3>{stateTitle}</h3><p>{detail}</p>
-        {!busy && <button type="button" className="snapshot-button snapshot-button--primary" disabled={previewing} onClick={onRender}>{renderLabel}</button>}
+        {!busy && <button type="button" className="snapshot-button snapshot-button--primary" disabled={previewing || renderDisabled} onClick={onRender}>{renderLabel}</button>}
       </div>}
       {!hasPreview && hasImage && !showLive && !composing && (busy || failed || cancelled) && <div className={`snapshot-image-notice ${failed ? 'snapshot-image-notice--error' : ''}`}>
         {busy && <span className="snapshot-spinner" aria-hidden="true" />}<span>{busy ? 'Showing your previous snapshot while the new one renders.' : failed ? 'The previous snapshot is still available.' : 'Rendering stopped. Your previous snapshot is still available.'}</span>
@@ -116,12 +120,13 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
     {composing && <aside className={`snapshot-compose-rail ${panelOpen ? 'is-open' : 'is-collapsed'}`} aria-label="Compose snapshot">
       <div className="snapshot-rail-heading"><strong>Set up your shot</strong><button type="button" className="snapshot-rail-toggle" aria-expanded={panelOpen} aria-controls={`${id}-controls`} onClick={() => setPanelOpen(value => !value)}>{panelOpen ? 'Hide controls' : 'Show controls'}<span aria-hidden="true">{panelOpen ? '−' : '+'}</span></button></div>
       <div id={`${id}-controls`} className="snapshot-rail-body" hidden={!panelOpen}>
-        <div inert={previewing}>{presetControls}</div>
+        {panel !== 'export' && <div inert={previewing}>{presetControls}</div>}
         <div className="snapshot-panel-tabs" role="tablist" aria-label="Snapshot controls">
-          {(motionControls ? ['camera', 'lighting', 'motion'] as const : ['camera', 'lighting'] as const).map(value => <button key={value} id={`${id}-${value}-tab`} type="button" role="tab" data-panel={value} disabled={previewing && value !== 'motion'} aria-selected={panel === value} aria-controls={`${id}-${value}-panel`} tabIndex={panel === value ? 0 : -1} onKeyDown={panelKey} onClick={() => choosePanel(value)}>{value === 'camera' ? 'Photo' : value === 'lighting' ? 'Lights' : 'Video'}</button>)}
+          {tabs.map(value => <button key={value} id={`${id}-${value}-tab`} type="button" role="tab" data-panel={value} disabled={previewing && value !== 'motion'} aria-selected={panel === value} aria-controls={`${id}-${value}-panel`} tabIndex={panel === value ? 0 : -1} onKeyDown={panelKey} onClick={() => choosePanel(value)}>{value === 'camera' ? 'Photo' : value === 'lighting' ? 'Lights' : value === 'export' ? 'Save' : 'Video'}</button>)}
         </div>
         <div id={`${id}-camera-panel`} role="tabpanel" aria-labelledby={`${id}-camera-tab`} hidden={panel !== 'camera'} inert={previewing}>{cameraControls ?? <p className="snapshot-controls-hint">The camera is ready for this view.</p>}</div>
         <div id={`${id}-lighting-panel`} role="tabpanel" aria-labelledby={`${id}-lighting-tab`} hidden={panel !== 'lighting'} inert={previewing}>{lightingControls ?? <p className="snapshot-controls-hint">Your current studio lighting will be used.</p>}</div>
+        {exportControls && <div id={`${id}-export-panel`} role="tabpanel" aria-labelledby={`${id}-export-tab`} hidden={panel !== 'export'}>{exportControls}</div>}
         {motionControls && <div id={`${id}-motion-panel`} role="tabpanel" aria-labelledby={`${id}-motion-tab`} hidden={panel !== 'motion'}>{motionControls}</div>}
       </div>
     </aside>}
@@ -149,7 +154,7 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
           {!composing && !busy && <button type="button" className="snapshot-button" onClick={onAdjust}>Adjust shot</button>}
           {!composing && <button type="button" className={`snapshot-button snapshot-button--compare ${showLive ? 'is-active' : ''}`} aria-pressed={showLive} aria-describedby={hasImage && !comparisonAvailable ? `${id}-comparison-hint` : undefined} disabled={!hasImage || !comparisonAvailable || (busy && hasPreview)} onClick={() => { if (hasImage && comparisonAvailable) setCompare(value => !value); }}>{showLive ? 'Show snapshot' : comparisonAvailable ? 'Compare with live' : 'Compare unavailable'}</button>}
           {(!composing || hasImage) && <button type="button" className="snapshot-button" disabled={!hasImage} onClick={onDownload}>{composing || (busy && hasPreview) ? 'Download previous' : 'Download'}</button>}
-          {busy ? <button type="button" className="snapshot-button snapshot-button--cancel" onClick={onCancel}>Cancel render</button> : <button type="button" className="snapshot-button snapshot-button--primary" disabled={previewing} onClick={onRender}>{renderLabel}</button>}
+          {busy ? <button type="button" className="snapshot-button snapshot-button--cancel" onClick={onCancel}>Cancel render</button> : <button type="button" className="snapshot-button snapshot-button--primary" disabled={previewing || renderDisabled} onClick={onRender}>{renderLabel}</button>}
         </div>
       </div>
     </footer>
