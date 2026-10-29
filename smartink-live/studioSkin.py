@@ -139,7 +139,7 @@ def apply_shared_skin(body, body_mesh_id, skin_tone_id, contract_dir, world_scal
     normal = next(n for n in nodes if n.label == 'Sculpt normal')
     normal.inputs['Strength'].default_value = .75
     # No separate legacy colour zoning, oil or extra body groom over the shared recipe.
-    for key, value in [('Subsurface Weight', .035), ('Coat Weight', 0.), ('Sheen Weight', 0.), ('Metallic', 0.), ('IOR', 1.4), ('Specular IOR Level', .35)]:
+    for key, value in [('Subsurface Weight', .015), ('Coat Weight', 0.), ('Sheen Weight', 0.), ('Metallic', 0.), ('IOR', 1.4), ('Specular IOR Level', .35)]:
         if key in bsdf.inputs: assign(bsdf.inputs[key], value)
     body['smartink_skin_material'] = 'studio-v3'
     body['smartink_skin_atlas_version'] = 3

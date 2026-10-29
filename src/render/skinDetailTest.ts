@@ -15,7 +15,7 @@ export const SKIN_DETAIL_GLSL = `
     float h = texture2D(skinDetailMap, p.yz).r * w.x
             + texture2D(skinDetailMap, p.xz).r * w.y
             + texture2D(skinDetailMap, p.xy).r * w.z;
-    // Encoded range is 30 micrometres; browser world units are 2.4 per metre.
+    // Relief range comes from the shared recipe; browser units are 2.4 per metre.
     h *= .000030 * 2.4 * skinDetailStrength;
     vec3 dx = dFdx(vWorldPosition), dy = dFdy(vWorldPosition);
     vec3 r1 = cross(dy, N), r2 = cross(N, dx);

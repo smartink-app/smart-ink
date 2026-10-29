@@ -12,6 +12,8 @@ interface ViewportControlsProps {
   onRegionChange: (region: BodyRegionId | null) => void;
   onHighlightRegions: (regions: BodyRegionId[]) => void;
   onFit: () => void;
+  onFocus?: () => void;
+  canFocus?: boolean;
   showPlacementTips: boolean;
   onPlacementTipsChange: (visible: boolean) => void;
   performanceMode: boolean;
@@ -20,7 +22,7 @@ interface ViewportControlsProps {
 
 /** View choices stay beside the canvas; they do not change the figure itself. */
 export default function ViewportControls({ disabled = false, inline = false, cameraPreset, cameras, onCameraChange,
-  region, onRegionChange, onHighlightRegions, onFit, performanceMode, onPerformanceChange, showPlacementTips, onPlacementTipsChange }: ViewportControlsProps) {
+  region, onRegionChange, onHighlightRegions, onFit, onFocus, canFocus = false, performanceMode, onPerformanceChange, showPlacementTips, onPlacementTipsChange }: ViewportControlsProps) {
   const id = useId(), settings = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const closeOutside = (event: PointerEvent) => {
@@ -31,7 +33,7 @@ export default function ViewportControls({ disabled = false, inline = false, cam
   }, []);
   return <div className={`viewport-tools${inline ? ' viewport-tools--inline' : ''}`} inert={disabled} aria-label="Viewport controls">
     <div className="viewport-tools-row">
-      <label className="viewport-field" htmlFor={`${id}-focus`}><span>Focus</span>
+      <label className="viewport-field" htmlFor={`${id}-focus`}><span>Body area</span>
         <select id={`${id}-focus`} className="ep-select" value={region ?? 'full'}
           onChange={event => { onRegionChange(event.currentTarget.value === 'full' ? null : event.currentTarget.value as BodyRegionId); onHighlightRegions([]); }}
           onMouseEnter={() => onHighlightRegions(region ? [region] : [])} onMouseLeave={() => onHighlightRegions([])}>
@@ -40,6 +42,7 @@ export default function ViewportControls({ disabled = false, inline = false, cam
         </select>
       </label>
       <button type="button" className="ep-btn viewport-button" onClick={onFit} title={`Fit ${regionLabel(region).toLowerCase()} in the viewport`}><FaExpand aria-hidden="true" />Fit</button>
+      <button type="button" className="ep-btn viewport-button" onClick={onFocus} disabled={!canFocus} title={canFocus ? "Move closer to the tattoo" : "Place a visible tattoo to focus on it"}>Focus</button>
       <button type="button" className="ep-btn viewport-button" data-tattoo-controls-toggle aria-pressed={showPlacementTips}
         title={showPlacementTips ? 'Hide floating tattoo controls and placement tips' : 'Show floating tattoo controls and placement tips'}
         onClick={() => onPlacementTipsChange(!showPlacementTips)}><FaSlidersH aria-hidden="true" />Tattoo controls</button>

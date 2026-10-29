@@ -1593,6 +1593,14 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
             onCameraChange={(preset) => handleCameraPresetChange(preset as CameraPresetKey)}
             region={isolateRegion} onRegionChange={setIsolateRegion} onHighlightRegions={setPanelRegions}
             onFit={() => handleFrameRegion(uvPlacementRef.current?.getRegionFraming() ?? null)}
+            canFocus={!!surfacePlacement && decalVisible && !modelLoading}
+            onFocus={() => {
+              const framing = uvPlacementRef.current?.getTattooFraming()
+              if (!framing) return
+              setCameraState(frameTattoo(framing, { zoom: 1.2 }, viewportAspect))
+              setCameraRequestId(id => id + 1)
+              setCameraPreset('custom')
+            }}
             performanceMode={performanceMode} onPerformanceChange={setPerformanceMode} />}
         <div className="editor-toolbar-actions editor-toolbar-actions--spread">
           <div className="editor-history-controls" role="group" aria-label="Edit history">

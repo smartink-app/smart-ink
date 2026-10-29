@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import profile from '../../smartink-live/skinProfile.json';
 
-/** Baked from our Soft cells material. 16 mm tile, 30 µm encoded height range.
- * This is an artistic preview, not a measured scan or the Blender material. */
+/** Baked from our Soft cells material. 16 mm tile, 45 µm encoded height range.
+ * This is an artistic preview, not a measured skin scan. */
 export const SKIN_DETAIL = { texture: '/textures/soft-cells-height.png', strength: .9, scale: 1, tileMetres: profile.tileMetres, heightMetres: profile.heightMetres, worldUnitsPerMetre: 4.2 / 1.75 } as const;
 
 /** Shared units/seed/region controls are also shipped with Blender. */

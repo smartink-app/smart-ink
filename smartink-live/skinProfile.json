@@ -3,7 +3,7 @@
   "seed": 34,
   "coordinates": "rest metres; centred body; +Y up, +Z forward; reference height 1.75m",
   "tileMetres": 0.016,
-  "heightMetres": 3e-05,
+  "heightMetres": 4.5e-05,
   "hairCellMetres": 0.006,
   "hairRadiusMetres": 1.8e-05,
   "regions": {

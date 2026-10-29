@@ -27,6 +27,8 @@ browser procedural recipe for each body. `skinAtlasManifest.json` records channe
 encoding and hashes; Blender rejects missing or altered maps. Regenerate both body
 atlases and hashes when changing the procedural recipe or source UVs.
 
+Pore relief is 45 micrometres at the original 16 mm tile scale. Cycles uses a
+restrained 0.015 subsurface weight to preserve visible surface detail.
 The shared material uses the same base-tone transforms, pore dimensions, regional
 roughness and hair-over-ink order. Rest coordinates convert between browser Y-up
 and Blender Z-up. Blender also applies the browser's three-segment tangent-plane
