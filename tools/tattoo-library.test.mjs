@@ -16,7 +16,7 @@ globalThis.__tattooStore={get:async key=>values.get(key),update:(key,fn)=>{const
 await build({stdin:{contents:"export * from './src/storage/tattooLibrary'; export {default as Panel} from './src/EditorLeftPanel';",resolveDir:process.cwd()},bundle:true,jsx:'automatic',format:'esm',platform:'node',outfile:fileURLToPath(file),packages:'external',plugins:[{name:'local-store',setup(b){b.onResolve({filter:/^idb-keyval$/},()=>({path:'idb',namespace:'test'}));b.onResolve({filter:/auth\/betaAuthService$/},()=>({path:'auth',namespace:'test'}));b.onLoad({filter:/.*/,namespace:'test'},args=>({contents:args.path==='auth'?'export const subscribeSession=(...args)=>globalThis.__tattooAuth.subscribeSession(...args);':'export const get=(...args)=>globalThis.__tattooStore.get(...args);export const update=(...args)=>globalThis.__tattooStore.update(...args);'}));}}]});
 try{
 const {STARTER_TATTOOS,loadTattooLibrary,rememberTattoo,removeTattoo,subscribeTattooLibrary,Panel}=await import(file.href);
-assert.equal(STARTER_TATTOOS.length,3);assert.equal(new Set(STARTER_TATTOOS.map(a=>a.source)).size,3);
+assert.equal(STARTER_TATTOOS.length,18);assert.equal(new Set(STARTER_TATTOOS.map(a=>a.source)).size,18);
 assert.deepEqual(await loadTattooLibrary(),[],'Unowned legacy artwork is not assigned to the next account');
 const updatesA=[],unsubscribeA=subscribeTattooLibrary(items=>updatesA.push(items));
 const png='data:image/png;base64,example';

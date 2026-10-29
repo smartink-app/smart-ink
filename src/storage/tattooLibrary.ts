@@ -1,12 +1,8 @@
 import { get, update } from 'idb-keyval';
 import { subscribeSession } from '../auth/betaAuthService';
 
-export interface TattooAsset { id: string; name: string; source: string; category: string }
-export const STARTER_TATTOOS: TattooAsset[] = [
-  { id: 'rose', name: 'Botanical rose', source: '/tattoos/botanical-rose.png', category: 'Botanical' },
-  { id: 'moth', name: 'Lunar moth', source: '/tattoos/lunar-moth.png', category: 'Celestial' },
-  { id: 'dagger', name: 'Ornamental dagger', source: '/tattoos/ornamental-dagger.png', category: 'Ornamental' },
-];
+import type { TattooAsset } from '../starterTattoos';
+export { STARTER_TATTOOS, type TattooAsset } from '../starterTattoos';
 type Listener = { scope: string | null; bound: boolean; notify: (items: TattooAsset[]) => void };
 const listeners = new Set<Listener>();
 let activeScope: string | null = null;

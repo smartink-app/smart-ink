@@ -134,7 +134,7 @@ function bindingNames(name) {
   return ts.isIdentifier(name) ? [name.text] : name.elements.flatMap((entry) => ts.isOmittedExpression(entry) ? [] : bindingNames(entry.name));
 }
 // Include UI state touched by loadScene so its callback can finish in the harness.
-const retainedNames = new Set(`currentScene clientReview clientProjectId clientRole reviewOpen reviewCamera showDashboard inspectorTab artworkOpen sidebarCollapsed cameraPreset sceneSaves saveState saveTimer navigating stageScene flushPendingSave afterSaving
+const retainedNames = new Set(`placementExplored currentScene clientReview clientProjectId clientRole reviewOpen reviewCamera showDashboard inspectorTab artworkOpen sidebarCollapsed cameraPreset sceneSaves saveState saveTimer navigating stageScene flushPendingSave afterSaving
   uploadedImage decalRotation decalScale decalColor decalOpacity decalVisible surfacePlacement placementStatus photoMode background studio lightingPreset lights selectedLight
   decalPosition decalNormal cameraState bodyMeshId skinToneId poseId bodyShape bodyFit measureOpen bodyPose bodyAppearance isolateRegion hoverRegion panelRegions shapeMenu lookId qualityTier finalSamples
   canvasContainerRef loadScene handleBodyMeshChange`.split(/\s+/));

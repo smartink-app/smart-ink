@@ -183,7 +183,7 @@ export const SKIN_DETAIL_GLSL = `
         }
       } else L = normalize(uLightPos[i] - uLightTarget[i]);
       vec3 H = normalize(L + V);
-      float fresnel = .028 + .12 * pow(1.0 - max(dot(V, H), 0.0), 5.0);
+      float fresnel = .035 + .12 * pow(1.0 - max(dot(V, H), 0.0), 5.0);
       float reflection = fresnel * ((exponent + 2.0) / 8.0)
         * pow(max(dot(N, H), 0.0), exponent) * max(dot(N, L), 0.0);
       result += uLightColor[i] * uLightIntensity[i] * attenuation * reflection;
