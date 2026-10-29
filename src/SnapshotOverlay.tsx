@@ -20,6 +20,7 @@ export interface SnapshotOverlayProps {
   onAdjust: () => void;
   presetControls?: ReactNode;
   cameraControls?: ReactNode;
+  tattooControls?: ReactNode;
   lightingControls?: ReactNode;
   motionControls?: ReactNode;
   exportControls?: ReactNode;
@@ -38,9 +39,9 @@ function elapsedLabel(seconds: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, progress, message, elapsed, quality, onQualityChange, onRender, onCancel, onClose, onDownload, onAdjust, presetControls, cameraControls, lightingControls, motionControls, exportControls, onOpenRenders, renderDisabled = false, previewing = false, framingHint, warning, comparisonAvailable = true, comparisonUnavailableReason }: SnapshotOverlayProps) {
+export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, progress, message, elapsed, quality, onQualityChange, onRender, onCancel, onClose, onDownload, onAdjust, presetControls, cameraControls, tattooControls, lightingControls, motionControls, exportControls, onOpenRenders, renderDisabled = false, previewing = false, framingHint, warning, comparisonAvailable = true, comparisonUnavailableReason }: SnapshotOverlayProps) {
   const id = useId(), [compare, setCompare] = useState(false);
-  const [panel, setPanel] = useState<'camera' | 'lighting' | 'motion' | 'export'>('camera');
+  const [panel, setPanel] = useState<'camera' | 'tattoo' | 'lighting' | 'motion' | 'export'>('camera');
   const [panelOpen, setPanelOpen] = useState(() => typeof window === 'undefined' || !window.matchMedia?.('(max-width: 700px)').matches);
   const busy = status === 'uploading' || status === 'rendering';
   const [loadedFinal, setLoadedFinal] = useState<string | null>(null);
@@ -86,8 +87,8 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
     : failed ? 'Try again, or return to editing.' : cancelled ? hasImage ? 'Your previous snapshot is still available.' : 'You can try again whenever you’re ready.'
       : hasImage ? 'Compare it with the live view, or save the image.' : 'Render this view with studio lighting and shadows.');
   const renderLabel = composing ? 'Create photo' : failed || cancelled ? 'Try again' : hasImage ? 'Render again' : 'Render snapshot';
-  const choosePanel = (next: 'camera' | 'lighting' | 'motion' | 'export') => { setPanel(next); setPanelOpen(true); };
-  const tabs: Array<'camera' | 'lighting' | 'motion' | 'export'> = ['camera', 'lighting', ...(motionControls ? ['motion' as const] : []), ...(exportControls ? ['export' as const] : [])];
+  const choosePanel = (next: 'camera' | 'tattoo' | 'lighting' | 'motion' | 'export') => { setPanel(next); setPanelOpen(true); };
+  const tabs: Array<'camera' | 'tattoo' | 'lighting' | 'motion' | 'export'> = ['camera', ...(tattooControls ? ['tattoo' as const] : []), 'lighting', ...(motionControls ? ['motion' as const] : []), ...(exportControls ? ['export' as const] : [])];
   const panelKey = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (previewing) return;
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -120,11 +121,11 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
     {composing && <aside className={`snapshot-compose-rail ${panelOpen ? 'is-open' : 'is-collapsed'}`} aria-label="Compose snapshot">
       <div className="snapshot-rail-heading"><strong>Set up your shot</strong><button type="button" className="snapshot-rail-toggle" aria-expanded={panelOpen} aria-controls={`${id}-controls`} onClick={() => setPanelOpen(value => !value)}>{panelOpen ? 'Hide controls' : 'Show controls'}<span aria-hidden="true">{panelOpen ? '−' : '+'}</span></button></div>
       <div id={`${id}-controls`} className="snapshot-rail-body" hidden={!panelOpen}>
-        {panel !== 'export' && <div inert={previewing}>{presetControls}</div>}
         <div className="snapshot-panel-tabs" role="tablist" aria-label="Snapshot controls">
-          {tabs.map(value => <button key={value} id={`${id}-${value}-tab`} type="button" role="tab" data-panel={value} disabled={previewing && value !== 'motion'} aria-selected={panel === value} aria-controls={`${id}-${value}-panel`} tabIndex={panel === value ? 0 : -1} onKeyDown={panelKey} onClick={() => choosePanel(value)}>{value === 'camera' ? 'Photo' : value === 'lighting' ? 'Lights' : value === 'export' ? 'Save' : 'Video'}</button>)}
+          {tabs.map(value => <button key={value} id={`${id}-${value}-tab`} type="button" role="tab" data-panel={value} disabled={previewing && value !== 'motion'} aria-selected={panel === value} aria-controls={`${id}-${value}-panel`} tabIndex={panel === value ? 0 : -1} onKeyDown={panelKey} onClick={() => choosePanel(value)}>{value === 'camera' ? 'Photo' : value === 'tattoo' ? 'Tattoo' : value === 'lighting' ? 'Lights' : value === 'export' ? 'Save' : 'Video'}</button>)}
         </div>
-        <div id={`${id}-camera-panel`} role="tabpanel" aria-labelledby={`${id}-camera-tab`} hidden={panel !== 'camera'} inert={previewing}>{cameraControls ?? <p className="snapshot-controls-hint">The camera is ready for this view.</p>}</div>
+        <div id={`${id}-camera-panel`} role="tabpanel" aria-labelledby={`${id}-camera-tab`} hidden={panel !== 'camera'} inert={previewing}>{presetControls}{cameraControls ?? <p className="snapshot-controls-hint">The camera is ready for this view.</p>}</div>
+        {tattooControls && <div id={`${id}-tattoo-panel`} role="tabpanel" aria-labelledby={`${id}-tattoo-tab`} hidden={panel !== 'tattoo'} inert={previewing}>{tattooControls}</div>}
         <div id={`${id}-lighting-panel`} role="tabpanel" aria-labelledby={`${id}-lighting-tab`} hidden={panel !== 'lighting'} inert={previewing}>{lightingControls ?? <p className="snapshot-controls-hint">Your current studio lighting will be used.</p>}</div>
         {exportControls && <div id={`${id}-export-panel`} role="tabpanel" aria-labelledby={`${id}-export-tab`} hidden={panel !== 'export'}>{exportControls}</div>}
         {motionControls && <div id={`${id}-motion-panel`} role="tabpanel" aria-labelledby={`${id}-motion-tab`} hidden={panel !== 'motion'}>{motionControls}</div>}

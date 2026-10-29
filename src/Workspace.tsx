@@ -1,4 +1,6 @@
 import { recordJourney } from './beta-journey/tracking'
+import SnapshotTattooControls from './SnapshotTattooControls'
+import { guidedCamera, guidedBrightness, guidedLights, shootBounds } from './render/shootQuality'
 import { setNativeDraftOwner, cacheSceneImages } from './ipad/nativeDraftStore'
 import { supabaseSceneStore } from './storage/supabaseSceneStore'
 import { authMode } from './auth/betaAuthService'
@@ -366,6 +368,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
   const [snapshotFramingHint, setSnapshotFramingHint] = useState('')
   const [snapshotCamera, setSnapshotCamera] = useState<TattooCameraAdjustment>(() => ({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT }))
   const [revealPreview, setRevealPreview] = useState<RevealPreset | null>(null)
+  const [guidedShot, setGuidedShot] = useState(true)
   const [shotBlur, setShotBlur] = useState(0)
   const [shotBrightness, setShotBrightness] = useState(1)
   const [shotFormat, setShotFormat] = useState<'view' | 'portrait' | 'square' | 'landscape'>('view')
@@ -394,10 +397,16 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
   // stays on the posed tattoo, and window resizing refits the same footprint.
   useEffect(() => {
     if (!snapshot.open || snapshot.mode !== 'compose' || !tattooFraming) return
-    setCameraState(frameTattoo(tattooFraming, snapshotCamera, viewportAspect, cinematicPreset(snapshotLook)?.fov))
+    setCameraState(frameTattoo(tattooFraming, guidedShot ? guidedCamera(snapshotCamera, snapshotLook) : snapshotCamera, viewportAspect, cinematicPreset(snapshotLook)?.fov))
     setCameraRequestId((value) => value + 1)
     setCameraPreset('custom')
-  }, [snapshot.open, snapshot.mode, tattooFraming, snapshotCamera, viewportAspect, snapshotLook])
+  }, [snapshot.open, snapshot.mode, tattooFraming, snapshotCamera, viewportAspect, snapshotLook, guidedShot])
+  useEffect(() => {
+    if (!guidedShot || !snapshot.open || snapshot.mode !== 'compose' || !tattooFraming) return
+    const camera = frameTattoo(tattooFraming, guidedCamera(snapshotCamera, snapshotLook), viewportAspect, cinematicPreset(snapshotLook)?.fov)
+    setLightingPreset('studio')
+    setLights(guidedLights(snapshotLook, camera, shotBrightness, LIGHTING_PRESETS.studio.threeIntensityScale))
+  }, [guidedShot, snapshot.open, snapshot.mode, tattooFraming, snapshotCamera, snapshotLook, viewportAspect, shotBrightness])
   useEffect(() => {
     if (!revealPreview || !snapshot.open || !threeCamera) return
     const base = orbitControlsRef.current?.freezeSnapshot(true) ?? cameraState
@@ -539,11 +548,17 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       'ink.png', dims,
       { presetName: lightingPreset, intensityScale: LIGHTING_PRESETS[lightingPreset].threeIntensityScale, lights: structuredClone(lights) },
     )
-    if (options?.snapshot) contract.skinMaterial = 'studio'
+    if (options?.snapshot) {
+      contract.skinMaterial = 'studio'
+      if (guidedShot) contract.lighting = {
+        presetName: 'studio', intensityScale: LIGHTING_PRESETS.studio.threeIntensityScale,
+        lights: guidedLights(snapshotLook, snap, shotBrightness, LIGHTING_PRESETS.studio.threeIntensityScale),
+      }
+    }
     const cinematic = options?.snapshot ? cinematicPreset(snapshotLook) : undefined
     if (cinematic) {
       contract.camera.aperture = cinematic.aperture / (1 + shotBlur * (cinematic.id === 'detail' ? 2 : .8))
-      contract.camera.depthOfField = shotBlur > 0
+      contract.camera.depthOfField = !guidedShot && shotBlur > 0
       contract.bodyHair = 'vellus'
     }
     // Freeze scene metadata before the asynchronous image bake.
@@ -556,7 +571,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       : await blankInkLayer()
     options?.signal?.throwIfAborted()
     return { contract: frozenContract, inkBlob }
-  }, [snapshotLook, shotBlur, bodyFit, uploadedImage, decalVisible, exportPreset, bodyMeshId, skinToneId, poseId, lookId, qualityTier, finalSamples, bodyShape, bodyPose, bodyAppearance, isolateRegion, cameraState, lightingPreset, lights, studio, background, modelLoading])
+  }, [guidedShot, shotBrightness, snapshotLook, shotBlur, bodyFit, uploadedImage, decalVisible, exportPreset, bodyMeshId, skinToneId, poseId, lookId, qualityTier, finalSamples, bodyShape, bodyPose, bodyAppearance, isolateRegion, cameraState, lightingPreset, lights, studio, background, modelLoading])
 
   const handleLookChange = useCallback((id: string) => {
     setLookId(id)
@@ -985,7 +1000,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       ? 'The tattoo is covered or outside this Focus view. The camera is centered on the visible figure.'
       : 'Camera centered on the figure. Return to editing and click the skin to place the example tattoo, or render without ink.')
     const preset = cinematicPreset(initialLook)!
-    setSnapshotCamera({ ...preset.adjustment })
+    setSnapshotCamera(guidedShot ? guidedCamera(preset.adjustment, preset.id) : { ...preset.adjustment })
     if (nativeHost && shotFormat === 'view') setShotFormat('portrait')
     setSnapshotLook(initialLook)
     setShotBrightness(1); setShotBlur(initialLook === 'detail' ? .3 : 0)
@@ -1005,7 +1020,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
     const camera = frameTattoo(tattooFraming, preset.adjustment, viewportAspect, preset.fov)
     setShotBrightness(1); setShotBlur(id === 'detail' ? .3 : 0)
     setSnapshotLook(id)
-    setSnapshotCamera({ ...preset.adjustment })
+    setSnapshotCamera(guidedShot ? guidedCamera(preset.adjustment, preset.id) : { ...preset.adjustment })
     setLightingPreset('studio')
     setLights(cinematicLights(preset, camera, LIGHTING_PRESETS.studio.threeIntensityScale))
     setStudio(previous => ({ ...previous, mode: 'sweep', color: preset.background, gradient: undefined, showGuides: false }))
@@ -1731,6 +1746,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
             fingerPlacement={nativeHost && fingerPlacement}
             key={`${currentScene?.id}:${bodyMeshId}`}
             ref={uvPlacementRef}
+            closeupPreview={snapshot.open}
             uploadedImage={uploadedImage}
             skinToneId={skinToneId}
             bodyMeshId={bodyMeshId}
@@ -1807,10 +1823,21 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
             onOpenRenders={() => afterSaving(() => { closeSnapshot(); setDashboardSection('renders'); setShowDashboard(true) })}
             mode={snapshot.mode} onAdjust={snapshotSession.adjust} previewing={!!revealPreview}
             motionControls={<RevealPanel key={`${session.email}:${currentScene?.id}`} sceneKey={`${session.email}:${currentScene?.id}`} buildShot={() => currentShotBuilder.current({ snapshot: 'quick' })} hasTattoo={snapshotHasTattoo && decalVisible} previewing={!!revealPreview} onPreview={setRevealPreview} />}
-            presetControls={<SnapshotPresets selected={snapshotLook} onSelect={applySnapshotPreset} />}
-            cameraControls={<><ShotStyleControls format={shotFormat} onFormatChange={setShotFormat} blur={shotBlur} onBlurChange={setShotBlur} brightness={shotBrightness} onBrightnessChange={value => { setLights(previous => previous.map(light => ({ ...light, intensity: light.intensity * value / shotBrightness }))); setShotBrightness(value) }} studio={studio} onStudioChange={setStudio} /><SnapshotCameraControls adjustment={snapshotCamera} onChange={setSnapshotCamera}
-              onReset={() => setSnapshotCamera({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT })} hasTattoo={snapshotHasTattoo} /></>}
-            lightingControls={<>
+            tattooControls={<SnapshotTattooControls disabled={!snapshotHasTattoo || !decalVisible || !!(surfacePlacement?.wrap || surfacePlacement?.sleeve)}
+              reason={surfacePlacement?.wrap || surfacePlacement?.sleeve ? 'Adjust wrap and sleeve placement in the Tattoo editor.' : 'Place a visible tattoo in the editor first.'}
+              onNudge={(dx, dy) => uvPlacementRef.current?.nudgeInView(dx, dy) ?? false}
+              size={decalScale * 100} rotation={decalRotation}
+              onSize={value => setDecalScale(uvPlacementRef.current?.limitScale(value / 100) ?? value / 100)}
+              onRotation={value => setDecalRotation(uvPlacementRef.current?.limitRotation(value) ?? value)}
+              onFrame={() => { const framing = uvPlacementRef.current?.getTattooFraming(); if (framing) setTattooFraming(framing) }} />}
+            presetControls={<><label className="shoot-guided-toggle"><input type="checkbox" checked={guidedShot} onChange={event => {
+              const enabled = event.target.checked
+              setGuidedShot(enabled)
+              if (enabled) { setSnapshotCamera(guidedCamera(snapshotCamera, snapshotLook)); setShotBrightness(guidedBrightness(shotBrightness)); setShotBlur(0) }
+            }} /> Guided shot</label><p className="snapshot-controls-hint">{guidedShot ? snapshotLook === 'detail' ? 'Intentional close crop · sharp artwork · balanced lighting.' : 'Gentle angles · space around the design · sharp artwork · balanced lighting.' : 'Manual composition and lighting.'}</p><SnapshotPresets selected={snapshotLook} onSelect={applySnapshotPreset} /></>}
+            cameraControls={<><ShotStyleControls guided={guidedShot} format={shotFormat} onFormatChange={setShotFormat} blur={shotBlur} onBlurChange={setShotBlur} brightness={shotBrightness} onBrightnessChange={value => { setLights(previous => previous.map(light => ({ ...light, intensity: light.intensity * value / shotBrightness }))); setShotBrightness(value) }} studio={studio} onStudioChange={setStudio} /><button type="button" className="snapshot-button" onClick={() => { applySnapshotPreset('detail'); setSnapshotCamera({ ...cinematicPreset('detail')!.adjustment, zoom: 6 }) }}>Inspect skin up close</button><p className="snapshot-controls-hint">Original Soft cells texture at a fixed skin scale. Choose Portfolio to return to the full tattoo.</p><details className="snapshot-camera-details"><summary>Camera angle &amp; zoom</summary><SnapshotCameraControls adjustment={guidedShot ? guidedCamera(snapshotCamera, snapshotLook) : snapshotCamera} limits={guidedShot ? shootBounds(snapshotLook) : undefined} onChange={value => setSnapshotCamera(guidedShot ? guidedCamera(value, snapshotLook) : value)}
+              onReset={() => setSnapshotCamera({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT })} hasTattoo={snapshotHasTattoo} /></details></>}
+            lightingControls={guidedShot ? <p className="snapshot-controls-hint">Soft fill keeps shadows open and a restrained edge light separates the figure. Lights follow your camera. Choose a look or adjust brightness in Photo; turn off Guided shot to edit individual lights.</p> : <>
               <button type="button" className="snapshot-button" onClick={aimSnapshotLights} disabled={!snapshotHasTattoo}>Aim lights at tattoo</button>
               <LightingControls lights={lights} selectedIndex={selectedLight} onSelectLight={setSelectedLight}
                 onChange={setLights} onReset={() => setLights(resolveRig(lightingPreset))}

@@ -5,6 +5,11 @@ These are artistic physical dimensions, not clinically measured skin anatomy.
 Rest attributes retain the pattern through fit/pose without changing tattoo UVs.
 """
 import bpy
+import json
+from pathlib import Path
+
+# One source of physical dimensions for browser preview and Blender.
+PROFILE = json.loads(Path(__file__).with_name('skinProfile.json').read_text())
 
 POSITION = 'smartink_skin_rest'
 NORMAL = 'smartink_skin_normal'
@@ -45,7 +50,7 @@ def apply_studio_skin(body, texture_path, world_scale):
     coordinates = node('ShaderNodeAttribute', 'Studio skin rest metres'); coordinates.attribute_name = POSITION
     normals = node('ShaderNodeAttribute', 'Studio skin rest normals'); normals.attribute_name = NORMAL
     frequency = node('ShaderNodeVectorMath', 'Studio skin 16 mm tile'); frequency.operation = 'SCALE'
-    frequency.inputs[3].default_value = 1 / .016
+    frequency.inputs[3].default_value = 1 / PROFILE['tileMetres']
     links.new(coordinates.outputs['Vector'], frequency.inputs[0])
     separate = node('ShaderNodeSeparateXYZ', 'Studio skin coordinates'); links.new(frequency.outputs[0], separate.inputs[0])
     axes = node('ShaderNodeSeparateXYZ', 'Studio skin normal axes'); links.new(normals.outputs['Vector'], axes.inputs[0])
@@ -62,8 +67,12 @@ def apply_studio_skin(body, texture_path, world_scale):
         height = math('ADD', height, math('MULTIPLY', texture.outputs['Color'], math('DIVIDE', weights[axis], total)))
     links.new(height, bump.inputs['Height'])
     bump.inputs['Strength'].default_value = .35
-    bump.inputs['Distance'].default_value = .000030 * world_scale
+    bump.inputs['Distance'].default_value = PROFILE['heightMetres'] * world_scale
     # Preserve sculpt Normal input, existing regional colour and roughness, and
     # the downstream ink composition. Relief is shared across bare and inked skin.
     body['smartink_skin_material'] = 'studio-v1'
-    body['smartink_skin_tile_metres'] = .016
+    body['smartink_skin_tile_metres'] = PROFILE['tileMetres']
+    body['smartink_skin_profile_version'] = PROFILE['version']
+    # Save the recipe for the subsequent pigment/curve bake. The current Blender
+    # node tree still implements relief only; this is not a parity claim.
+    body['smartink_skin_recipe'] = json.dumps(PROFILE, sort_keys=True)

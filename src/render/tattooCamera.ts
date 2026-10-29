@@ -6,7 +6,7 @@ import { validateSurfaceAnchor, type SurfaceAnchor } from './surfacePlacement';
 export interface TattooCameraAdjustment { azimuth: number; elevation: number; zoom: number }
 export const DEFAULT_TATTOO_CAMERA_ADJUSTMENT: TattooCameraAdjustment = { azimuth: 0, elevation: 0, zoom: 1 };
 export const TATTOO_CAMERA_LIMITS = {
-  azimuth: { min: -55, max: 55 }, elevation: { min: -40, max: 40 }, zoom: { min: 0.65, max: 1.8 },
+  azimuth: { min: -55, max: 55 }, elevation: { min: -40, max: 40 }, zoom: { min: 0.65, max: 6 },
 } as const;
 export function normalizeTattooCamera(value?: Partial<TattooCameraAdjustment>): TattooCameraAdjustment {
   return Object.fromEntries(Object.entries(TATTOO_CAMERA_LIMITS).map(([name, bounds]) => {
