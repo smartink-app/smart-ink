@@ -1,7 +1,7 @@
 import { closeupGeometry } from './render/closeupGeometry';
 import FeedbackScene, { type FeedbackSceneProps } from './feedback/FeedbackScene';
 import { deformFit, heightWarp, type BodyFit } from './measurements/fitter';
-import { bindSkinRestCoordinates, SKIN_DETAIL, SKIN_DETAIL_GLSL } from './render/skinDetail';
+import { bindSkinRestCoordinates, SKIN_DETAIL, SKIN_DETAIL_GLSL, SKIN_REGION_GLSL } from './render/skinDetail';
 import { isTattooHit, tattooAnchorPoint } from './model/tattooHit';
 import TattooViewportControls from './model/TattooViewportControls';
 import SleeveTattooControls from './model/SleeveTattooControls';
@@ -96,6 +96,8 @@ const vertexShader = `
   varying vec3 vSkinRest;
   varying vec3 vSkinNormal;
   varying float vSkinArm;
+  varying vec4 vSkinProfile;
+  ${SKIN_REGION_GLSL}
 
   varying vec2 vUv;
   varying vec2 vTattooUv;
@@ -115,6 +117,7 @@ const vertexShader = `
     ${SLEEVE_VERTEX_ASSIGN}
     vUv = uv;
     vSkinRest = aSkinRest;
+    vSkinProfile = skinRegion(aRegion, aSkinRest);
     vSkinNormal = aSkinNormal;
     vSkinArm = 1.0 - step(.1, min(abs(aRegion - 2.0), abs(aRegion - 3.0)));
     vTattooUv = aTattooUv;
@@ -208,9 +211,12 @@ const fragmentShader = `
     skin.rgb *= 1.0 - appearance.x;
     float veins = skinVeins() * smoothstep(.15,.9,vSkinArm);
     skin.rgb *= vec3(1.0) + veins * vec3(-.075,-.012,.018);
-    vec3 N = skinDetailNormal(surfaceNormal(), microHeight);
-    vec3 skinLighting = studioLighting(N, vWorldPosition);
-    float roughness = clamp(.56 + (microHeight - .5) * .14, .48, .64);
+    vec3 broadNormal = surfaceNormal();
+    vec3 N = skinDetailNormal(broadNormal, microHeight);
+    // Diffuse softens fine relief; surface reflections retain pore definition.
+    // A preview approximation, not true subsurface light transport.
+    vec3 skinLighting = studioLighting(normalize(mix(broadNormal, N, .4)), vWorldPosition);
+    float roughness = clamp(.56 + (microHeight - .5) * .14 + appearance.z * .7, .44, .68);
     vec3 reflection = skinSpecular(N, roughness);
     skin.rgb = skin.rgb * skinLighting + reflection;
 
@@ -227,8 +233,8 @@ const fragmentShader = `
     }
 
     // Fine hairs sit over both bare and tattooed skin, with the same light rig.
-    skin.rgb = mix(skin.rgb, baseSkinColor * skinLighting * 1.8 + reflection,
-      min(.24, appearance.y * .9));
+    skin.rgb = mix(skin.rgb, baseSkinColor * skinLighting * .38 + reflection * .6,
+      min(.65, appearance.y));
 
     bool lit = vHighlightMask > 0.5;
     if (lit) {
