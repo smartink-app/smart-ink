@@ -303,6 +303,7 @@ export interface ModelWithUVTattooHandle {
   getSleeveFraming: (section?: SleeveSectionId) => TattooFraming | null;
   setWrap: (value: WrapSettings | null) => boolean;
   placeInView: () => boolean;
+  nudgeInView: (dx: number, dy: number) => boolean;
   getPlacement: () => UVTattooPlacementSnapshot;
   getRegionFraming: () => RegionFraming | null;
   getMeasurementGuide: (key: string) => MeasurementGuide | null;
@@ -1015,8 +1016,23 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       return false;
     }, [gl, camera, editingEnabled, pick, applyAnchor, onPlacementStatus]);
 
+    // Explicit Shoot controls may edit while canvas dragging stays locked.
+    const nudgeInView = useCallback((dx: number, dy: number): boolean => {
+      const mesh = bodyMeshRef.current, anchor = anchorRef.current;
+      if (!mesh || !anchor || anchor.wrap || anchor.sleeve || !visible ||
+          !Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > 8 || Math.abs(dy) > 8) return false;
+      const rect = gl.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return false;
+      camera.updateMatrixWorld(true); mesh.updateWorldMatrix(true, false);
+      const point = tattooAnchorPoint(mesh, anchor, new THREE.Vector3()).project(camera);
+      if (point.z < -1 || point.z > 1) return false;
+      const hit = pick({ clientX: rect.left + (point.x + 1) * rect.width / 2 + dx,
+        clientY: rect.top + (1 - point.y) * rect.height / 2 + dy });
+      return !!hit && applyAnchor({ ...hit.anchor, bounds: anchor.bounds });
+    }, [gl, camera, visible, pick, applyAnchor]);
+
     useImperativeHandle(ref, () => ({
-      placeInView, setWrap, setSleeve, getSleeveFraming,
+      placeInView, nudgeInView, setWrap, setSleeve, getSleeveFraming,
       limitScale, limitRotation, setAreaLock, fitToArea,
       getPlacement: () => ({
         imageSource: resolveTattooSource(uploadedImage),
@@ -1052,7 +1068,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
           size, aspect: imageAspect, rotationRad, wrap: !!anchor.wrap, hairCoverage: hairCoverageRef.current,
         });
       },
-    }), [placeInView, setWrap, setSleeve, getSleeveFraming, size, imageAspect, decalColor, decalOpacity, rotationRad, uploadedImage, visible, regionFraming, isolateRegion, assessment, limitScale, limitRotation, setAreaLock, fitToArea]);
+    }), [placeInView, nudgeInView, setWrap, setSleeve, getSleeveFraming, size, imageAspect, decalColor, decalOpacity, rotationRad, uploadedImage, visible, regionFraming, isolateRegion, assessment, limitScale, limitRotation, setAreaLock, fitToArea]);
 
     const setOrbitEnabled = useCallback(
       (enabled: boolean) => {

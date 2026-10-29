@@ -682,3 +682,32 @@ html[data-theme] .beta-admin-page { max-width:1440px; width:100%; box-sizing:bor
 .admin-last-link { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
 .admin-last-link input { flex:1; min-width:180px; background:transparent; color:var(--text-primary); border:0; }
 @media(max-width:700px) { .admin-summary { grid-template-columns:repeat(2,1fr); } .beta-admin-header { flex-wrap:wrap; gap:16px; } }
+
+/* Shoot: navigation first, compact looks, and a separate placement workspace. */
+html[data-theme] .snapshot-compose-rail { width: 310px; }
+html[data-theme] .snapshot-rail-body > [role=tabpanel] { padding: 14px; }
+html[data-theme] .snapshot-panel-tabs { gap: 2px; }
+html[data-theme] .snapshot-panel-tabs > button { padding: 8px 5px; min-width: 0; font-size: 12px; }
+html[data-theme] .snapshot-compose-rail .snapshot-presets { padding: 12px 0 0; margin-bottom: 12px; }
+html[data-theme] .snapshot-compose-rail .snapshot-presets-heading > span { display: none; }
+html[data-theme] .snapshot-compose-rail .snapshot-preset img { height: 62px; aspect-ratio: auto; margin-bottom: 6px; }
+html[data-theme] .snapshot-compose-rail .snapshot-preset-name { font-size: 11px; }
+html[data-theme] .snapshot-compose-rail .snapshot-preset-description { display: none; }
+html[data-theme] .snapshot-compose-rail .snapshot-presets > p { margin: 8px 0 10px; }
+html[data-theme] .snapshot-compose-rail .shoot-guided-toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; margin: 0 0 6px; }
+html[data-theme] .snapshot-compose-rail .shoot-guided-toggle input { accent-color: var(--accent-blue); width: 16px; height: 16px; margin: 0; }
+html[data-theme] .snapshot-compose-rail .shot-style-controls { gap: 10px; margin-bottom: 12px; padding-bottom: 10px; }
+.snapshot-tattoo-controls h3 { margin: 0 0 8px; font-size: 14px; }
+.tattoo-nudge-pad { display: grid; grid-template-columns: repeat(3,44px); grid-template-rows: repeat(3,40px); gap: 5px; justify-content: center; margin: 14px 0; }
+.tattoo-nudge-pad button { border: 1px solid var(--snapshot-line); border-radius: 10px; background: var(--bg-input); color: var(--text-primary); font-size: 22px; cursor: pointer; }
+.tattoo-nudge-pad button:hover { background: var(--selection); }
+.tattoo-nudge-pad .nudge-up { grid-area: 1 / 2; }
+.tattoo-nudge-pad .nudge-left { grid-area: 2 / 1; }
+.tattoo-nudge-pad span { grid-area: 2 / 2; align-self: center; text-align: center; font-size: 10px; color: var(--text-secondary); }
+.tattoo-nudge-pad .nudge-right { grid-area: 2 / 3; }
+.tattoo-nudge-pad .nudge-down { grid-area: 3 / 2; }
+.snapshot-nudge-status { font-size: 11px; line-height: 1.5; color: var(--text-secondary); }
+@media(max-width:450px) { html[data-theme] .snapshot-compose-rail { width: 286px; } }
+
+.snapshot-camera-details > summary { cursor: pointer; padding: 10px 0; font-size: 12px; font-weight: 600; }
+.snapshot-camera-details[open] > summary { margin-bottom: 10px; }

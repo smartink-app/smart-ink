@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import ts from 'typescript';
+import { transform } from 'esbuild';
+import * as THREE from 'three';
+const source=await fs.readFile('src/ModelWithUVTattoo.tsx','utf8');
+const ast=ts.createSourceFile('model.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+let callback;
+function visit(node){if(ts.isVariableDeclaration(node)&&node.name.getText(ast)==='nudgeInView') callback=node.initializer.arguments[0].getText(ast);ts.forEachChild(node,visit);}
+visit(ast);
+const {code}=await transform(`(${callback})`,{loader:'ts'});
+const camera=new THREE.PerspectiveCamera(30,1,.1,100);camera.position.z=3;camera.lookAt(0,0,0);camera.updateMatrixWorld();
+const boundary={region:'armLeft',allowAcrossRegions:false};
+let picked, applied;
+const scope={THREE,camera,visible:true,gl:{domElement:{getBoundingClientRect:()=>({left:20,top:30,width:1000,height:1000})}},bodyMeshRef:{current:new THREE.Mesh()},anchorRef:{current:{faceIndex:0,barycentric:[1,0,0],bodyMeshId:'body_full',bounds:boundary}},tattooAnchorPoint:(_m,_a,p)=>p.set(0,0,0),pick:point=>{picked=point;return {anchor:{faceIndex:1,barycentric:[0,1,0],bodyMeshId:'body_full'}}},applyAnchor:anchor=>{applied=anchor;return true;}};
+const nudge=()=>new Function('scope',`with(scope){return ${code}}`)(scope);
+const before=camera.matrixWorld.toArray();
+assert.equal(nudge()(2,-2),true);assert.deepEqual(picked,{clientX:522,clientY:528});assert.deepEqual(applied.bounds,boundary);assert.deepEqual(camera.matrixWorld.toArray(),before);
+for(const bad of [NaN,Infinity,9]) assert.equal(nudge()(bad,0),false);
+scope.visible=false;assert.equal(nudge()(2,0),false);scope.visible=true;
+scope.anchorRef.current.wrap={};assert.equal(nudge()(2,0),false);delete scope.anchorRef.current.wrap;
+scope.pick=()=>null;applied=null;assert.equal(nudge()(2,0),false);assert.equal(applied,null);
+scope.pick=()=>({anchor:{}});scope.applyAnchor=()=>false;assert.equal(nudge()(2,0),false);
+console.log('Shoot nudging passed: screen direction, fixed camera, retained area lock, hidden/wrap/invalid input and rejected skin hits.');

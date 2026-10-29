@@ -1,3 +1,4 @@
+import SnapshotTattooControls from './SnapshotTattooControls'
 import { guidedCamera, guidedBrightness, guidedLights, shootBounds } from './render/shootQuality'
 import { setNativeDraftOwner, cacheSceneImages } from './ipad/nativeDraftStore'
 import { supabaseSceneStore } from './storage/supabaseSceneStore'
@@ -1817,13 +1818,20 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
             onOpenRenders={() => afterSaving(() => { closeSnapshot(); setDashboardSection('renders'); setShowDashboard(true) })}
             mode={snapshot.mode} onAdjust={snapshotSession.adjust} previewing={!!revealPreview}
             motionControls={<RevealPanel key={`${session.email}:${currentScene?.id}`} sceneKey={`${session.email}:${currentScene?.id}`} buildShot={() => currentShotBuilder.current({ snapshot: 'quick' })} hasTattoo={snapshotHasTattoo && decalVisible} previewing={!!revealPreview} onPreview={setRevealPreview} />}
+            tattooControls={<SnapshotTattooControls disabled={!snapshotHasTattoo || !decalVisible || !!(surfacePlacement?.wrap || surfacePlacement?.sleeve)}
+              reason={surfacePlacement?.wrap || surfacePlacement?.sleeve ? 'Adjust wrap and sleeve placement in the Tattoo editor.' : 'Place a visible tattoo in the editor first.'}
+              onNudge={(dx, dy) => uvPlacementRef.current?.nudgeInView(dx, dy) ?? false}
+              size={decalScale * 100} rotation={decalRotation}
+              onSize={value => setDecalScale(uvPlacementRef.current?.limitScale(value / 100) ?? value / 100)}
+              onRotation={value => setDecalRotation(uvPlacementRef.current?.limitRotation(value) ?? value)}
+              onFrame={() => { const framing = uvPlacementRef.current?.getTattooFraming(); if (framing) setTattooFraming(framing) }} />}
             presetControls={<><label className="shoot-guided-toggle"><input type="checkbox" checked={guidedShot} onChange={event => {
               const enabled = event.target.checked
               setGuidedShot(enabled)
               if (enabled) { setSnapshotCamera(guidedCamera(snapshotCamera, snapshotLook)); setShotBrightness(guidedBrightness(shotBrightness)); setShotBlur(0) }
             }} /> Guided shot</label><p className="snapshot-controls-hint">{guidedShot ? snapshotLook === 'detail' ? 'Intentional close crop · sharp artwork · balanced lighting.' : 'Gentle angles · space around the design · sharp artwork · balanced lighting.' : 'Manual composition and lighting.'}</p><SnapshotPresets selected={snapshotLook} onSelect={applySnapshotPreset} /></>}
-            cameraControls={<><ShotStyleControls guided={guidedShot} format={shotFormat} onFormatChange={setShotFormat} blur={shotBlur} onBlurChange={setShotBlur} brightness={shotBrightness} onBrightnessChange={value => { setLights(previous => previous.map(light => ({ ...light, intensity: light.intensity * value / shotBrightness }))); setShotBrightness(value) }} studio={studio} onStudioChange={setStudio} /><SnapshotCameraControls adjustment={guidedShot ? guidedCamera(snapshotCamera, snapshotLook) : snapshotCamera} limits={guidedShot ? shootBounds(snapshotLook) : undefined} onChange={value => setSnapshotCamera(guidedShot ? guidedCamera(value, snapshotLook) : value)}
-              onReset={() => setSnapshotCamera({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT })} hasTattoo={snapshotHasTattoo} /></>}
+            cameraControls={<><ShotStyleControls guided={guidedShot} format={shotFormat} onFormatChange={setShotFormat} blur={shotBlur} onBlurChange={setShotBlur} brightness={shotBrightness} onBrightnessChange={value => { setLights(previous => previous.map(light => ({ ...light, intensity: light.intensity * value / shotBrightness }))); setShotBrightness(value) }} studio={studio} onStudioChange={setStudio} /><details className="snapshot-camera-details"><summary>Camera angle &amp; zoom</summary><SnapshotCameraControls adjustment={guidedShot ? guidedCamera(snapshotCamera, snapshotLook) : snapshotCamera} limits={guidedShot ? shootBounds(snapshotLook) : undefined} onChange={value => setSnapshotCamera(guidedShot ? guidedCamera(value, snapshotLook) : value)}
+              onReset={() => setSnapshotCamera({ ...DEFAULT_TATTOO_CAMERA_ADJUSTMENT })} hasTattoo={snapshotHasTattoo} /></details></>}
             lightingControls={guidedShot ? <p className="snapshot-controls-hint">Soft fill keeps shadows open and a restrained edge light separates the figure. Lights follow your camera. Choose a look or adjust brightness in Photo; turn off Guided shot to edit individual lights.</p> : <>
               <button type="button" className="snapshot-button" onClick={aimSnapshotLights} disabled={!snapshotHasTattoo}>Aim lights at tattoo</button>
               <LightingControls lights={lights} selectedIndex={selectedLight} onSelectLight={setSelectedLight}
