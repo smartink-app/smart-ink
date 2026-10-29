@@ -6,7 +6,7 @@ import type { CameraView } from './cameraTransition';
 export function shootBounds(id: CinematicPresetId | null) {
   return {
     azimuth: { min: -30, max: 30 }, elevation: { min: -20, max: 20 },
-    zoom: { min: .8, max: id === 'detail' ? 1.45 : 1 },
+    zoom: { min: .8, max: id === 'detail' ? 6 : 1 },
   };
 }
 export function guidedCamera(value: TattooCameraAdjustment, id: CinematicPresetId | null): TattooCameraAdjustment {

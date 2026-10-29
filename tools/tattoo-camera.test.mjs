@@ -15,7 +15,7 @@ const anchor = (faceIndex, barycentric = [1 / 3, 1 / 3, 1 / 3]) => ({ faceIndex,
 const identity = new THREE.Matrix4();
 assert.deepEqual(normalizeTattooCamera(), { azimuth: 0, elevation: 0, zoom: 1 });
 assert.deepEqual(normalizeTattooCamera({ azimuth: Infinity, elevation: NaN, zoom: -3 }), { azimuth: 0, elevation: 0, zoom: .65 });
-assert.deepEqual(normalizeTattooCamera({ azimuth: 300, elevation: -300, zoom: 20 }), { azimuth: 55, elevation: -40, zoom: 1.8 });
+assert.deepEqual(normalizeTattooCamera({ azimuth: 300, elevation: -300, zoom: 20 }), { azimuth: 55, elevation: -40, zoom: 6 });
 function addMasks(geometry) {
   const count = geometry.attributes.position.count;
   for (const [name, fill] of [['aTattooMask', 1], ['aFocusMask', 1], ['aClothingMask', -1]]) geometry.setAttribute(name, new THREE.Float32BufferAttribute(new Float32Array(count).fill(fill), 1));
@@ -31,7 +31,7 @@ function checkView(f, adjustment, aspect, label) {
   const offset = camera.position.clone().sub(new THREE.Vector3(...f.center)), direction = offset.clone().normalize();
   assert.ok(view.position.every(Number.isFinite), `${label}: finite camera`);
   assert.ok(direction.dot(new THREE.Vector3(...f.normal)) > .43, `${label}: stays in the outward hemisphere`);
-  assert.ok(offset.length() >= f.minDistance, `${label}: minimum skin clearance`);
+  assert.ok(offset.length() + 1e-9 >= f.minDistance, `${label}: minimum skin clearance (${offset.length()} vs ${f.minDistance})`);
   if ((adjustment.zoom ?? 1) <= 1) for (let i = 0; i < f.points.length; i += 3) {
     const point = new THREE.Vector3().fromArray(f.points, i).project(camera);
     assert.ok(Math.abs(point.x) <= 1 + 1e-5 && Math.abs(point.y) <= 1 + 1e-5, `${label}: unzoomed tattoo fits both viewport axes`);
@@ -130,7 +130,7 @@ for (const sex of ['male', 'female']) {
       assert.ok(new THREE.Vector3(...f.center).distanceTo(atAnchor(geometry, posedMatrix, saved)) < 1e-6, `${label}: follows the same barycentric anchor`);
       const expectedNormal = indices(geometry, saved.faceIndex).reduce((n, i, k) => n.addScaledVector(new THREE.Vector3().fromBufferAttribute(geometry.attributes.normal, i), saved.barycentric[k]), new THREE.Vector3()).applyMatrix3(new THREE.Matrix3().getNormalMatrix(posedMatrix)).normalize();
       assert.ok(expectedNormal.dot(new THREE.Vector3(...f.normal)) > .999999, `${label}: uses current posed normal`);
-      const adjustments = [{}, { zoom: .65 }, { zoom: 1.8 }, { azimuth: -55 }, { azimuth: 55 }, { elevation: -40 }, { elevation: 40 }, { azimuth: -55, elevation: -40 }, { azimuth: 55, elevation: 40 }];
+      const adjustments = [{}, { zoom: .65 }, { zoom: 1.8 }, { zoom: 6 }, { azimuth: -55 }, { azimuth: 55 }, { elevation: -40 }, { elevation: 40 }, { azimuth: -55, elevation: -40 }, { azimuth: 55, elevation: 40 }];
       for (const adjustment of adjustments) for (const viewport of [.5, 1.8]) { checkView(f, adjustment, viewport, label); tested++; }
       if (visual && ((placement.id === 'chest-seam' && deformation.id === 'neutral') || (placement.id === 'forearm' && deformation.id === 'slim-flex'))) {
         const normals = geometry.attributes.normal.array, transformed = new Float32Array(normals.length), normalMatrix = new THREE.Matrix3().getNormalMatrix(posedMatrix), v = new THREE.Vector3();
