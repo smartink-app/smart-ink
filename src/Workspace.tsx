@@ -228,6 +228,18 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
   const [decalOpacity, setDecalOpacity] = useState(1) // Default full opacity
   const [decalVisible, setDecalVisible] = useState(false)
   const [surfacePlacement, setSurfacePlacement] = useState<SurfaceAnchor | null>(null)
+  const [placementExplored, setPlacementExplored] = useState(false)
+  const [shootHintDismissed, setShootHintDismissed] = useState(() => {
+    try { return localStorage.getItem('smartink:shoot-discovery') === 'seen' } catch { return false }
+  })
+  const dismissShootHint = () => {
+    setShootHintDismissed(true)
+    try { localStorage.setItem('smartink:shoot-discovery', 'seen') } catch { /* Optional hint. */ }
+  }
+  const handlePlacementChange = useCallback((anchor: SurfaceAnchor | null) => {
+    setSurfacePlacement(anchor)
+    if (anchor) setPlacementExplored(true)
+  }, [])
   const [placementStatus, setPlacementStatus] = useState('Click the skin to place. Drag the tattoo to move it; drag bare skin to orbit.')
   const [photoMode, setPhotoMode] = useState(false)
   const [background, setBackground] = useState<BgKey>('white')
@@ -580,6 +592,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       review.setRole(reviewContext.role)
       reviewCamera.current = structuredClone(migrated.camera ?? CAMERA_PRESETS.threeQuarter)
     }
+    setPlacementExplored(false)
     setInspectorTab('tattoo')
     setArtworkOpen(false)
     setSidebarCollapsed(false)
@@ -965,6 +978,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
 
   const openSnapshot = (initialLook: CinematicPresetId = 'editorial') => {
     if (renderBusy || modelLoading || !canvasHostSized || snapshotSession.getState().open) return
+    dismissShootHint()
     setShapeMenu(null)
     setPanelRegions([])
     setAccountMenuOpen(false)
@@ -1065,6 +1079,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
   const chooseNativeArtwork = useCallback((source: string) => {
     setUploadedImage(source)
     setDecalVisible(true)
+    setPlacementExplored(false)
     setInspectorTab('tattoo')
     setArtworkOpen(false)
     setPanelRegions([])
@@ -1638,12 +1653,13 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
               uploadedImage={uploadedImage}
               decalVisible={decalVisible}
               hasPlacement={surfacePlacement !== null}
+              placementRegion={tattooBounds?.region}
               decalRotation={decalRotation}
               decalScale={decalScale}
               decalColor={decalColor}
               decalOpacity={decalOpacity}
-              onDecalRotationChange={value => setDecalRotation(uvPlacementRef.current?.limitRotation(value) ?? value)}
-              onDecalScaleChange={value => setDecalScale(uvPlacementRef.current?.limitScale(value) ?? value)}
+              onDecalRotationChange={value => { setDecalRotation(uvPlacementRef.current?.limitRotation(value) ?? value); setPlacementExplored(true) }}
+              onDecalScaleChange={value => { setDecalScale(uvPlacementRef.current?.limitScale(value) ?? value); setPlacementExplored(true) }}
               onDecalColorChange={setDecalColor}
               onDecalOpacityChange={setDecalOpacity}
               onDecalVisibleChange={setDecalVisible}
@@ -1661,6 +1677,13 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
         </div>
 
         <div className="editor-canvas-host">
+          {placementExplored && !shootHintDismissed && decalVisible && surfacePlacement && inspectorTab === 'tattoo' && !reviewOpen && !photoMode && !snapshot.open && !measureOpen && !modelLoading && (
+            <aside className="studio-shoot-discovery" aria-label="Discover Photoshoot">
+              <div><strong>Like the placement?</strong><p>Turn it into a studio photo.</p></div>
+              <button type="button" className="ep-btn" onClick={() => openSnapshot()} disabled={renderBusy || !canvasHostSized}>Try Shoot <span aria-hidden="true">↗</span></button>
+              <button type="button" className="studio-discovery-dismiss" aria-label="Dismiss photo tip" onClick={dismissShootHint}>×</button>
+            </aside>
+          )}
           {reviewOpen && <div className="feedback-view-tools" role="group" aria-label="Review camera">
             <span>Explore the placement</span>
             <button type="button" className="ep-btn" onClick={() => viewWrap(false)} disabled={!surfacePlacement}>Frame tattoo</button>
@@ -1737,7 +1760,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
             setDecalVisible={setDecalVisible}
             visible={decalVisible}
             initialPlacement={surfacePlacement}
-            onPlacementChange={setSurfacePlacement}
+            onPlacementChange={handlePlacementChange}
             onWrapView={viewWrap}
             onSleeveView={viewSleeve}
             onWrapRegion={setIsolateRegion}
@@ -1755,8 +1778,8 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
             showTattooControls={showPlacementTips} onHideTattooControls={() => { togglePlacementTips(false); document.querySelector<HTMLButtonElement>('[data-tattoo-controls-toggle]')?.focus(); }}
             editingEnabled={!reviewOpen && !photoMode && !snapshot.open && !measureOpen && inspectorTab !== 'studio'}
             interactionMode={inspectorTab === 'figure' ? 'model' : 'tattoo'}
-            onDecalScaleChange={setDecalScale}
-            onDecalRotationChange={setDecalRotation}
+            onDecalScaleChange={value => { setDecalScale(value); setPlacementExplored(true) }}
+            onDecalRotationChange={value => { setDecalRotation(value); setPlacementExplored(true) }}
             onRegionPress={inspectorTab === 'figure' ? handleRegionPress : undefined}
             onFrameRegion={measureOpen || reviewOpen ? undefined : handleFrameRegion}
             feedback={reviewOpen ? {

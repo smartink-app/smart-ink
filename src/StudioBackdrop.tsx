@@ -17,7 +17,7 @@ export default function StudioBackdrop({ studio, isolateRegion, performanceMode 
   }, [scene, studio.mode, studio.color]);
   const stage = useMemo(() => {
     const geometry = createStudioSweepGeometry(4.2, 8);
-    const paper = new THREE.MeshStandardMaterial({ color: '#d6cdc1', roughness: .98, metalness: 0, side: THREE.DoubleSide });
+    const paper = new THREE.MeshStandardMaterial({ color: '#d6cdc1', roughness: .98, metalness: 0, transparent: true, depthWrite: false, side: THREE.DoubleSide });
     const shadow = createStudioShadowMaterial();
     const sweep = new THREE.Mesh(geometry, paper), shadows = new THREE.Mesh(geometry, shadow);
     shadows.receiveShadow = true; shadows.renderOrder = 1;
@@ -35,7 +35,13 @@ export default function StudioBackdrop({ studio, isolateRegion, performanceMode 
     let body: THREE.Mesh | null = null;
     scene.traverse(object => { if (object.userData.smartInkBody) body = object as THREE.Mesh; });
     const floor = body ? studioFloor(body) : null;
-    if (!floor || camera.position.y < floor.floor + .05) { stage.group.visible = false; return; }
+    if (!floor) { stage.group.visible = false; return; }
+    // A floor cannot remain in front of a below-floor camera. Fade toward the
+    // matching background before crossing it, rather than popping it off.
+    const floorBlend = THREE.MathUtils.smoothstep(camera.position.y - floor.floor, .05, .65);
+    stage.paper.opacity = floorBlend;
+    stage.shadow.opacity = studio.shadow * floorBlend;
+    if (floorBlend === 0) { stage.group.visible = false; return; }
     const distance = camera.position.length(), key = `${floor.height.toFixed(2)}:${distance.toFixed(1)}`;
     if (key !== stage.dimensions) {
       const geometry = createStudioSweepGeometry(floor.height, distance);

@@ -1,0 +1,110 @@
+{
+  "generator": "Built-in image_gen",
+  "designs": [
+    {
+      "id": "wild-peony",
+      "name": "Wild peony",
+      "category": "Botanical",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: an elegant open peony flower with layered petals, two leaves and a curved stem. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-0a5f9a52-da28-4a9d-983b-f8f590998267.png"
+    },
+    {
+      "id": "olive-branch",
+      "name": "Olive branch",
+      "category": "Botanical",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: a graceful curved olive branch with slender leaves and three olives. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-2449f251-4772-4f37-a94d-a9de7d38cb1d.png"
+    },
+    {
+      "id": "fern-frond",
+      "name": "Fern frond",
+      "category": "Botanical",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: one elegantly unfurling fern frond with delicate paired leaflets. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-ab3b87f1-42aa-4a8b-8ff7-040a1567c8a2.png"
+    },
+    {
+      "id": "coiled-serpent",
+      "name": "Coiled serpent",
+      "category": "Blackwork",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: a slender snake in a flowing vertical S curve with finely patterned scales. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-8965ae61-0966-4624-a16d-eed9e54dcc88.png"
+    },
+    {
+      "id": "swallow-flight",
+      "name": "Swallow in flight",
+      "category": "Traditional",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: a graceful swallow in flight with spread wings and a forked tail. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-32c0c29a-7efe-4ac8-a544-ed35146117e1.png"
+    },
+    {
+      "id": "koi-flow",
+      "name": "Flowing koi",
+      "category": "Illustrative",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: a single elegant koi swimming upward, curved tail and finely detailed scales. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-e769b832-2c9e-4cbb-9a82-a584e9966f84.png"
+    },
+    {
+      "id": "atlas-beetle",
+      "name": "Atlas beetle",
+      "category": "Blackwork",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: a symmetrical horned beetle with engraved wing cases. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-be84aecd-cb0e-4f45-9313-4d097462f6bb.png"
+    },
+    {
+      "id": "mountain-moon",
+      "name": "Mountain moon",
+      "category": "Landscape",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: an alpine mountain range under a crescent moon, enclosed in a slender diamond. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-cd1696a4-8c31-4d1f-92dc-94379c356ab0.png"
+    },
+    {
+      "id": "solar-orbit",
+      "name": "Solar orbit",
+      "category": "Celestial",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: an ornamental sun with elegant rays and three small orbital arcs. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-679160d0-f84e-44d7-bac5-1f19fa0dce69.png"
+    },
+    {
+      "id": "crescent-bloom",
+      "name": "Crescent bloom",
+      "category": "Celestial",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: a crescent moon entwined with delicate small flowers. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-43486d37-80c2-405f-a4dd-07615b7ed4a0.png"
+    },
+    {
+      "id": "ornamental-lotus",
+      "name": "Ornamental lotus",
+      "category": "Ornamental",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: a symmetrical lotus with ornamental hanging beads and delicate dots. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-7feac13c-c31b-482d-87f9-7ad07071be86.png"
+    },
+    {
+      "id": "compass-star",
+      "name": "Compass star",
+      "category": "Geometric",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: an elegant eight-point compass rose with fine concentric rings. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-8c09f295-a392-4cfe-ae36-d1107bfbf1bd.png"
+    },
+    {
+      "id": "ocean-wave",
+      "name": "Ocean wave",
+      "category": "Illustrative",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: a curling ocean wave with elegant foam and layered flowing lines. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-45576f9f-7a0a-48a5-9c00-c01375a99ac1.png"
+    },
+    {
+      "id": "sacred-heart",
+      "name": "Sacred heart",
+      "category": "Traditional",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: a classic heart with a small flame above and ornamental leaf flourishes. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-0842e7d4-4502-4e82-909d-34320de21b1e.png"
+    },
+    {
+      "id": "ginkgo-fan",
+      "name": "Ginkgo fan",
+      "category": "Botanical",
+      "prompt": "Use case: stylized-concept. Create one finished professional black ink tattoo flash design: three graceful fan-shaped ginkgo leaves with fine veins on a curved twig. Fine line engraving with selective bold black shapes and restrained stippling. Beautiful clean silhouette, balanced standalone composition, generous clear margin. Actual transparent background, transparent negative spaces, black ink only. No paper, no skin, no mockup, no checkerboard, no text, no borders, no shadow. Crisp art suitable for placing onto a 3D body.",
+      "source": "/Users/sil/.codex/generated_images/01a187d0-625b-74a0-86d7-1fdaba97b127/exec-242fdd64-db33-486c-90eb-e2f65cf76485.png"
+    }
+  ]
+}

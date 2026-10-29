@@ -1,0 +1,21 @@
+export interface TattooAsset { id: string; name: string; source: string; category: string }
+export const STARTER_TATTOOS: TattooAsset[] = [
+  { id: 'rose', name: 'Botanical rose', source: '/tattoos/botanical-rose.png', category: 'Botanical' },
+  { id: 'moth', name: 'Lunar moth', source: '/tattoos/lunar-moth.png', category: 'Celestial' },
+  { id: 'dagger', name: 'Ornamental dagger', source: '/tattoos/ornamental-dagger.png', category: 'Ornamental' },
+  {"id": "wild-peony", "name": "Wild peony", "source": "/tattoos/wild-peony.png", "category": "Botanical"},
+  {"id": "olive-branch", "name": "Olive branch", "source": "/tattoos/olive-branch.png", "category": "Botanical"},
+  {"id": "fern-frond", "name": "Fern frond", "source": "/tattoos/fern-frond.png", "category": "Botanical"},
+  {"id": "coiled-serpent", "name": "Coiled serpent", "source": "/tattoos/coiled-serpent.png", "category": "Blackwork"},
+  {"id": "swallow-flight", "name": "Swallow in flight", "source": "/tattoos/swallow-flight.png", "category": "Traditional"},
+  {"id": "koi-flow", "name": "Flowing koi", "source": "/tattoos/koi-flow.png", "category": "Illustrative"},
+  {"id": "atlas-beetle", "name": "Atlas beetle", "source": "/tattoos/atlas-beetle.png", "category": "Blackwork"},
+  {"id": "mountain-moon", "name": "Mountain moon", "source": "/tattoos/mountain-moon.png", "category": "Landscape"},
+  {"id": "solar-orbit", "name": "Solar orbit", "source": "/tattoos/solar-orbit.png", "category": "Celestial"},
+  {"id": "crescent-bloom", "name": "Crescent bloom", "source": "/tattoos/crescent-bloom.png", "category": "Celestial"},
+  {"id": "ornamental-lotus", "name": "Ornamental lotus", "source": "/tattoos/ornamental-lotus.png", "category": "Ornamental"},
+  {"id": "compass-star", "name": "Compass star", "source": "/tattoos/compass-star.png", "category": "Geometric"},
+  {"id": "ocean-wave", "name": "Ocean wave", "source": "/tattoos/ocean-wave.png", "category": "Illustrative"},
+  {"id": "sacred-heart", "name": "Sacred heart", "source": "/tattoos/sacred-heart.png", "category": "Traditional"},
+  {"id": "ginkgo-fan", "name": "Ginkgo fan", "source": "/tattoos/ginkgo-fan.png", "category": "Botanical"},
+];

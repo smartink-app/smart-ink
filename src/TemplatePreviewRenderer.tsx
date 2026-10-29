@@ -6,9 +6,7 @@ import CinematicLights from './CinematicLights';
 import StudioBackdrop from './StudioBackdrop';
 import ErrorBoundary from './ErrorBoundary';
 import { LIGHTING_PRESETS } from './config/lightingPresets';
-import { DEFAULT_STUDIO } from './render/studioSettings';
-import { fitRegionCamera } from './render/focusCamera';
-import { SCENE_TEMPLATES, templatePreviewCache, type TemplatePreview } from './sceneTemplates';
+import { SCENE_TEMPLATES, TEMPLATE_STUDIO, TEMPLATE_LIGHTS, templateCamera, templatePreviewCache, type TemplatePreview } from './sceneTemplates';
 
 const noPlacement = () => {};
 const lighting = LIGHTING_PRESETS.studio;
@@ -27,7 +25,8 @@ function Snapshot({ template, onReady, onError }: {
     if (!fitted.current) {
       const framing = model.current?.getRegionFraming();
       if (!framing) return;
-      fitted.current = fitRegionCamera(framing, [0.35, 0.08, 1], 45, camera.aspect);
+      fitted.current = templateCamera(template, framing, camera.aspect);
+      camera.fov = fitted.current.fov;
       camera.position.fromArray(fitted.current.position);
       camera.lookAt(...fitted.current.target);
       camera.updateProjectionMatrix();
@@ -41,12 +40,12 @@ function Snapshot({ template, onReady, onError }: {
     } catch { onError(); }
   }, 1);
   return <>
-    <CinematicLights preset="studio" />
-    <StudioBackdrop studio={DEFAULT_STUDIO} isolateRegion={template.region} performanceMode={false} />
+    <CinematicLights preset="studio" lights={TEMPLATE_LIGHTS} />
+    <StudioBackdrop studio={TEMPLATE_STUDIO} isolateRegion={template.region} performanceMode={false} />
     <ModelWithUVTattoo ref={model} uploadedImage={null} skinToneId="tone_03" bodyMeshId="body_full"
       decalRotation={0} decalScale={1} decalColor="#ffffff" decalOpacity={1}
       setDecalVisible={noPlacement} visible={false} editingEnabled={false}
-      lights={lighting.lights} intensityScale={lighting.threeIntensityScale} isolateRegion={template.region} />
+      lights={TEMPLATE_LIGHTS} intensityScale={lighting.threeIntensityScale} isolateRegion={template.region} />
   </>;
 }
 

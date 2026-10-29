@@ -1,3 +1,4 @@
+import { STARTER_TATTOOS } from './starterTattoos';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { FiArrowLeft, FiMaximize, FiEdit3 } from 'react-icons/fi';
@@ -15,11 +16,7 @@ import type { CameraView } from './render/cameraTransition';
 import type { SurfaceAnchor } from './render/surfacePlacement';
 
 // Deliberately no account, storage, upload, or render-service dependency.
-const samples = [
-  { name: 'Botanical rose', image: '/tattoos/botanical-rose.png' },
-  { name: 'Lunar moth', image: '/tattoos/lunar-moth.png' },
-  { name: 'Ornamental dagger', image: '/tattoos/ornamental-dagger.png' },
-];
+const samples = STARTER_TATTOOS.map(asset => ({ name: asset.name, image: asset.source }));
 const initialCamera: CameraView = { position: [0, 0, 8], target: [0, 0, 0], fov: 45 };
 
 export default function PublicDemo({ onHome, onRequestAccess }: { onHome: () => void; onRequestAccess: () => void }) {
@@ -68,7 +65,7 @@ export default function PublicDemo({ onHome, onRequestAccess }: { onHome: () => 
         <div className="ep-sidebar-body">
           <section className="ep-section" hidden={tab !== 'tattoo'}>
             <p className="ep-section-label">Choose a sample</p>
-            <div className="demo-samples">{samples.map(sample => <button type="button" key={sample.image} aria-pressed={artwork === sample.image} onClick={() => { setArtwork(sample.image); setVisible(true); }}><img src={sample.image} alt="" /><span>{sample.name}</span></button>)}</div>
+            <div className="demo-samples">{samples.map(sample => <button type="button" key={sample.image} aria-pressed={artwork === sample.image} onClick={() => { setArtwork(sample.image); setVisible(true); }}><img src={sample.image} alt="" loading="lazy" /><span>{sample.name}</span></button>)}</div>
             <button type="button" className="ep-btn" disabled={!ready} onClick={() => model.current?.placeInView()}>Place on visible skin</button>
             <AdjustmentControl label="Size" value={scale * 100} min={10} max={300} step={1} unit="%" resetValue={100} onChange={value => setScale(value / 100)} />
             <AdjustmentControl label="Rotation" value={rotation} min={-180} max={180} step={1} unit="°" resetValue={0} onChange={setRotation} />

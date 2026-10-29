@@ -95,7 +95,7 @@ for (const node of byRole('tab')) {
   assert.equal(node.props.tabIndex, node.props['aria-selected'] ? 0 : -1);
   assert.equal(byRole('tabpanel').find(panel => panel.props.id === node.props['aria-controls']).props['aria-labelledby'], node.props.id);
 }
-assert.ok(render().some(node => node.type === 'img' && node.props.src === '/logo.png'));
+assert.ok(render().some(node => node.type === 'img' && node.props.src === '/tattoos/botanical-rose.png'));
 assert.ok(text(render()).includes('Click the skin to place the example tattoo.'));
 assert.equal(button('Show before'), undefined, 'Before/after is offered once a tattoo is placed');
 assert.equal(render().filter(node => node.type === 'LightingControls').length, 1, 'One lighting editor');

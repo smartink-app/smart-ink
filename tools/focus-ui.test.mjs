@@ -85,7 +85,7 @@ try {
   dashboard.button('New project').props.onClick();assert.ok(dashboard.render().some(n=>n.type==='FocusDialog'));
   dashboard.render().find(n=>n.type==='input'&&n.props.placeholder?.startsWith('e.g.')).props.onChange({target:{value:'Rose sleeve'}});
   const create=dashboard.button('Create project');create.props.onClick();create.props.onClick();await dashboard.settle();assert.equal(created.length,1);assert.equal(opened.length,0);
-  assert.equal(created[0].name,'Rose sleeve');assert.equal(created[0].studio.color,'#30343c');
+  assert.equal(created[0].name,'Rose sleeve');assert.equal(created[0].studio.color,'#91857b');assert.equal(created[0].camera.fov,36);assert.ok(created[0].camera.position[0] > created[0].camera.target[0], 'Full-body introduction opens at an angle even before previews load');assert.ok(created[0].lights.every(light => light.color !== '#aaffee'), 'Introduction uses neutral fill');
   resolveCreate();await dashboard.settle();assert.equal(opened.length,1);dashboard.unmount();
 
   created=[];opened=[];failCreate=true;

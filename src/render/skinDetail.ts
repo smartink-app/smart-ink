@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 /** Baked from our Soft cells material. 16 mm tile, 30 µm encoded height range.
  * This is an artistic preview, not a measured scan or the Blender material. */
-export const SKIN_DETAIL = { texture: '/textures/soft-cells-height.png', strength: .4, scale: 1 } as const;
+export const SKIN_DETAIL = { texture: '/textures/soft-cells-height.png', strength: .24, scale: 1 } as const;
 
 /** Bind once before proportions or pose are applied, preserving skin anchors. */
 export function bindSkinRestCoordinates(geometry: THREE.BufferGeometry, matrixWorld: THREE.Matrix4, metresPerUnit = 1.75 / 4.2): void {
@@ -64,7 +64,7 @@ export const SKIN_DETAIL_GLSL = `
         }
       } else L = normalize(uLightPos[i] - uLightTarget[i]);
       vec3 H = normalize(L + V);
-      float fresnel = .028 + .12 * pow(1.0 - max(dot(V, H), 0.0), 5.0);
+      float fresnel = .035 + .12 * pow(1.0 - max(dot(V, H), 0.0), 5.0);
       float reflection = fresnel * ((exponent + 2.0) / 8.0)
         * pow(max(dot(N, H), 0.0), exponent) * max(dot(N, L), 0.0);
       result += uLightColor[i] * uLightIntensity[i] * attenuation * reflection;
