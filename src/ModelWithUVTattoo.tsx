@@ -210,7 +210,7 @@ const fragmentShader = `
     // Colour irregularity works at normal shot distance, independent of bump.
     skin.rgb *= vec3(1.0) + appearance.z * vec3(.45, 1.0, 1.15);
     skin.rgb *= 1.0 - appearance.x;
-    float veins = skinVeins() * smoothstep(.15,.9,vSkinArm);
+    float veins = skinVeins();
     skin.rgb *= vec3(1.0) + veins * vec3(-.075,-.012,.018);
     vec3 broadNormal = surfaceNormal();
     vec3 N = skinDetailNormal(broadNormal, microHeight);
@@ -291,14 +291,6 @@ function createSkinTexture(hexColor: string): THREE.CanvasTexture {
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = hexColor;
   ctx.fillRect(0, 0, size, size);
-  const imgData = ctx.getImageData(0, 0, size, size);
-  for (let i = 0; i < imgData.data.length; i += 4) {
-    const noise = (Math.sin(i * 12.9898) * 43758.5453 % 1) * 1.5;
-    imgData.data[i] += noise;
-    imgData.data[i + 1] += noise * 0.8;
-    imgData.data[i + 2] += noise * 0.5;
-  }
-  ctx.putImageData(imgData, 0, 0);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
@@ -491,6 +483,11 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       draco.setDecoderPath(DRACO_DECODER_PATH);
       (loader as GLTFLoader).setDRACOLoader(draco);
     });
+    const skinSex = bodyDef.id === 'body_full_female' ? 'female' : 'male';
+    const [skinAppearanceMap, skinRegionsMap] = useLoader(TextureLoader, [
+      `/textures/skin-${skinSex}-appearance-v3.png`, `/textures/skin-${skinSex}-regions-v3.png`,
+    ]);
+    for (const map of [skinAppearanceMap, skinRegionsMap]) { map.colorSpace = THREE.NoColorSpace; map.flipY = false; }
     const normalMap = useLoader(TextureLoader, bodyDef.normalMapUrl);
     const [sleeveShoulderTexture, sleeveChestTexture] = useLoader(TextureLoader, [SLEEVE_SOURCES.shoulder, SLEEVE_SOURCES.chest]);
     useEffect(() => { for (const texture of [sleeveShoulderTexture, sleeveChestTexture]) { texture.colorSpace = THREE.SRGBColorSpace; texture.needsUpdate = true; } }, [sleeveShoulderTexture, sleeveChestTexture]);
@@ -549,7 +546,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         vertexShader, fragmentShader,
         uniforms: {
           skinTexture: { value: null }, normalMap: { value: null }, normalMapStrength: { value: .75 },
-          skinDetailMap: { value: null }, skinDetailStrength: { value: SKIN_DETAIL.strength }, skinDetailScale: { value: SKIN_DETAIL.scale },
+          skinAppearanceMap: { value: null }, skinRegionsMap: { value: null }, skinDetailMap: { value: null }, skinDetailStrength: { value: SKIN_DETAIL.strength }, skinDetailScale: { value: SKIN_DETAIL.scale },
           sleeveEnabled: { value: 0 }, sleeveShoulderTexture: { value: null }, sleeveChestTexture: { value: null },
           starterInkOnly: { value: 0 }, tattooTexture: { value: null }, tattooAspect: { value: 1 },
           tattooColor: { value: new THREE.Color('#ffffff') }, tattooOpacity: { value: 1 },
@@ -566,9 +563,11 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       shaderMaterial.uniforms.skinTexture.value = skinTexture;
       shaderMaterial.uniforms.normalMap.value = normalMap;
       shaderMaterial.uniforms.skinDetailMap.value = detailMap;
+      shaderMaterial.uniforms.skinAppearanceMap.value = skinAppearanceMap;
+      shaderMaterial.uniforms.skinRegionsMap.value = skinRegionsMap;
       shaderMaterial.uniforms.tattooTexture.value = tattooTexture;
       shaderMaterial.uniforms.starterInkOnly.value = isStarterTattoo(tattooTexture.name) ? 1 : 0;
-    }, [shaderMaterial, skinTexture, normalMap, tattooTexture, detailMap, sleeveShoulderTexture, sleeveChestTexture]);
+    }, [shaderMaterial, skinTexture, normalMap, tattooTexture, detailMap, skinAppearanceMap, skinRegionsMap, sleeveShoulderTexture, sleeveChestTexture]);
     useEffect(() => { shaderMaterial.uniforms.skinDetailStrength.value = performanceMode ? 0 : SKIN_DETAIL.strength; }, [shaderMaterial, performanceMode]);
     useEffect(() => () => shaderMaterial.dispose(), [shaderMaterial]);
     const shadowMaterials = useMemo(() => createBodyShadowMaterials(shaderMaterial.uniforms.uIsolateRegion), [shaderMaterial]);

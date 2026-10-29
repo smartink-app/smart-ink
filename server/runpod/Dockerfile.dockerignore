@@ -21,3 +21,9 @@
 !smartink-live/body_full_female.blend
 !smartink-live/assets/
 !smartink-live/assets/skins.blend
+
+!smartink-live/skinProfile.json
+!smartink-live/skinAtlasManifest.json
+!public/textures/
+!public/textures/skin-*-v3.png
+!smartink-live/studioGeometry.py

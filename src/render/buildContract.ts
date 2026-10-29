@@ -102,6 +102,7 @@ export function validateContract(c: RenderContract): string[] {
       errs.push(`output.samples must be a number in [${FINAL_SAMPLES.min}, ${FINAL_SAMPLES.max}]`);
     }
   }
+  if (c.skinProfileVersion !== undefined && (c.skinProfileVersion !== 3 || c.skinMaterial !== 'studio' || c.renderStyle !== 'cinematic')) errs.push('unsupported shared skin material');
   if (!c.inkTextureUrl) errs.push('missing inkTextureUrl');
   if (c.bodyFit !== undefined) {
     if (!normalizeBodyFit(c.bodyFit, c.bodyMeshId)) errs.push('invalid bodyFit for this model');

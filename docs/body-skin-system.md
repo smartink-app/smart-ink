@@ -1,4 +1,4 @@
-# Body skin, recipe v2
+# Body skin, shared material v3
 
 The browser applies the authored Soft cells relief, irregular pigment, follicle marks,
 roughness variation, subtle arm veins, and surface-bound fine hairs. Torso, head,
@@ -20,16 +20,36 @@ No personal reference photos are bundled or uploaded.
 
 ## Blender handoff
 
-Blender now reads the same physical relief dimensions and stores the entire recipe
-on the body object. Package the JSON alongside studioSkin.py (the Runpod image does
-this). Existing Blender shading still implements only the authored relief layer;
-pigment, veins and body hairs do **not** match the browser yet.
+New Shoot contracts request `skinMaterial: studio` and `skinProfileVersion: 3`.
+Both renderers read the same 4096px UV data maps for pigment, spots, surface hair
+coverage, veins and regional relief. `tools/skin-atlas.html` bakes these from the
+browser procedural recipe for each body. `skinAtlasManifest.json` records channel
+encoding and hashes; Blender rejects missing or altered maps. Regenerate both body
+atlases and hashes when changing the procedural recipe or source UVs.
 
-For exact cross-renderer pattern matching, bake the browser's generated pigment,
-roughness, follicle and vein fields into the body UV atlas. Use non-colour data for
-roughness/height/masks and colour-managed base colour. Preserve source UVs and face
-anchors. Browser sin-hash arithmetic is not bit-identical to Blender noise; merely
-copying the seed into a Noise Texture node will not reproduce these markings.
+The shared material uses the same base-tone transforms, pore dimensions, regional
+roughness and hair-over-ink order. Rest coordinates convert between browser Y-up
+and Blender Z-up. Blender also applies the browser's three-segment tangent-plane
+surface refinement and closes focused limbs. Original source meshes and placement
+anchors remain unchanged. Blender 5.2 triangulation indices and older vector results
+are both supported by the closure code.
+
+Run `tools/shared-skin-parity.test.mjs` with a NumPy-enabled `PYTHON` to check surface
+math and asset hashes. Run `tools/shared-skin-blender.test.py` inside Blender for
+material, geometry and actual render checks; optional `SKIN_TEST_BODY`,
+`SKIN_TEST_REGION` and `SKIN_TEST_TONE` select additional cases.
+
+This shares surface inputs, not identical pixels: Cycles light transport, colour
+management, lens blur, denoising and export resolution still differ from the live
+browser. The local focused-arm photo completed through the app after the Blender
+5.2 closure fix; live comparison confirmed matching framing and tattoo placement,
+with softer fine lines in the Quick output. Final tonal/sharpness calibration and
+hosted verification remain release checks. Four-kilopixel atlases also need device
+memory/performance measurements before claiming mobile readiness.
+
+Deploy the rebuilt render-worker image (including the maps, manifest and geometry
+module) before releasing the frontend requesting v3. Local checks do not verify a
+hosted worker. Legacy contracts retain their existing material path.
 
 For the subsequent 3D hair groom, generate and save roots as source triangle IDs +
 barycentric coordinates, length, tangent direction, curvature and radius in metres.
@@ -44,7 +64,7 @@ orientation and handedness before baking.
 
 - Authored anatomical masks and directional guides; current boundaries are A-pose heuristics.
 - True surface curves for silhouette hairs, shadows and close macro shots.
-- UV baking and side-by-side Blender/browser validation under the same lights.
+- Detailed-output sharpness and tonal calibration under matched lighting.
 - Subsurface light transport and skin-tone calibration with neutral reference lighting.
 - Device performance measurements before increasing strand density or shader complexity.
 

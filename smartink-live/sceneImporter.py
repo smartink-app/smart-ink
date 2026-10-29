@@ -3577,7 +3577,8 @@ def apply_uv_ink_layer(body: bpy.types.Object, ink_path: str) -> None:
     links.new(ink_tex.outputs["Alpha"], mix.inputs["Factor"])
     links.new(mix.outputs["Result"], base_color_socket)
 
-    _apply_ink_surface_response(mat, bsdf, ink_tex)
+    if body.get('smartink_skin_material') != 'studio-v3':
+        _apply_ink_surface_response(mat, bsdf, ink_tex)
 
 
 def _apply_ink_surface_response(mat: bpy.types.Material, bsdf, ink_tex) -> None:
@@ -3963,6 +3964,9 @@ def build_scene(contract_path: str) -> str:
 
     if not is_render_contract(contract):
         raise ValueError("Expected RenderContract JSON (schemaVersion, bodyMeshId, output)")
+    shared_skin = contract.get('skinProfileVersion') == 3
+    if 'skinProfileVersion' in contract and (not shared_skin or contract.get('skinMaterial') != 'studio' or contract.get('renderStyle') != 'cinematic'):
+        raise ValueError('Unsupported shared skin material version')
     appearance = _body_appearance(contract)
     studio = _studio_settings(contract)
 
@@ -4029,7 +4033,7 @@ def build_scene(contract_path: str) -> str:
     if landmarks:
         add_hair(body, landmarks, eye_radius, appearance['hairTone'] if appearance else contract.get("hairTone") or DEFAULT_HAIR_TONE,
                  prepared_regions=True, scalp_style='none' if appearance is not None else None)
-    if cinematic:
+    if cinematic and not shared_skin:
         add_body_hair(
             body,
             contract.get("bodyHair") or BODY_HAIR_DEFAULTS.get(contract["bodyMeshId"], DEFAULT_BODY_HAIR),
@@ -4062,7 +4066,10 @@ def build_scene(contract_path: str) -> str:
     )
     if cinematic:
         enhance_skin_realism(body, contract["bodyMeshId"], contract_dir)
-        if contract.get('skinMaterial') == 'studio':
+        if shared_skin:
+            from studioSkin import apply_shared_skin
+            apply_shared_skin(body, contract['bodyMeshId'], contract.get('skinToneId', 'tone_03'), contract_dir, _world_scale(body))
+        elif contract.get('skinMaterial') == 'studio':
             from studioSkin import apply_studio_skin
             apply_studio_skin(body, _resolve_texture(contract_dir, 'soft-cells-height.png'), _world_scale(body))
         enhance_appearance_materials(body)
@@ -4073,9 +4080,18 @@ def build_scene(contract_path: str) -> str:
         ink_name = "ink.png"
     ink_path = ink_name if os.path.isabs(ink_name) else os.path.join(contract_dir, os.path.basename(ink_name))
     apply_uv_ink_layer(body, ink_path)
+    if shared_skin:
+        from studioSkin import apply_shared_hair_over_ink
+        apply_shared_hair_over_ink(body)
     if cinematic:
         # After the ink, because focus is pulled to the tattoo itself.
         apply_camera_realism(cam_obj, body, ink_path, camera_cfg)
+    if shared_skin:
+        from studioGeometry import add_focus_caps, refine_body
+        field = body.data.attributes.get('SmartInkFocus')
+        if contract.get('bodyRegion') and field:
+            add_focus_caps(body, [x.value for x in field.data], tuple(srgb_to_linear(c) for c in SKIN_TONES[contract.get('skinToneId', 'tone_03')]))
+        refine_body(body)
     focus_viewport_on_camera()
     output_path = setup_output(contract.get("output", {}), contract_dir)
     if studio and studio['mode'] == 'plain' and studio.get('gradient'):

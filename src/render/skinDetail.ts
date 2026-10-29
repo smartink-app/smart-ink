@@ -103,7 +103,7 @@ export const SKIN_DETAIL_GLSL = `
     }
     return vec2(0.0,hairs);
   }
-  vec3 skinAppearance() {
+  vec3 proceduralSkinAppearance() {
     if (skinDetailStrength <= 0.0) return vec3(0.0);
     vec2 mx = skinMarks(vSkinRest.yz,0.0), my = skinMarks(vSkinRest.xz,101.0), mz = skinMarks(vSkinRest.xy,207.0);
     vec2 marks;
@@ -119,7 +119,7 @@ export const SKIN_DETAIL_GLSL = `
     return vec3(marks,pigment*vSkinProfile.w);
   }
 
-  float skinVeins() {
+  float proceduralSkinVeins() {
     if (skinDetailStrength <= 0.0) return 0.0;
     vec3 p = vSkinRest;
     // Gentle longitudinal paths with a tapered tributary. Sparse exposure keeps
@@ -137,6 +137,16 @@ export const SKIN_DETAIL_GLSL = `
       * smoothstep(.004,.01,branchOffset) * .45;
     float exposure = smoothstep(.38,.7,skinNoise(p/.055+vec3(9.0)));
     return max(main,branch) * exposure;
+  }
+  uniform sampler2D skinAppearanceMap;
+  uniform sampler2D skinRegionsMap;
+  vec3 skinAppearance() {
+    if (skinDetailStrength <= 0.0) return vec3(0.0);
+    vec3 field = texture2D(skinAppearanceMap, vUv).rgb;
+    return vec3(field.r * .2, field.g, (field.b - .5) * .2);
+  }
+  float skinVeins() {
+    return skinDetailStrength <= 0.0 ? 0.0 : texture2D(skinRegionsMap, vUv).r;
   }
   float skinHeight() {
     vec3 p = vSkinRest / (${SKIN_DETAIL.tileMetres} * skinDetailScale);

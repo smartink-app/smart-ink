@@ -159,6 +159,8 @@ def validate_contract(data: bytes) -> dict:
     ):
         if name in contract and (not isinstance(contract[name], str) or contract[name] not in allowed):
             _invalid(f"Unknown {name}")
+    if "skinProfileVersion" in contract and (type(contract["skinProfileVersion"]) is not int or contract["skinProfileVersion"] != 3 or contract.get("skinMaterial") != "studio" or contract.get("renderStyle") != "cinematic"):
+        _invalid("skinProfileVersion requires supported studio v3 cinematic material")
     if "showEyes" in contract and type(contract["showEyes"]) is not bool:
         _invalid("showEyes must be true or false")
     if "eyeColor" in contract and (not isinstance(contract["eyeColor"], str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", contract["eyeColor"])):

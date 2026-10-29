@@ -21,6 +21,16 @@ class SnapshotCameraTests(unittest.TestCase):
         contract['camera'].update(camera)
         return validate_contract(json.dumps(contract).encode())
 
+    def test_shared_skin_version(self):
+        contract = copy.deepcopy(BASE)
+        contract.update(skinMaterial='studio', skinProfileVersion=3)
+        self.assertEqual(validate_contract(json.dumps(contract).encode())['skinProfileVersion'], 3)
+        for value in (0, 2, 4, True, '3', None):
+            contract['skinProfileVersion'] = value
+            with self.assertRaises(HTTPException): validate_contract(json.dumps(contract).encode())
+        contract.update(skinProfileVersion=3, skinMaterial='legacy')
+        with self.assertRaises(HTTPException): validate_contract(json.dumps(contract).encode())
+
     def test_legacy_contract_remains_legacy(self):
         self.assertNotIn('preserveFraming', self.validate()['camera'])
 

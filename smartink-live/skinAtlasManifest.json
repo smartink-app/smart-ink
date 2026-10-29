@@ -1,0 +1,13 @@
+{
+  "version": 3,
+  "resolution": 4096,
+  "generator": "tools/skin-atlas.html",
+  "appearanceChannels": "R: spots / .2; G: hair coverage; B: pigment / .2 + .5",
+  "regionsChannels": "R: veins; G: relief / 2",
+  "files": {
+    "skin-male-appearance-v3.png": "6f9349a5303e9dbb0dcb3838c8f06d9b4978ace6a230a499d87b50d519607fa6",
+    "skin-male-regions-v3.png": "fe8adb11b0b4f4efcc40db54d57e566e01409d2a968dffe88bb46b12e1471a2b",
+    "skin-female-appearance-v3.png": "6890c829756c7315748c21812ce3f170d12490f35094a083e4e1308a52018d2f",
+    "skin-female-regions-v3.png": "2f66515f917bfc852922f93eefa790541bda74ecf2b0e0115b721b7f868d9e4c"
+  }
+}

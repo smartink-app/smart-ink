@@ -562,6 +562,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
     )
     if (options?.snapshot) {
       contract.skinMaterial = 'studio'
+      contract.skinProfileVersion = 3
       if (guidedShot) contract.lighting = {
         presetName: 'studio', intensityScale: LIGHTING_PRESETS.studio.threeIntensityScale,
         lights: guidedLights(snapshotLook, snap, shotBrightness, LIGHTING_PRESETS.studio.threeIntensityScale),

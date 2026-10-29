@@ -26,6 +26,7 @@ export interface RenderContract {
   renderStyle?: 'cinematic' | 'preview';
   /** Opt-in calibrated skin. Missing retains the previous render material. */
   skinMaterial?: 'legacy' | 'studio';
+  skinProfileVersion?: 3;
   /** Local bounded motion endpoint only; still renders reject this field. */
   reveal?: RevealSettings;
   bodyMeshId: string;
