@@ -95,6 +95,7 @@ const vertexShader = `
   attribute vec3 aSkinNormal;
   varying vec3 vSkinRest;
   varying vec3 vSkinNormal;
+  varying float vSkinArm;
 
   varying vec2 vUv;
   varying vec2 vTattooUv;
@@ -115,6 +116,7 @@ const vertexShader = `
     vUv = uv;
     vSkinRest = aSkinRest;
     vSkinNormal = aSkinNormal;
+    vSkinArm = 1.0 - step(.1, min(abs(aRegion - 2.0), abs(aRegion - 3.0)));
     vTattooUv = aTattooUv;
     vTattooMask = aTattooMask;
     vTattooBoundary = aTattooBoundary;
@@ -199,6 +201,13 @@ const fragmentShader = `
     vec4 skin = texture2D(skinTexture, vUv);
     // Compute relief before branching on ink coverage; both surfaces share it.
     float microHeight = skinHeight();
+    vec3 appearance = skinAppearance();
+    vec3 baseSkinColor = skin.rgb;
+    // Colour irregularity works at normal shot distance, independent of bump.
+    skin.rgb *= vec3(1.0) + appearance.z * vec3(.45, 1.0, 1.15);
+    skin.rgb *= 1.0 - appearance.x;
+    float veins = skinVeins() * smoothstep(.15,.9,vSkinArm);
+    skin.rgb *= vec3(1.0) + veins * vec3(-.075,-.012,.018);
     vec3 N = skinDetailNormal(surfaceNormal(), microHeight);
     vec3 skinLighting = studioLighting(N, vWorldPosition);
     float roughness = clamp(.56 + (microHeight - .5) * .14, .48, .64);
@@ -216,6 +225,10 @@ const fragmentShader = `
         skin.rgb = mix(skin.rgb, tattooLayer.rgb * 0.85 * skinLighting + reflection, tattooLayer.a);
       }
     }
+
+    // Fine hairs sit over both bare and tattooed skin, with the same light rig.
+    skin.rgb = mix(skin.rgb, baseSkinColor * skinLighting * 1.8 + reflection,
+      min(.24, appearance.y * .9));
 
     bool lit = vHighlightMask > 0.5;
     if (lit) {
