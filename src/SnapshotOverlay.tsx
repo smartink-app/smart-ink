@@ -145,8 +145,8 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
 
     <footer ref={footerRef} className="snapshot-footer">
       {busy && progress?.phase === 'final' && <div className="snapshot-progress">
-        <div className="snapshot-progress-copy"><span>{fraction === 1 ? 'Finishing details…' : 'Refining details…'}</span><span aria-hidden="true">{progress.total ? `${progress.sample ?? 0} / ${progress.total} samples` : 'Rendering'}</span></div>
-        <progress aria-label="Final render samples" max={1} value={progress.total ? fraction : undefined} />
+        <div className="snapshot-progress-copy"><span>{fraction === 1 ? 'Finishing details…' : 'Refining details…'}</span><span aria-hidden="true">{progress.total ? `${progress.sample ?? 0} / ${progress.total}` : 'Rendering'}</span></div>
+        <progress aria-label="Final render progress" max={1} value={progress.total ? fraction : undefined} />
       </div>}
       <div className={`snapshot-status-row ${failed ? 'snapshot-status-row--error' : ''}`}>
         <div className="snapshot-status-copy" role={failed ? 'alert' : 'status'} aria-live={failed ? 'assertive' : 'polite'}>
