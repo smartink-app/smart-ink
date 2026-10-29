@@ -4,7 +4,7 @@ const img='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAA
 const contract={schemaVersion:1,bodyMeshId:'body_full',inkTextureUrl:'ink.png',lookId:'studio_softbox',output:{width:512,height:512,qualityTier:'preview'}};
 const config={url:'https://db.test',serviceKey:'server-only',runpodKey:'gpu-secret',endpoint:'endpoint',origins:['https://app.test']};
 const assert=(x:unknown,message='Assertion failed')=>{if(!x)throw new Error(message);};
-function setup(options: {anonymous?:boolean; active?:boolean; missing?:boolean; reserve?:boolean; limited?:boolean; status?:string; failedUpload?:boolean; direct?:boolean; wrongPath?:boolean; wrongSize?:boolean; signFailure?:boolean}={}) {
+function setup(options: {anonymous?:boolean; active?:boolean; missing?:boolean; reserve?:boolean; limited?:boolean; status?:string; failedUpload?:boolean; direct?:boolean; wrongPath?:boolean; wrongSize?:boolean; signFailure?:boolean; providerStatus?:number}={}) {
  const calls:{url:string;body:unknown;method:string}[]=[];
  const row={id:jobId,owner:uid,status:'IN_QUEUE',runpod_id:'provider-job',contract,result_path:null,expires_at:new Date(Date.now()+100000).toISOString()};
  const handler=createHandler(config,(async(input,init)=>{
@@ -18,6 +18,8 @@ function setup(options: {anonymous?:boolean; active?:boolean; missing?:boolean; 
    assert(url.includes(`owner=eq.${uid}`),'Every job query must include authenticated owner');
    if(method==='PATCH')Object.assign(row,body);return Response.json(options.missing?[]:[row]);
   }
+  if(url.endsWith('/health'))return new Response(null,{status:options.providerStatus??200});
+  if(url.endsWith('/run') && options.providerStatus)return new Response(null,{status:options.providerStatus});
   if(url.endsWith('/run'))return Response.json({id:'provider-job',status:'IN_QUEUE'});
   if(url.includes('/status/'))return Response.json({status:options.status??'IN_PROGRESS',output:options.direct?[{type:'final',path:options.wrongPath?'another-owner/image.png':`${uid}/${jobId}.png`,mimeType:'image/png',width:512,height:512,bytes:8*1024*1024}]:[{type:'final',image:img}]});
   if(url.includes('/stream/'))return Response.json({stream:[{output:{type:'progress',phase:'final',sample:3,total:16}},{output:{type:'preview',image:img}}]});
@@ -93,4 +95,20 @@ Deno.test('missing, mismatched or foreign stored image cannot complete job',asyn
 });
 Deno.test('Detailed 2560 dimensions accepted without rescaling',()=>{
  validateInput({contract:{...contract,output:{width:2560,height:1440,qualityTier:'final',samples:512}},ink_base64:img});
+});
+
+Deno.test('explicit provider rejection releases reservation but ambiguous failure keeps it locked',async()=>{
+ for(const status of [400,401,403,404,422,429,500,503]) {
+  const s=setup({providerStatus:status});
+  assert((await s.request('submit',{contract,ink_base64:img})).status>=400);
+  assert(s.calls.some(c=>c.method==='PATCH' && (c.body as {status:string}).status==='FAILED') === (status<500));
+  assert(s.calls.filter(c=>c.url.endsWith('/run')).length===1);
+ }
+});
+Deno.test('health checks provider access without submitting a render',async()=>{
+ for(const status of [200,401,403,404,503]) {
+  const s=setup({providerStatus:status});const reply=await(await s.request('health')).json();
+  assert(reply.ready===(status===200));
+  assert(!s.calls.some(c=>c.url.endsWith('/run') || c.url.includes('reserve')));
+ }
 });

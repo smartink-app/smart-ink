@@ -1850,7 +1850,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
             onFocus={setMeasureStep} onClose={closeMeasurement} completeLabel="Fit my body"
             onComplete={async values => { const result = await fitBody(bodyMeshId, values); setBodyFit(result.fit); closeMeasurement() }} />}
           {snapshot.open && <SnapshotOverlay
-            renderDisabled={renderBusy || isExporting}
+            renderDisabled={renderBusy || isExporting || renderServer?.ready === false}
             exportControls={shootExportControls}
             onOpenRenders={() => afterSaving(() => { closeSnapshot(); setDashboardSection('renders'); setShowDashboard(true) })}
             mode={snapshot.mode} onAdjust={snapshotSession.adjust} previewing={!!revealPreview}
@@ -1878,7 +1878,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
             framingHint={snapshotHasTattoo ? (decalVisible ? 'Camera anchored to your tattoo. Adjust the shot, then render.' : 'Camera anchored to the placement. The tattoo is hidden in this before view.') : snapshotFramingHint}
             previewUrl={snapshot.previewUrl} progress={snapshot.progress}
             status={snapshot.status} imageUrl={snapshot.imageUrl} message={snapshot.message}
-            elapsed={snapshotElapsed} quality={snapshot.quality} warning={snapshot.warning}
+            elapsed={snapshotElapsed} quality={snapshot.quality} warning={renderServer?.ready === false ? renderServer.message : snapshot.warning}
             comparisonAvailable={snapshot.imageMatchesView && (!snapshot.aspect || Math.abs(viewportAspect / snapshot.aspect - 1) < 0.005)}
             comparisonUnavailableReason={!snapshot.imageMatchesView ? 'This image is from the previous shot. Render the new camera and lighting to compare.' : undefined}
             onQualityChange={snapshotSession.setQuality} onRender={() => void snapshotSession.render()}
