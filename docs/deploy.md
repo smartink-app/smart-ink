@@ -124,7 +124,7 @@ npm run build
 
 `test:phase1` includes core demo regressions. Repeat only suites affected by later
 changes. CI runs core and prototype suites on `main`, `beta` and `studio-test`. CI rejects
-`dist/` over 25 MiB. Keep Blender working files outside `public/`; inspect the
+`dist/` over 80 MiB (70 MiB reviewed baseline including starter artwork and skin atlases). Keep Blender working files outside `public/`; inspect the
 actual release output rather than relying on an old size estimate.
 
 ## Live smoke tests before inviting testers

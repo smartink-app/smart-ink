@@ -7,7 +7,9 @@ on:
     paths:
       - 'server/**'
       - 'public/measurements/**'
-      - 'smartink-live/sceneImporter.py'
+      - 'smartink-live/*.py'
+      - 'smartink-live/*.json'
+      - 'public/textures/skin-*-v3.png'
       - 'smartink-live/body_full*.blend'
       - 'smartink-live/assets/skins.blend'
       - 'tools/runpod-worker.test.py'
@@ -70,7 +72,7 @@ jobs:
         run: |
           docker run --rm --entrypoint python -e SMARTINK_RENDER_DEVICE=CPU \
             -v "$PWD/tools/runpod-smoke.py:/app/tools/runpod-smoke.py:ro" \
-            ghcr.io/smartink-app/smart-ink-render:${{ github.sha }} tools/runpod-smoke.py
+            ghcr.io/smartink-app/smart-ink-render:${{ github.sha }} tools/runpod-smoke.py --shared-skin
       - name: Verify native measured bodies and render a fitted image
         run: |
           docker run --rm --entrypoint blender -v "$PWD/tools:/app/tools:ro" \
