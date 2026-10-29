@@ -3,6 +3,7 @@
  * environment (see authMode) and keeps the function names the pages already
  * use; everything is async because the hosted backend is.
  */
+import { localDebugEnabled } from './localDebug';
 import { authMode, type BetaAuthBackend } from './backend';
 import {
   localDemoBackend,
@@ -70,12 +71,12 @@ export function redeemInvite(code: string, email: string): Promise<void> {
   return requireSignInBackend().redeemInvite(code, email);
 }
 
-export function requestEmailCode(email: string): Promise<{ demoCode?: string }> {
-  return requireSignInBackend().requestEmailCode(email);
+export function requestEmailCode(email: string, inviteCode?: string): Promise<{ demoCode?: string }> {
+  return requireSignInBackend().requestEmailCode(email, inviteCode);
 }
 
-export function verifyEmailCode(email: string, code: string): Promise<BetaSession> {
-  return requireSignInBackend().verifyEmailCode(email, code);
+export function verifyEmailCode(email: string, code: string, inviteCode?: string): Promise<BetaSession> {
+  return requireSignInBackend().verifyEmailCode(email, code, inviteCode);
 }
 
 export async function signInWithPassword(email: string, password: string): Promise<BetaSession> {
@@ -84,13 +85,13 @@ export async function signInWithPassword(email: string, password: string): Promi
 }
 
 /** Resolves to null while the browser is being redirected to Google. */
-export function signInWithGoogle(emailHint?: string): Promise<BetaSession | null> {
-  return requireSignInBackend().signInWithGoogle(emailHint);
+export function signInWithGoogle(emailHint?: string, inviteCode?: string): Promise<BetaSession | null> {
+  return requireSignInBackend().signInWithGoogle(emailHint, inviteCode);
 }
 
 /** Demo backend only (DEV builds). */
 export async function signInAsDevAdmin(): Promise<BetaSession> {
-  if (authMode() !== 'demo') throw new Error('The dev admin shortcut only exists in the local demo backend.');
+  if (!localDebugEnabled(authMode())) throw new Error('Local admin requires development mode on localhost with ?debug=1.');
   return demoSignInAsDevAdmin();
 }
 

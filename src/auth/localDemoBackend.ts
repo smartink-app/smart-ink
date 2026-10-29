@@ -72,6 +72,13 @@ function save(snapshot: BetaAuthSnapshot): void {
   listeners.forEach((l) => l());
 }
 
+export function updateDemoDisplayName(email: string, displayName: string): void {
+  const snapshot = load();
+  if (!snapshot.session || snapshot.session.email !== email) throw new Error('Please sign in again.');
+  snapshot.session.displayName = displayName;
+  save(snapshot);
+}
+
 function adminUnlocked(): boolean {
   return sessionStorage.getItem(ADMIN_KEY) === '1';
 }
@@ -250,6 +257,7 @@ export const localDemoBackend: BetaAuthBackend = {
     if (invite.email && invite.email !== email) {
       throw new Error('This invite is reserved for a different email.');
     }
+    if (snap.waitlist.some(e => e.email === email && e.status === 'revoked')) throw new Error(accessMessage('revoked'));
     invite.redeemedAt = Date.now();
     invite.redeemedByEmail = email;
     const entry = snap.waitlist.find((e) => e.email === email);
@@ -262,7 +270,7 @@ export const localDemoBackend: BetaAuthBackend = {
         invitedAt: Date.now(),
         source: `invite:${invite.code}`,
       });
-    } else if (entry.status !== 'revoked') {
+    } else if (entry.status !== 'revoked' && entry.status !== 'active') {
       entry.status = 'invited';
       entry.invitedAt = Date.now();
     }
@@ -270,26 +278,32 @@ export const localDemoBackend: BetaAuthBackend = {
     if (entry?.status === 'revoked') throw new Error(accessMessage('revoked'));
   },
 
-  async requestEmailCode(rawEmail) {
+  async requestEmailCode(rawEmail, inviteCode) {
     const email = normalizeEmail(rawEmail);
     if (!isValidEmail(email)) throw new Error('Enter a valid email address.');
-    assertCanSignIn(load(), email);
+    if (inviteCode) {
+      const invite = await localDemoBackend.getInvite(inviteCode);
+      if (!invite || invite.redeemed || invite.expiresAt <= Date.now()) throw new Error('This invitation is no longer available. Ask for a new link.');
+      if (invite.email && invite.email !== email) throw new Error('Use the email this invitation was sent to.');
+    } else assertCanSignIn(load(), email);
     return { demoCode: DEMO_EMAIL_CODE };
   },
 
-  async verifyEmailCode(rawEmail, code) {
+  async verifyEmailCode(rawEmail, code, inviteCode) {
     const email = normalizeEmail(rawEmail);
     if (code.trim() !== DEMO_EMAIL_CODE) {
       throw new Error('Incorrect code. Use the demo code shown below the form.');
     }
+    if (inviteCode) await localDemoBackend.redeemInvite(inviteCode, email);
     return activateSession(email, 'email');
   },
 
-  async signInWithGoogle(emailHint) {
+  async signInWithGoogle(emailHint, inviteCode) {
     const email = normalizeEmail(emailHint ?? '');
     if (!isValidEmail(email)) {
       throw new Error('Enter the Google account email to continue (demo).');
     }
+    if (inviteCode) await localDemoBackend.redeemInvite(inviteCode, email);
     return activateSession(email, 'google');
   },
 

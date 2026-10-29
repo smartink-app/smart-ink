@@ -38,10 +38,10 @@ export interface BetaAuthBackend {
   redeemInvite(code: string, email: string): Promise<void>;
 
   /** Sends a one-time code. The demo backend returns the code instead. */
-  requestEmailCode(email: string): Promise<{ demoCode?: string }>;
-  verifyEmailCode(email: string, code: string): Promise<BetaSession>;
+  requestEmailCode(email: string, inviteCode?: string): Promise<{ demoCode?: string }>;
+  verifyEmailCode(email: string, code: string, inviteCode?: string): Promise<BetaSession>;
   /** Resolves to null when the browser is being redirected to Google. */
-  signInWithGoogle(emailHint?: string): Promise<BetaSession | null>;
+  signInWithGoogle(emailHint?: string, inviteCode?: string): Promise<BetaSession | null>;
 
   isAdmin(): Promise<boolean>;
   listWaitlist(): Promise<WaitlistEntry[]>;

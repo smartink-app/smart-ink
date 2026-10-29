@@ -1,3 +1,4 @@
+import { recordJourney } from './beta-journey/tracking';
 import { nativeDraftStore } from './ipad/nativeDraftStore';
 /**
  * Scene persistence, picked by the same switch as the beta gate: the hosted
@@ -21,12 +22,14 @@ export function loadScenes(): Promise<SceneData[]> {
   return store().loadScenes();
 }
 
-export function addScene(scene: SceneData): Promise<void> {
-  return store().addScene(scene);
+export async function addScene(scene: SceneData): Promise<void> {
+  await store().addScene(scene);
+  if (authMode() === 'demo' && scene.createdBy) void recordJourney(scene.createdBy, scene.createdBy, 'project_saved');
 }
 
-export function updateScene(scene: SceneData): Promise<void> {
-  return store().updateScene(scene);
+export async function updateScene(scene: SceneData): Promise<void> {
+  await store().updateScene(scene);
+  if (authMode() === 'demo' && scene.createdBy) void recordJourney(scene.createdBy, scene.createdBy, 'project_saved');
 }
 
 export function deleteScene(id: string): Promise<void> {

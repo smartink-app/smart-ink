@@ -682,3 +682,16 @@ html[data-theme] .beta-admin-page { max-width:1440px; width:100%; box-sizing:bor
 .admin-last-link { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
 .admin-last-link input { flex:1; min-width:180px; background:transparent; color:var(--text-primary); border:0; }
 @media(max-width:700px) { .admin-summary { grid-template-columns:repeat(2,1fr); } .beta-admin-header { flex-wrap:wrap; gap:16px; } }
+
+/* Keep login focused on one authentication step at a time. */
+.login-card--simple .login-back { margin-bottom: 18px; padding: 0; }
+.login-card--simple .login-logo { width: 42px; margin-bottom: 14px; }
+.login-card--simple .login-subtitle { line-height: 1.55; margin-bottom: 24px; }
+.login-method-divider { display: flex; align-items: center; gap: 14px; margin: 20px 0; color: var(--text-muted); font-size: 12px; }
+.login-method-divider::before, .login-method-divider::after { content: ''; height: 1px; flex: 1; background: var(--border-color); }
+.login-code-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 16px; font-size: 13px; }
+.login-card--simple .login-footer { margin-top: 24px; }
+.login-card--simple .login-footer p { margin: 0 0 8px; }
+.login-demo-tools { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted); }
+.login-demo-tools summary { cursor: pointer; }
+.login-demo-tools p { margin: 12px 0; }

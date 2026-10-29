@@ -21,7 +21,7 @@ interface Props {
   onSelectScene: (scene: SceneData) => void;
   onOpenLanding?: () => void;
   session: BetaSession;
-  onSignOut: () => void;
+  onSignOut: (opts?: { everywhere?: boolean }) => void | Promise<void>;
   onResume?: () => void;
   initialSection?: StudioSection;
   initialClientProject?: string; initialClientRole?: ProjectRole; initialVersionId?: string;

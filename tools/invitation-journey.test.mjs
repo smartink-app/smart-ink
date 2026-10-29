@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+const storage=new Map();
+globalThis.window={sessionStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},location:{origin:'https://example.com',pathname:'/'},setTimeout,addEventListener(){},removeEventListener(){}};
+let calls=[],failure=null,used=false,session={user:{id:'artist',email:'artist@example.com',created_at:'2026-01-01',user_metadata:{}}};
+globalThis.inviteClient={rpc:async(name,args)=>{
+ calls.push([name,args]);
+ if(name==='get_invite_public')return {data:[{code:'INVITE',email:'artist@example.com',expires_at:'2099-01-01',redeemed:used}]};
+ if(name==='redeem_invite')return {error:failure};
+ if(name==='my_access')return {data:'active'};
+ throw Error('Unexpected RPC '+name);
+},auth:{signInWithOtp:async args=>{calls.push(['send',args]);return {};},verifyOtp:async args=>{calls.push(['verify',args]);return {data:{session},error:args.token==='000000'?{message:'Invalid code'}:null};},signInWithOAuth:async args=>{calls.push(['google',args]);return {};},signOut:async()=>{calls.push(['signout']);return {};}}};
+const result=await build({entryPoints:['src/auth/supabaseBackend.ts'],bundle:true,write:false,format:'esm',platform:'node',define:{'import.meta.env':'{}'},plugins:[{name:'fixture',setup(b){b.onResolve({filter:/supabaseClient$/},()=>({path:'client',namespace:'mock'}));b.onLoad({filter:/.*/,namespace:'mock'},()=>({contents:'export const getSupabase=()=>globalThis.inviteClient;export const isSupabaseConfigured=()=>true;'}));}}]});
+const {supabaseBackend:backend}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+await backend.requestEmailCode('artist@example.com','INVITE');
+assert.deepEqual(calls.map(c=>c[0]),['get_invite_public','send'],'Sending a code must not consume invite');
+calls=[];await assert.rejects(backend.verifyEmailCode('artist@example.com','000000','INVITE'),/Invalid/);
+assert.deepEqual(calls.map(c=>c[0]),['verify'],'Wrong OTP must not consume invite');
+calls=[];const account=await backend.verifyEmailCode('artist@example.com','123456','INVITE');
+assert.equal(account.email,'artist@example.com');assert.deepEqual(calls.map(c=>c[0]),['verify','redeem_invite','my_access']);assert.equal(storage.size,0);
+calls=[];failure={message:'Use the invited Google account'};
+await assert.rejects(backend.verifyEmailCode('artist@example.com','123456','INVITE'),/invited Google/);
+assert.deepEqual(calls.map(c=>c[0]),['verify','redeem_invite','signout']);assert.equal(storage.size,1,'Retain invite for recovery');
+failure=null;calls=[];await backend.signInWithGoogle('artist@example.com','INVITE');
+assert.deepEqual(calls.map(c=>c[0]),['get_invite_public','google']);assert.equal(calls[1][1].options.queryParams.login_hint,'artist@example.com');assert.equal(storage.size,1,'Keep invite across OAuth redirect');
+calls=[];await assert.rejects(backend.requestEmailCode('wrong@example.com','INVITE'),/email/);assert.deepEqual(calls.map(c=>c[0]),['get_invite_public']);
+used=true;await assert.rejects(backend.requestEmailCode('artist@example.com','INVITE'),/already/);
+console.log('Invitation journey passed: send without redemption, failed OTP, verified redemption, failed account recovery, OAuth persistence, wrong recipient, used invite.');

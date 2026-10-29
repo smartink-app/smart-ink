@@ -1,3 +1,5 @@
+import BetaOperations from './beta-operations/BetaOperations';
+import BetaFeedbackInbox from './beta-feedback/BetaFeedbackInbox';
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   approveWaitlistEntry,
@@ -41,6 +43,9 @@ export default function BetaAdminPage({
   onGoLogin,
   onSignOut,
 }: BetaAdminPageProps) {
+  const [adminTab, setAdminTab] = useState<'people' | 'activity' | 'feedback' | 'followups' | 'access'>('people');
+  const [operationsRevision, setOperationsRevision] = useState(0);
+  const [feedbackTester, setFeedbackTester] = useState('all');
   const [query, setQuery] = useState('');
   const [section, setSection] = useState<'waitlisted' | 'invited' | 'active' | 'revoked' | 'invites'>('waitlisted');
   const [inviteFilter, setInviteFilter] = useState('all');
@@ -49,6 +54,7 @@ export default function BetaAdminPage({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [manualEmail, setManualEmail] = useState('');
+  const [inviteMethod, setInviteMethod] = useState<'email' | 'link'>('email');
   const [lastLink, setLastLink] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -115,7 +121,7 @@ export default function BetaAdminPage({
     setBusy('mint');
     try {
       const invite = await createInvite({
-        email: manualEmail.trim() ? manualEmail : null,
+        email: inviteMethod === 'email' ? manualEmail.trim() : null,
         note: note.trim() || 'Manual invite',
       });
       setManualEmail('');
@@ -148,7 +154,7 @@ export default function BetaAdminPage({
 
   const handleRefresh = async () => {
     setBusy('refresh'); setError(null);
-    try { await onRefresh(); } catch (err) { setError(err instanceof Error ? err.message : 'Could not refresh.'); }
+    try { await onRefresh(); setOperationsRevision(r => r + 1); } catch (err) { setError(err instanceof Error ? err.message : 'Could not refresh.'); }
     finally { setBusy(null); }
   };
 
@@ -181,7 +187,7 @@ export default function BetaAdminPage({
             <>
               <p className="beta-lead">
                 Local demo backend. Everything here lives in this browser only. Enter the operator
-                passphrase, or sign in as <code className="beta-code">admin</code> on the login page.
+                passphrase to manage this local preview.
               </p>
               <form className="beta-form" onSubmit={handleUnlock}>
                 <input
@@ -258,6 +264,10 @@ export default function BetaAdminPage({
       </div>
     </header>
     <p className="beta-admin-note">{mode === 'demo' ? 'Local preview · Changes stay in this browser. No real invitation emails are sent.' : `Hosted beta · Signed in as ${session?.email ?? 'operator'}`}</p>
+    <nav className="bf-admin-tabs" aria-label="Admin sections">{(['people','activity','feedback','followups'] as const).map(tab => <button key={tab} className="btn-login" aria-pressed={adminTab === tab || (tab === 'people' && adminTab === 'access')} onClick={() => { setAdminTab(tab); if (tab === 'feedback') setFeedbackTester('all'); }}>{tab === 'followups' ? 'Follow-ups' : tab[0].toUpperCase()+tab.slice(1)}</button>)}</nav>
+    {adminTab !== 'access' && loadError && <p className="beta-banner beta-banner--error" role="alert">{loadError}</p>}
+    {adminTab === 'people' || adminTab === 'activity' || adminTab === 'followups' ? <BetaOperations mode={mode} view={adminTab} waitlist={waitlist} invites={invites} activeEmails={activeEmails} refreshKey={operationsRevision} onInvites={() => setAdminTab('access')} onFeedback={email => { setFeedbackTester(email); setAdminTab('feedback'); }} /> : adminTab === 'feedback' ? <BetaFeedbackInbox key={feedbackTester} initialTester={feedbackTester} /> : <>
+    <div className="bo-heading"><h2>Access & invitations</h2><button className="btn-login" onClick={() => setAdminTab('people')}>Back to people</button></div>
     <div className="admin-summary">
       {(['waitlisted','invited','active','revoked'] as const).map(status => <button key={status} aria-pressed={section === status} onClick={() => setSection(status)}><strong>{counts[status]}</strong><span>{status === 'waitlisted' ? 'Awaiting review' : status === 'invited' ? 'Invited' : status === 'active' ? 'Active access' : 'Revoked'}</span></button>)}
     </div>
@@ -265,15 +275,25 @@ export default function BetaAdminPage({
     {(error || loadError) && <div className="beta-banner beta-banner--error" role="alert">{error || loadError}</div>}
     {lastLink && <div className="beta-banner admin-last-link"><span>Latest invitation</span><input aria-label="Latest invitation link" value={lastLink} readOnly onFocus={e => e.target.select()} /><button className="btn-login" onClick={() => void copy(lastLink).then(ok => setMessage(ok ? 'Link copied.' : 'Select and copy the link manually.'))}>Copy link</button></div>}
 
-    <details className="beta-admin-section admin-create">
-      <summary>Create an invitation</summary>
-      <p className="beta-muted">Enter an email to reserve and send the invitation. Leave it blank for a single-use link you can share yourself.</p>
+    <section className="beta-admin-section admin-create" aria-labelledby="invite-people-title">
+      <h2 id="invite-people-title">Invite people</h2>
+      <p className="beta-muted">Welcome someone into Smart Ink. Send a personal invitation or create a link to share.</p>
+      <div className="admin-record-tabs" role="group" aria-label="Invitation method">
+        <button type="button" aria-pressed={inviteMethod === 'email'} disabled={busy !== null} onClick={() => setInviteMethod('email')}>Send welcome email</button>
+        <button type="button" aria-pressed={inviteMethod === 'link'} disabled={busy !== null} onClick={() => setInviteMethod('link')}>Share an invite link</button>
+      </div>
+      <p className="beta-muted">{inviteMethod === 'email' ? 'Their welcome email includes a personal link to accept the invitation and sign in.' : 'Each link gives one person beta access. Create a new link for each person you invite.'}</p>
       <form className="beta-admin-inline-form" onSubmit={handleCreateInvite}>
-        <input className="login-input" aria-label="Invitation email" type="email" placeholder="Email address (optional)" value={manualEmail} onChange={e => setManualEmail(e.target.value)} />
-        <input className="login-input" aria-label="Invitation note" maxLength={200} placeholder="Internal note (optional)" value={note} onChange={e => setNote(e.target.value)} />
-        <button className="btn-getstarted" disabled={busy !== null}>{busy === 'mint' ? 'Creating…' : manualEmail.trim() ? 'Create & send invite' : 'Create invite link'}</button>
+        {inviteMethod === 'email' && <input className="login-input" aria-label="Invitation email" type="email" autoComplete="email" placeholder="you@studio.com" required disabled={busy !== null} value={manualEmail} onChange={e => setManualEmail(e.target.value)} />}
+        <input className="login-input" aria-label="Invitation note" maxLength={200} placeholder="Internal note (optional)" disabled={busy !== null} value={note} onChange={e => setNote(e.target.value)} />
+        <button className="btn-getstarted" disabled={busy !== null}>{busy === 'mint' ? 'Creating…' : inviteMethod === 'email' ? 'Send welcome email' : 'Create invite link'}</button>
       </form>
-    </details>
+      <p className="beta-muted">Just introducing Smart Ink? Share the homepage so people can explore and request access.</p>
+      <button type="button" className="btn-login" onClick={async () => {
+        const link = new URL('/', window.location.origin).toString();
+        setMessage(await copy(link) ? 'Homepage link copied.' : `Copy the homepage link: ${link}`);
+      }}>Copy homepage link</button>
+    </section>
 
     <section className="beta-admin-section">
       <div className="admin-list-tools">
@@ -293,5 +313,6 @@ export default function BetaAdminPage({
       </li>)}{extraActive.map(email => <li key={email}><strong>{email}</strong><span className="beta-muted">Active account</span></li>)}</ul>}
       {(section === 'invites' ? shownInvites.length === 0 : people.length + extraActive.length === 0) && <div className="admin-empty"><h3>{query ? 'No matching records' : 'Nothing here yet'}</h3><p className="beta-muted">{query ? 'Try another email or clear your search.' : 'New records will appear here as people move through the beta.'}</p></div>}
     </section>
+    </>}
   </div>;
 }

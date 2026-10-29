@@ -1,223 +1,92 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import {
-  getInvite,
-  redeemInvite,
-  requestEmailCode,
-  signInWithGoogle,
-  verifyEmailCode,
-} from './auth/betaAuthService';
+import { authMode, getInvite, requestEmailCode, signInWithGoogle, verifyEmailCode } from './auth/betaAuthService';
+import { setPendingInvite } from './auth/pendingInvite';
 import type { BetaSession, InvitePreview } from './auth/types';
 
 export interface InvitePageProps {
   code: string;
   onBack: () => void;
+  onLogin: () => void;
   onAuthenticated: (session: BetaSession) => void;
+  notice?: string | null;
 }
 
-type Step = 'redeem' | 'signin';
-type Busy = 'redeem' | 'google' | 'code' | 'verify' | null;
-
-export default function InvitePage({ code, onBack, onAuthenticated }: InvitePageProps) {
-  /** undefined while the lookup is in flight, null when the code is unknown. */
-  const [invite, setInvite] = useState<InvitePreview | null | undefined>(undefined);
+type Busy = 'google' | 'code' | 'verify' | null;
+export default function InvitePage({ code, onBack, onLogin, onAuthenticated, notice }: InvitePageProps) {
+  const [invite, setInvite] = useState<InvitePreview | null | undefined>();
   const [email, setEmail] = useState('');
-  const [step, setStep] = useState<Step>('redeem');
   const [otp, setOtp] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [demoCode, setDemoCode] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  const demo = authMode() === 'demo';
+  const nativeHost = typeof window !== 'undefined' && window.smartInkNativeHost === true;
 
   useEffect(() => {
     let cancelled = false;
-    setInvite(undefined);
-    setError(null);
-    getInvite(code)
-      .then((found) => {
-        if (cancelled) return;
-        setInvite(found);
-        if (found?.email) setEmail(found.email);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setInvite(null);
-        setError(err instanceof Error ? err.message : 'Could not look up that invite.');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [code]);
+    setInvite(undefined); setError(null); setEmail(''); setOtp(''); setCodeSent(false); setDemoCode(null);
+    getInvite(code).then(found => {
+      if (!cancelled) { setInvite(found); setEmail(found?.email ?? ''); }
+    }).catch(err => {
+      if (!cancelled) { setInvite(null); setError(err instanceof Error ? err.message : 'Could not check your invitation. Please try again.'); }
+    });
+    return () => { cancelled = true; };
+  }, [code, retry]);
 
-  const expired = invite ? Date.now() > invite.expiresAt : false;
+  const run = async (kind: Exclude<Busy, null>, fn: () => Promise<void>) => {
+    setBusy(kind); setError(null);
+    try { await fn(); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not continue. Please try again.'); }
+    finally { setBusy(null); }
+  };
+  const sendCode = () => run('code', async () => {
+    const result = await requestEmailCode(email, code);
+    setDemoCode(result.demoCode ?? null); setOtp(''); setCodeSent(true);
+  });
+  const google = () => run('google', async () => {
+    const session = await signInWithGoogle(email, code);
+    if (session) onAuthenticated(session);
+  });
+  const verify = (event: FormEvent) => {
+    event.preventDefault();
+    void run('verify', async () => onAuthenticated(await verifyEmailCode(email, otp, code)));
+  };
+  const leave = (action: () => void) => { setPendingInvite(); action(); };
   const used = Boolean(invite?.redeemed);
+  const expired = Boolean(invite && invite.expiresAt <= Date.now());
+  const available = invite && !used && !expired;
 
-  const run = async (kind: Exclude<Busy, null>, fn: () => Promise<void>, fallback: string) => {
-    setError(null);
-    setBusy(kind);
-    try {
-      await fn();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : fallback);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const handleRedeem = (e: FormEvent) => {
-    e.preventDefault();
-    void run(
-      'redeem',
-      async () => {
-        await redeemInvite(code, email);
-        setStep('signin');
-      },
-      'Could not redeem invite.'
-    );
-  };
-
-  const handleGoogle = () =>
-    run(
-      'google',
-      async () => {
-        const session = await signInWithGoogle(email);
-        if (session) onAuthenticated(session);
-      },
-      'Google sign-in failed.'
-    );
-
-  const handleSendCode = () =>
-    run(
-      'code',
-      async () => {
-        const result = await requestEmailCode(email);
-        setDemoCode(result.demoCode ?? null);
-        setCodeSent(true);
-      },
-      'Could not send code.'
-    );
-
-  const handleVerify = (e: FormEvent) => {
-    e.preventDefault();
-    void run(
-      'verify',
-      async () => {
-        onAuthenticated(await verifyEmailCode(email, otp));
-      },
-      'Could not verify code.'
-    );
-  };
-
-  return (
-    <div className="beta-gate-page">
-      <div className="beta-gate-card">
-        <button type="button" className="beta-link-btn" onClick={onBack}>
-          ← Back
-        </button>
-        <p className="beta-eyebrow">Private beta</p>
-        <h1>You’re invited</h1>
-        <p className="beta-lead">
-          Invite <code className="beta-code">{code}</code>
-          {invite?.email ? (
-            <>
-              {' '}
-              reserved for <strong>{invite.email}</strong>
-            </>
-          ) : invite === undefined ? null : (
-            <> — enter the email you’ll use to sign in.</>
-          )}
-        </p>
-
-        {invite === undefined && <p className="beta-muted">Checking your invite…</p>}
-        {invite === null && (
-          <div className="beta-banner beta-banner--error">
-            {error ?? 'This invite code was not found.'}
-          </div>
-        )}
-        {invite && expired && (
-          <div className="beta-banner beta-banner--error">This invite has expired.</div>
-        )}
-        {invite && used && step === 'redeem' && (
-          <div className="beta-banner">This invite was already redeemed. Try logging in.</div>
-        )}
-
-        {invite && !expired && step === 'redeem' && !used && (
-          <form className="beta-form" onSubmit={handleRedeem}>
-            <label className="beta-label" htmlFor="invite-email">
-              Email
-            </label>
-            <input
-              id="invite-email"
-              className="login-input"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@studio.com"
-              required
-              readOnly={Boolean(invite.email)}
-            />
-            {error && <p className="beta-error">{error}</p>}
-            <button
-              type="submit"
-              className="btn-cta"
-              disabled={busy !== null}
-              style={{ width: '100%' }}
-            >
-              {busy === 'redeem' ? 'Checking…' : 'Accept invite'}
-            </button>
-          </form>
-        )}
-
-        {step === 'signin' && (
-          <div className="beta-form">
-            <p className="beta-muted">Invite accepted for {email}. Finish signing in.</p>
-            <button
-              type="button"
-              className="btn-google"
-              onClick={handleGoogle}
-              disabled={busy !== null}
-            >
-              <span className="g-icon">G</span>{' '}
-              {busy === 'google' ? 'Opening Google…' : 'Continue with Google'}
-            </button>
-            <div className="login-divider" />
-            <button
-              type="button"
-              className="btn-continue"
-              onClick={handleSendCode}
-              disabled={busy !== null}
-            >
-              {busy === 'code' ? 'Sending…' : codeSent ? 'Send a new code' : 'Email me a code'}
-            </button>
-            {codeSent &&
-              (demoCode ? (
-                <div className="beta-banner">
-                  Demo only — the code is <strong>{demoCode}</strong>. Nothing is emailed by the
-                  local backend.
-                </div>
-              ) : (
-                <p className="beta-muted" role="status">
-                  We emailed a 6-digit code to <strong>{email.trim()}</strong>. Enter it below.
-                </p>
-              ))}
-            <form onSubmit={handleVerify} className="beta-otp-row">
-              <input
-                className="login-input"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                placeholder="6-digit code"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                aria-label="Sign-in code"
-              />
-              <button type="submit" className="btn-continue" disabled={busy !== null}>
-                {busy === 'verify' ? 'Checking…' : 'Verify'}
-              </button>
-            </form>
-            {error && <p className="beta-error">{error}</p>}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <div className="login-page"><div className="login-left"><div className="login-card login-card--simple">
+    <button type="button" className="beta-link-btn login-back" disabled={busy !== null} onClick={() => leave(onBack)}>← Home</button>
+    <img className="login-logo" src="/brand-droplet.svg" alt="Smart Ink" width={60} height={72} />
+    <p className="beta-eyebrow">Your private beta invitation</p>
+    <h2>{codeSent ? 'Check your email' : used ? 'Already accepted' : expired ? 'Let’s get you a new invite' : 'You’re invited to Smart Ink'}</h2>
+    <p className="login-subtitle">{codeSent ? `Enter the code sent to ${email.trim()}.` : used ? 'If you accepted this invitation, sign in to pick up where you left off.' : expired ? 'Ask the person who invited you for a fresh link, or request access from the homepage.' : 'Bring your tattoo ideas to life. Sign in below to accept your invitation and enter the studio. No password needed.'}</p>
+    {invite === undefined && <p role="status" className="beta-muted">Checking your invitation…</p>}
+    {notice && !busy && <p role="alert" className="beta-error">{notice}</p>}
+    {error && <p role="alert" className="beta-error">{error}</p>}
+    {invite === null && <div className="beta-form"><p className="beta-muted">{error ? 'Your invitation could not be checked.' : 'We couldn’t find this invitation. Check the link or ask the sender for a new one.'}</p><button className="btn-login" onClick={() => setRetry(value => value + 1)}>Try again</button><button className="beta-inline-link" onClick={() => leave(onBack)}>Request access</button></div>}
+    {(used || expired) && <div className="beta-form"><button className="btn-continue" onClick={() => leave(onLogin)}>Go to sign in</button><button className="beta-inline-link" onClick={() => leave(onBack)}>Request a new invitation</button></div>}
+    {available && !codeSent && <>
+      {invite.email && <p className="beta-muted" style={{ marginBottom: 16 }}>For <strong>{invite.email}</strong>. Use this same email with Google or an email code.</p>}
+      {!nativeHost && !demo && <><button className="btn-google" disabled={busy !== null} onClick={() => void google()}><span className="g-icon" aria-hidden="true">G</span>{busy === 'google' ? 'Opening Google…' : 'Continue with Google'}</button><div className="login-method-divider"><span>or use email</span></div></>}
+      <form onSubmit={event => { event.preventDefault(); void sendCode(); }}>
+        <label className="beta-label" htmlFor="invite-email">Email address</label>
+        <input id="invite-email" className="login-input" type="email" autoComplete="email" required value={email} readOnly={Boolean(invite.email)} disabled={busy !== null} onChange={event => setEmail(event.target.value)} placeholder="you@studio.com" />
+        <button className="btn-continue" type="submit" disabled={busy !== null}>{busy === 'code' ? 'Sending…' : 'Continue with email'}</button>
+      </form>
+      <p className="login-footer">Your invitation is accepted once you finish signing in.</p>
+    </>}
+    {available && codeSent && <>
+      {demoCode && <p className="beta-banner" role="status">Local preview code: <strong>{demoCode}</strong>. No email was sent.</p>}
+      <form onSubmit={verify}>
+        <label className="beta-label" htmlFor="invite-otp">Sign-in code</label>
+        <input id="invite-otp" className="login-input" autoFocus autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required placeholder="6-digit code" value={otp} disabled={busy !== null} onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))} />
+        <button className="btn-continue" type="submit" disabled={busy !== null || otp.length !== 6}>{busy === 'verify' ? 'Opening your studio…' : 'Accept invitation & enter studio'}</button>
+      </form>
+      <div className="login-code-actions"><button className="beta-inline-link" disabled={busy !== null} onClick={() => void sendCode()}>{busy === 'code' ? 'Sending…' : 'Send a new code'}</button><button className="beta-inline-link" disabled={busy !== null} onClick={() => { setCodeSent(false); setOtp(''); setDemoCode(null); setError(null); setPendingInvite(); }}>{invite.email ? 'Other sign-in options' : 'Use another email'}</button></div>
+    </>}
+  </div></div></div>;
 }

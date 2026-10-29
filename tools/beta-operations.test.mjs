@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+async function load(path){const result=await build({entryPoints:[path],bundle:true,write:false,format:'esm',platform:'node',define:{'import.meta.env':'{}'}});return import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);}
+const {buildPeople,taskTiming}=await load('src/beta-operations/model.ts');
+const notes=[{email:'ARTIST@example.com',name:'Artist',studio:'Studio',cohort:'Wave 1',notes:'Private'}];
+const tasks=[{id:'t',email:'artist@example.com',title:'Check in',dueDate:'2026-10-29',status:'open',notes:'',createdAt:'2026-10-28T12:00:00Z',completedAt:null}];
+const people=buildPeople([{id:'w',email:'Artist@example.com',status:'revoked',createdAt:1}], [{code:'a',email:'artist@example.com',createdAt:2,redeemedAt:3,redeemedByEmail:'artist@example.com'},{code:'open',email:null,createdAt:4,redeemedAt:null}], ['artist@example.com'],notes,tasks,[{id:'f',tester:'artist@example.com',createdAt:'2026-10-28T14:00:00Z',screen:'Studio'}]);
+assert.equal(people.length,1,'Normalize identity across sources; unclaimed links are not people');
+assert.equal(people[0].access,'revoked','An old active list must not override explicit revocation');
+assert.equal(people[0].note.name,'Artist');assert.equal(people[0].reports.length,1);assert.equal(people[0].tasks.length,1);
+assert.deepEqual(new Set(people[0].activities.map(a=>a.kind)),new Set(['request','invite','redemption','feedback']));
+assert.equal(people[0].activities.some(a=>/sign.in|saved|export|return/i.test(a.label)),false,'Do not invent product usage');
+assert.equal(taskTiming(tasks[0],'2026-10-29'),'Due today');assert.equal(taskTiming(tasks[0],'2026-10-30'),'Overdue');assert.equal(taskTiming({...tasks[0],status:'done'},'2026-10-30'),'Done');
+let storage=new Map();globalThis.localStorage={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)};
+const {saveFollowUp,saveTester,readOperations}=await load('src/beta-operations/storage.ts');
+await saveTester('demo',notes[0]);await saveTester('demo',{...notes[0],email:'artist@example.com',cohort:'Wave 2'});
+assert.equal((await readOperations('demo')).notes.length,1);assert.equal((await readOperations('demo')).notes[0].cohort,'Wave 2');
+await saveFollowUp('demo',tasks[0]);await saveFollowUp('demo',{...tasks[0],status:'done',completedAt:'2026-10-29T12:00:00Z'});
+assert.equal((await readOperations('demo')).tasks.length,1);assert.equal((await readOperations('demo')).tasks[0].status,'done');
+await saveFollowUp('demo',tasks[0]);assert.equal((await readOperations('demo')).tasks[0].completedAt,null);
+localStorage.setItem=()=>{throw Error('Quota exceeded');};await assert.rejects(saveFollowUp('demo',{...tasks[0],title:'Unsaved'}),/Quota/);
+assert.equal((await readOperations('demo')).tasks[0].title,'Check in','Failed writes preserve stored task');
+storage.set('smartink:beta-operations:demo:v1','broken');await assert.rejects(readOperations('demo'));assert.equal(storage.get('smartink:beta-operations:demo:v1'),'broken');
+await assert.rejects(readOperations('unconfigured'),/not configured/);
+console.log('Beta operations passed: identity merge, revoked access, truthful events, due dates, persistence, completion/reopening, failed writes and malformed data.');

@@ -623,9 +623,8 @@ const Forearm: React.FC<{
   drag: DesignDrag;
   /** Written each frame with the design's place in the world, for the focus. */
   focus: React.RefObject<THREE.Vector3>;
-  onReady: () => void;
   onPlacementStatus: (message: string | null) => void;
-}> = ({ spin, drag, focus, onReady, onPlacementStatus }) => {
+}> = ({ spin, drag, focus, onPlacementStatus }) => {
   const sourceGeometry = useLoader(ForearmGeometryLoader, MESH_URL);
   const surface = useMemo(() => createInitialHeroTattoo(sourceGeometry), [sourceGeometry]);
   const geometry = surface.geometry;
@@ -663,10 +662,6 @@ const Forearm: React.FC<{
       }),
     [design]
   );
-
-  useEffect(() => {
-    onReady();
-  }, [onReady]);
 
   /* Aimed once here, since the per-frame aim below is skipped under reduced
      motion, and the canvas only places the camera. */
@@ -858,8 +853,12 @@ const gradeShader = {
  * is what stays sharp while the hand reaching out of the frame and the forearm
  * receding behind it soften off.
  */
-const Cinematic: React.FC<{ focus: React.RefObject<THREE.Vector3> }> = ({ focus }) => {
+const Cinematic: React.FC<{
+  focus: React.RefObject<THREE.Vector3>;
+  onReady: () => void;
+}> = ({ focus, onReady }) => {
   const { gl, scene, camera, size, viewport } = useThree();
+  const rendered = useRef(false);
 
   const passes = useMemo(() => {
     const composer = new EffectComposer(gl);
@@ -918,6 +917,11 @@ const Cinematic: React.FC<{ focus: React.RefObject<THREE.Vector3> }> = ({ focus 
     passes.bokeh.uniforms.focus.value = camera.position.distanceTo(focus.current);
     passes.grade.uniforms.uTime.value = clock.elapsedTime;
     passes.composer.render();
+    // Reveal only after the posed model and its final effects reach the canvas.
+    if (!rendered.current) {
+      rendered.current = true;
+      onReady();
+    }
   }, 1);
 
   return null;
@@ -1094,7 +1098,7 @@ export const HeroPreview: React.FC = () => {
       onPointerMove={showFallback ? undefined : trackHover}
       onPointerLeave={showFallback ? undefined : clearHover}
     >
-      {showFallback && (
+      {failed && (
         <div className="hero-preview-fallback">
           <SplitFigure />
         </div>
@@ -1116,8 +1120,8 @@ export const HeroPreview: React.FC = () => {
             style={{ opacity: ready ? 1 : 0 }}
           >
             <Suspense fallback={null}>
-              <Forearm spin={spin} drag={drag} focus={focus} onReady={handleReady} onPlacementStatus={setPlacementStatus} />
-              <Cinematic focus={focus} />
+              <Forearm spin={spin} drag={drag} focus={focus} onPlacementStatus={setPlacementStatus} />
+              <Cinematic focus={focus} onReady={handleReady} />
             </Suspense>
           </Canvas>
         </PreviewBoundary>

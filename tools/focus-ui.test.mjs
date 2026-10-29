@@ -7,7 +7,7 @@ const landingSource = await fs.readFile('src/LandingPage.tsx','utf8');
 const requestForm = landingSource.slice(landingSource.indexOf('const RequestAccessForm:'), landingSource.indexOf('const LandingPage:'));
 let lazyId = 0;
 globalThis.__focusLazy = () => `Lazy${lazyId++}`;
-const stubNames = /^(\.\/)(client\/ClientProjectSpace|artist\/ArtistPanel|discovery\/ArtistDiscovery|moodboard\/MoodboardPortal|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryPage|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
+const stubNames = /^(\.\/)(beta-feedback\/BetaFeedback|beta-journey\/JourneyTracking|client\/ClientProjectSpace|artist\/ArtistPanel|discovery\/ArtistDiscovery|moodboard\/MoodboardPortal|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryPage|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
 const { outputFiles } = await build({
   stdin: { contents: `export {default as Dashboard} from './src/ScenesDashboard'; export {default as App} from './src/App'; export {default as Rail} from './src/StudioRail'; export {default as More} from './src/MoreControls'; export {ThemeRoot} from './src/Theme'; export {usePreference} from './src/usePreference'; export {RequestAccessForm} from 'focus-request-form';`, resolveDir: root },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', logLevel: 'silent',
@@ -58,7 +58,7 @@ const savedGlobals = new Map(['window','document','localStorage'].map(key=>[key,
 const events = new EventTarget(), storage = new Map(); let writesFail=false, readsFail=false;
 globalThis.localStorage={getItem(key){if(readsFail)throw Error('blocked');return storage.get(key)??null;},setItem(key,value){if(writesFail)throw Error('quota');storage.set(key,value);}};
 globalThis.document={documentElement:{dataset:{}},getElementById:()=>null};
-globalThis.window={addEventListener:events.addEventListener.bind(events),removeEventListener:events.removeEventListener.bind(events),dispatchEvent:events.dispatchEvent.bind(events),confirm:()=>true,location:{href:'http://local/',search:''},history:{replaceState(_,__,url){window.location={href:new URL(url,'http://local/').href,search:new URL(url,'http://local/').search};}},setTimeout};
+globalThis.window={matchMedia:()=>({matches:true,addEventListener(){},removeEventListener(){}}),addEventListener:events.addEventListener.bind(events),removeEventListener:events.removeEventListener.bind(events),dispatchEvent:events.dispatchEvent.bind(events),confirm:()=>true,location:{href:'http://local/',search:''},history:{replaceState(_,__,url){window.location={href:new URL(url,'http://local/').href,search:new URL(url,'http://local/').search};}},setTimeout};
 const session={email:'test@example.invalid',displayName:'Test artist',userId:'local-test',method:'email'};
 try {
   // The beta always opens in dark mode, even with an old saved light preference.

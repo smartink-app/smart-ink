@@ -1,14 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import {
   authMode,
-  DEV_ADMIN_HANDLE,
-  isDevAdminHandle,
   requestEmailCode,
   signInAsDevAdmin,
   signInWithGoogle,
   signInWithPassword,
   verifyEmailCode,
 } from './auth/betaAuthService';
+import { localDebugEnabled } from './auth/localDebug';
 import type { BetaSession } from './auth/types';
 
 export interface LoginPageProps {
@@ -45,18 +44,10 @@ export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvi
     }
   };
 
-  /** Dev shortcut (demo backend only): `admin` in the email field signs straight in. */
-  const tryDevAdmin = async (): Promise<boolean> => {
-    if (mode !== 'demo' || !isDevAdminHandle(email)) return false;
-    onAuthenticated(await signInAsDevAdmin());
-    return true;
-  };
-
   const handleGoogle = () =>
     run(
       'google',
       async () => {
-        if (await tryDevAdmin()) return;
         const session = await signInWithGoogle(email);
         // null means the browser is on its way to Google.
         if (session) onAuthenticated(session);
@@ -68,7 +59,6 @@ export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvi
     run(
       'code',
       async () => {
-        if (await tryDevAdmin()) return;
         const result = await requestEmailCode(email);
         setDemoCode(result.demoCode ?? null);
         setCodeSent(true);
@@ -81,7 +71,6 @@ export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvi
     void run(
       'verify',
       async () => {
-        if (await tryDevAdmin()) return;
         onAuthenticated(await verifyEmailCode(email, otp));
       },
       'Could not verify code.'
@@ -91,22 +80,21 @@ export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvi
   return (
     <div className="login-page">
       <div className="login-left">
-        <div className="login-card">
+        <div className="login-card login-card--simple">
           {onBackToLanding && !nativeHost && (
             <button
               type="button"
-              className="btn-login"
-              style={{ marginBottom: 20, width: '100%' }}
+              className="beta-link-btn login-back"
               onClick={onBackToLanding}
             >
-              ← Back
+              ← Home
             </button>
           )}
           <img className="login-logo" src="/brand-droplet.svg" alt="Smart Ink" width={100} height={120} />
-          <p className="beta-eyebrow">Members</p>
-          <h2>Welcome back</h2>
+          <p className="beta-eyebrow">Smart Ink · Private beta</p>
+          <h2>{codeSent ? 'Check your email' : 'Welcome to Smart Ink'}</h2>
           <p className="login-subtitle">
-            Sign in only if you’ve been invited. New here? Request access from the landing page.
+            {codeSent ? `Enter the code sent to ${email.trim()}.` : 'Use the email you accepted your invitation with. No password needed.'}
           </p>
 
           {notice && (
@@ -121,83 +109,40 @@ export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvi
             </div>
           )}
 
-          <label className="beta-label" htmlFor="login-email">
-            Email
-          </label>
-          <input
-            id="login-email"
-            type="email"
-            className="login-input"
-            placeholder="you@studio.com"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={unconfigured}
-            aria-label="Email"
-          />
-          <button
-            type="button"
-            className="btn-google"
-            hidden={nativeHost}
-            onClick={handleGoogle}
-            disabled={busy !== null || unconfigured}
-          >
-            <span className="g-icon">G</span>{' '}
-            {busy === 'google' ? 'Opening Google…' : 'Continue with Google'}
-          </button>
-          <div className="login-divider" />
-          <button
-            type="button"
-            className="btn-continue"
-            onClick={handleSendCode}
-            disabled={busy !== null || unconfigured}
-          >
-            {busy === 'code' ? 'Sending…' : codeSent ? 'Send a new code' : 'Email me a code'}
-          </button>
-
-          {mode === 'demo' && (
-            <div className="beta-banner" style={{ marginTop: 12 }}>
-              <button
-                type="button"
-                className="btn-continue"
-                disabled={busy !== null}
-                onClick={() => void run('verify', async () => {
-                  onAuthenticated(await signInAsDevAdmin());
-                }, 'Could not sign in as local admin.')}
-              >
-                Sign in as local admin
+          {!codeSent ? <>
+            {!nativeHost && <>
+              <button type="button" className="btn-google" onClick={handleGoogle} disabled={busy !== null || unconfigured}>
+                <span className="g-icon" aria-hidden="true">G</span>
+                {busy === 'google' ? 'Opening Google…' : 'Continue with Google'}
               </button>
-              Or type <strong>{DEV_ADMIN_HANDLE}</strong> in the email field. Local data stays in this browser.
+              <div className="login-method-divider"><span>or use email</span></div>
+            </>}
+            <form onSubmit={event => { event.preventDefault(); void handleSendCode(); }}>
+              <label className="beta-label" htmlFor="login-email">Email address</label>
+              <input id="login-email" type="email" className="login-input" placeholder="you@studio.com"
+                autoComplete="email" value={email} onChange={event => setEmail(event.target.value)}
+                required disabled={busy !== null || unconfigured} aria-label="Email" />
+              <button type="submit" className="btn-continue" disabled={busy !== null || unconfigured}>
+                {busy === 'code' ? 'Sending…' : 'Email me a code'}
+              </button>
+            </form>
+          </> : <>
+            {demoCode && <div className="beta-banner" role="status">Local preview code: <strong>{demoCode}</strong>. No email was sent.</div>}
+            <form onSubmit={handleVerify} className="login-code-form">
+              <label className="beta-label" htmlFor="login-code">Sign-in code</label>
+              <input id="login-code" className="login-input" inputMode="numeric" autoComplete="one-time-code"
+                placeholder="6-digit code" value={otp} onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                pattern="[0-9]{6}" maxLength={6} required autoFocus disabled={busy !== null || unconfigured} aria-label="Sign-in code" />
+              <button type="submit" className="btn-continue" disabled={busy !== null || unconfigured || otp.length !== 6}>
+                {busy === 'verify' ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
+            <div className="login-code-actions">
+              <button type="button" className="beta-inline-link" disabled={busy !== null} onClick={() => void handleSendCode()}>{busy === 'code' ? 'Sending…' : 'Send a new code'}</button>
+              <button type="button" className="beta-inline-link" disabled={busy !== null} onClick={() => { setCodeSent(false); setOtp(''); setDemoCode(null); setError(null); }}>Use another email</button>
             </div>
-          )}
-          {codeSent &&
-            (demoCode ? (
-              <div className="beta-banner" style={{ marginTop: 12 }}>
-                Demo only — the code is <strong>{demoCode}</strong>. Nothing is emailed by the
-                local backend.
-              </div>
-            ) : (
-              <p className="beta-muted" style={{ marginTop: 12 }} role="status">
-                We emailed a 6-digit code to <strong>{email.trim()}</strong>. Enter it below.
-              </p>
-            ))}
-
-          <form onSubmit={handleVerify} className="beta-otp-row" style={{ marginTop: 12 }}>
-            <input
-              className="login-input"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="6-digit code"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              disabled={unconfigured}
-              aria-label="Sign-in code"
-            />
-            <button type="submit" className="btn-continue" disabled={busy !== null || unconfigured}>
-              {busy === 'verify' ? 'Checking…' : 'Verify'}
-            </button>
-          </form>
-          {mode === 'supabase' && (
+          </>}
+          {mode === 'supabase' && !codeSent && (
             <details style={{ marginTop: 20 }}>
               <summary className="beta-inline-link" style={{ cursor: 'pointer' }}>Sign in with a password</summary>
               <form style={{ marginTop: 12 }} onSubmit={(event) => {
@@ -220,6 +165,7 @@ export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvi
           {error && <p className="beta-error" role="alert">{error}</p>}
 
           <div className="login-footer">
+            {onBackToLanding && !nativeHost && <p>New here? <button type="button" className="beta-inline-link" onClick={onBackToLanding}>Request beta access</button></p>}
             Have an invite code?{' '}
             {onOpenInvite ? (
               <button type="button" className="beta-inline-link" onClick={onOpenInvite}>
@@ -229,6 +175,13 @@ export default function LoginPage({ onAuthenticated, onBackToLanding, onOpenInvi
               <span>Open your invite link.</span>
             )}
           </div>
+          {localDebugEnabled(mode) && <details className="login-demo-tools">
+            <summary>Local preview tools</summary>
+            <p className="beta-muted">Preview only. Data stays in this browser.</p>
+            <button type="button" className="btn-login" disabled={busy !== null} onClick={() => void run('verify', async () => {
+              onAuthenticated(await signInAsDevAdmin());
+            }, 'Could not sign in as local admin.')}>Sign in as local admin</button>
+          </details>}
         </div>
       </div>
     </div>

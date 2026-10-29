@@ -56,11 +56,8 @@ export function useBetaAuth() {
   }, []);
 
   const signOut = useCallback(async (opts?: { everywhere?: boolean }) => {
-    try {
-      await betaAuth.signOut(opts);
-    } finally {
-      setSessionState(null);
-    }
+    await betaAuth.signOut(opts);
+    setSessionState(null);
   }, []);
 
   const unlockAdmin = useCallback(async (passphrase: string) => {

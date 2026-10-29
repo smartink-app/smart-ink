@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+const storage=new Map();globalThis.localStorage={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)};
+const result=await build({entryPoints:['src/beta-journey/tracking.ts'],bundle:true,write:false,format:'esm',platform:'node',define:{'import.meta.env':JSON.stringify({DEV:true,VITE_AUTH_MODE:'demo'})}});
+const {recordJourney,demoEvents}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+await recordJourney('a','a@example.invalid','verified_signin');await recordJourney('a','a@example.invalid','verified_signin');
+await recordJourney('a','a@example.invalid','visit');await recordJourney('a','a@example.invalid','visit');
+assert.equal(demoEvents().length,2);assert.equal(demoEvents().some(e=>e.kind==='returned'),false);
+const old=demoEvents();old.find(e=>e.kind==='visit').key='2000-01-01';localStorage.setItem('smartink:journey:demo:v1',JSON.stringify(old));
+await recordJourney('a','a@example.invalid','visit');await recordJourney('a','a@example.invalid','visit');
+assert.equal(demoEvents().filter(e=>e.kind==='returned').length,1);
+await recordJourney('b','b@example.invalid','visit');assert.equal(demoEvents().filter(e=>e.owner==='b'&&e.kind==='returned').length,0);
+localStorage.setItem=()=>{throw Error('Quota')};await assert.doesNotReject(recordJourney('a','a@example.invalid','export_ready'));
+console.log('Journey tracking passed: milestone and daily visit deduplication, later-day returns, account isolation and nonblocking storage failure.');

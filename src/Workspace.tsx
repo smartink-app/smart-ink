@@ -1,3 +1,4 @@
+import { recordJourney } from './beta-journey/tracking'
 import { setNativeDraftOwner, cacheSceneImages } from './ipad/nativeDraftStore'
 import { supabaseSceneStore } from './storage/supabaseSceneStore'
 import { authMode } from './auth/betaAuthService'
@@ -149,7 +150,7 @@ interface WorkspaceProps {
   /** Leave the workspace for the landing page. */
   onHome: () => void
   /** `everywhere` also revokes the account's sessions on other devices. */
-  onSignOut: (opts?: { everywhere?: boolean }) => void
+  onSignOut: (opts?: { everywhere?: boolean }) => void | Promise<void>
 }
 
 /**
@@ -350,6 +351,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
   const [snapshotSession] = useState(() => createSnapshotSession({
     render: renderContract,
     retain: async (shot, imageUrl) => {
+      void recordJourney(session.userId || session.email, session.email, 'export_ready')
       if (usesRunpodGateway()) return // Gateway already persisted this render.
       const image = await fetch(imageUrl).then((response) => response.blob())
       await addRenderHistory({ source: 'cycles', width: shot.contract.output.width,
@@ -858,6 +860,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       // Restore the interactive camera before image encoding or history I/O.
       restoreRenderer()
       const blob = await canvasPng(finalCanvas)
+      void recordJourney(session.userId || session.email, session.email, 'export_ready')
       downloadBlob(`smart-ink-${exportPreset}-${Date.now()}.png`, blob)
       try {
         await addRenderHistory({ source: 'canvas', width, height, exportPreset,
@@ -941,6 +944,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
         },
       })
       if (controller.signal.aborted) { URL.revokeObjectURL(imageUrl); return }
+      void recordJourney(session.userId || session.email, session.email, 'export_ready')
       setCloudRenderImage(imageUrl)
       setCloudRenderStatus('done')
       setCloudRenderMessage('Render complete.')
@@ -1228,7 +1232,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
           initialClientProject={clientProjectId} initialClientRole={clientRole} initialVersionId={clientReview?.versionId} onMoodboard={onMoodboard}
           onReviewScene={(scene, projectId, role, versionId) => loadScene(scene, { projectId, role, versionId })}
           session={session}
-          onSignOut={() => onSignOut()}
+          onSignOut={onSignOut}
           onSelectScene={loadScene}
           onResume={currentScene && !clientReview ? () => setShowDashboard(false) : undefined}
           onOpenLanding={() => afterSaving(onHome)}
@@ -1829,8 +1833,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       </div>
 
       {accountMenuOpen && <FocusDialog title="Your account" onClose={() => setAccountMenuOpen(false)}>
-        <AccountSettings session={session} onSignOut={() => afterSaving(() => onSignOut())} />
-        <button type="button" className="ep-btn" onClick={() => afterSaving(() => onSignOut({ everywhere: true }))}>Sign out everywhere</button>
+        <AccountSettings session={session} onSignOut={async (opts) => { await flushPendingSave(); await onSignOut(opts); }} />
       </FocusDialog>}
 
       {shapeMenu && !photoMode && !reviewOpen && (

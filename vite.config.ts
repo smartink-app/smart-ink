@@ -1,9 +1,10 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
+import { googleFeedbackBridge } from './integrations/google-feedback/localBridge'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), googleFeedbackBridge({ ...loadEnv(mode, process.cwd(), ''), ...process.env } as Record<string, string>)],
   build: {
     rollupOptions: {
       output: {
@@ -37,4 +38,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

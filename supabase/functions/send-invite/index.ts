@@ -65,14 +65,24 @@ Deno.serve(async (req) => {
   if (!invite.email) return json(400, { error: 'This invite has no email; copy the link instead.' });
   if (invite.redeemed_at) return json(400, { error: 'This invite was already used.' });
 
+  if (new Date(invite.expires_at).getTime() <= Date.now()) return json(400, { error: 'This invite has expired. Create a new invitation.' });
+
   const link = `${siteUrl}/?invite=${encodeURIComponent(invite.code)}`;
   const expires = new Date(invite.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
 
   const html = `
-    <p>You're invited to the Smart Ink private beta.</p>
-    <p><a href="${link}">Accept your invite</a> — it's reserved for ${escapeHtml(invite.email)} and works until ${expires}.</p>
-    <p>If the link doesn't open, enter the code <strong>${invite.code}</strong> at ${escapeHtml(siteUrl)}.</p>
-    <p>Reply to this email if anything is unclear. We read every message.</p>
+    <div style="background:#f5f3ee;padding:32px 16px;font-family:Arial,sans-serif;color:#262623">
+      <div style="max-width:520px;margin:auto;background:#fff;padding:36px;border-radius:16px">
+        <p style="font-size:12px;letter-spacing:3px;color:#777">SMART INK · PRIVATE BETA</p>
+        <h1 style="font-size:32px;line-height:1.15">Your next tattoo starts here.</h1>
+        <p style="line-height:1.7">Welcome to Smart Ink. You’re invited to explore your ideas, place your artwork, and bring it to life in the studio.</p>
+        <p style="margin:32px 0"><a href="${escapeHtml(link)}" style="display:inline-block;background:#262623;color:#fff;padding:16px 24px;border-radius:8px;text-decoration:none">Accept your invitation</a></p>
+        <p style="line-height:1.7">This invitation is reserved for <strong>${escapeHtml(invite.email)}</strong>. Accept it, then sign in with Google or an email code to get started.</p>
+        <p style="font-size:13px;color:#666">Your single-use invitation is valid until ${expires}. If the button doesn’t open, use this link:<br><a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>
+        <p><a href="${escapeHtml(siteUrl)}" style="color:#555">Explore the Smart Ink homepage</a></p>
+        <p style="font-size:13px;color:#777">Thanks for helping shape Smart Ink.</p>
+      </div>
+    </div>
   `;
 
   const res = await fetch('https://api.resend.com/emails', {
@@ -81,9 +91,9 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       from,
       to: [invite.email],
-      subject: 'Your Smart Ink beta invite',
+      subject: 'Welcome to Smart Ink — you’re invited',
       html,
-      text: `You're invited to the Smart Ink private beta.\n\nAccept your invite: ${link}\nCode: ${invite.code} (valid until ${expires})\n`,
+      text: `Welcome to Smart Ink! Explore your ideas, place your artwork, and bring it to life in the studio.\n\nAccept your invite: ${link}\nCode: ${invite.code} (valid until ${expires})\n\nAccept your invitation, then sign in with Google or an email code.\n\nExplore Smart Ink: ${siteUrl}\n`,
     }),
   });
 
