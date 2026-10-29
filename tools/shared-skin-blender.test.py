@@ -37,6 +37,7 @@ assert not importer._node_by_label(mat, 'Roughness under ink'), 'Shared ink must
 bsdf = next(n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
 assert bsdf.inputs['Normal'].links[0].from_node.label == 'Skin micro-relief'
 assert bsdf.inputs['Base Color'].links[0].from_node.label == 'Shared fine hairs over ink'
+assert sum(n.label == 'Studio surface lines' for n in mat.node_tree.nodes) == 3
 assert bsdf.inputs['Roughness'].is_linked
 assert importer._node_by_label(mat, 'Skin micro-relief').inputs['Distance'].is_linked
 assert not any(p.settings.name.startswith('body_') for p in body.particle_systems)

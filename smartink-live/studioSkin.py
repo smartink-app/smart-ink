@@ -68,7 +68,17 @@ def apply_studio_skin(body, texture_path, world_scale):
         texture = node('ShaderNodeTexImage', 'Studio Soft cells height'); texture.image = image
         texture.extension = 'REPEAT'; texture.interpolation = 'Linear'
         links.new(combine.outputs[0], texture.inputs['Vector'])
-        height = math('ADD', height, math('MULTIPLY', texture.outputs['Color'], math('DIVIDE', weights[axis], total)))
+        # Keep micro-cells small; a second fixed scale supplies readable surface lines.
+        line_scale = node('ShaderNodeVectorMath', 'Studio surface line scale'); line_scale.operation = 'SCALE'
+        line_scale.inputs[3].default_value = PROFILE['tileMetres'] / PROFILE['surfaceLines']['tileMetres']
+        links.new(combine.outputs[0], line_scale.inputs[0])
+        line_tex = node('ShaderNodeTexImage', 'Studio surface lines'); line_tex.image = image
+        line_tex.extension = 'REPEAT'; line_tex.interpolation = 'Linear'
+        links.new(line_scale.outputs[0], line_tex.inputs['Vector'])
+        line_height = math('MULTIPLY', math('SUBTRACT', line_tex.outputs['Color'], .5),
+                           PROFILE['surfaceLines']['heightMetres'] / PROFILE['heightMetres'])
+        layered = math('ADD', texture.outputs['Color'], line_height)
+        height = math('ADD', height, math('MULTIPLY', layered, math('DIVIDE', weights[axis], total)))
     links.new(height, bump.inputs['Height'])
     bump.inputs['Strength'].default_value = .35
     bump.inputs['Distance'].default_value = PROFILE['heightMetres'] * world_scale

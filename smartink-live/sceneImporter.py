@@ -3244,7 +3244,7 @@ def apply_render_quality(quality_tier: str, backend: Optional[str] = None) -> No
     cycles.blur_glossy = 1.0
     cycles.caustics_reflective = False
     cycles.caustics_refractive = False
-    bpy.context.scene.render.filter_size = 1.0 if cycles.samples >= 512 else 1.5
+    bpy.context.scene.render.filter_size = .8 if cycles.samples >= 512 else 1.5
     if quality_tier != "preview":
         cycles.use_denoising = True
         # OptiX denoises on the RT cores, so on NVIDIA it is far cheaper than

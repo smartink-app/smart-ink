@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import profile from '../../smartink-live/skinProfile.json';
 
-/** Baked from our Soft cells material. 16 mm tile, 45 µm encoded height range.
+/** Baked from our Soft cells material. 16 mm micro tile plus broader surface lines, shared with Blender.
  * This is an artistic preview, not a measured skin scan. */
 export const SKIN_DETAIL = { texture: '/textures/soft-cells-height.png', strength: .9, scale: 1, tileMetres: profile.tileMetres, heightMetres: profile.heightMetres, worldUnitsPerMetre: 4.2 / 1.75 } as const;
 
@@ -148,17 +148,21 @@ export const SKIN_DETAIL_GLSL = `
   float skinVeins() {
     return skinDetailStrength <= 0.0 ? 0.0 : texture2D(skinRegionsMap, vUv).r;
   }
-  float skinHeight() {
-    vec3 p = vSkinRest / (${SKIN_DETAIL.tileMetres} * skinDetailScale);
+  float skinHeightAtScale(float tileMetres) {
+    vec3 p = vSkinRest / (tileMetres * skinDetailScale);
     vec3 w = pow(abs(normalize(vSkinNormal)), vec3(6.0));
     w /= max(w.x + w.y + w.z, .00001);
     float broad = texture2D(skinDetailMap, p.yz).r * w.x
       + texture2D(skinDetailMap, p.xz).r * w.y
       + texture2D(skinDetailMap, p.xy).r * w.z;
-    // Keep the authored 0.29 mm cell pattern at its original size. The texture's
-    // mip chain filters unresolved grooves as they recede; no zoom magnification
-    // or extra fade that erases visible skin at normal tattoo-view distances.
     return broad;
+  }
+  float skinHeight() {
+    // Two fixed physical scales: fine cells and broader intersecting skin lines.
+    // Centre the second layer so it does not bias the shared roughness response.
+    return skinHeightAtScale(${SKIN_DETAIL.tileMetres})
+      + (skinHeightAtScale(${profile.surfaceLines.tileMetres}) - .5)
+      * ${profile.surfaceLines.heightMetres / profile.heightMetres};
   }
   vec3 skinDetailNormal(vec3 N, float height) {
     if (skinDetailStrength <= 0.0) return N;

@@ -27,7 +27,11 @@ browser procedural recipe for each body. `skinAtlasManifest.json` records channe
 encoding and hashes; Blender rejects missing or altered maps. Regenerate both body
 atlases and hashes when changing the procedural recipe or source UVs.
 
-Pore relief is 45 micrometres at the original 16 mm tile scale. Cycles uses a
+Recipe revision 3 uses 75 micrometres of fine relief at the original 16 mm tile scale,
+plus 85 micrometres of broader surface lines from a 112 mm tile. The secondary
+height is centred before addition, avoiding an artificial roughness offset. Both
+scales are fixed in rest metres; zoom does not resize the skin pattern. These
+are deliberately pronounced artistic settings, not measured anatomical depths. Cycles uses a
 restrained 0.015 subsurface weight to preserve visible surface detail.
 The shared material uses the same base-tone transforms, pore dimensions, regional
 roughness and hair-over-ink order. Rest coordinates convert between browser Y-up
@@ -61,6 +65,17 @@ This avoids claiming precision from the current coarse six-region classification
 Blender is Z-up; convert centred browser rest positions (x,y,z) to (x,-z,y), with
 consistent scale/origin, before applying the shared records. Validate model-specific
 orientation and handedness before baking.
+
+## October 29 reference iteration
+
+Local Blender comparisons tested stronger single-scale relief and layered relief. Layering retained readable surface lines in a 1536 × 1920
+arm composition; close-up and darker-tone checks also completed. Detailed output
+uses a 0.8 px reconstruction filter to reduce fine-line softening, with the
+existing denoiser and sample count retained. This cannot preserve details smaller
+than the final image pixels or add information missing from source artwork.
+
+This iteration is locally verified; rebuild the worker and deploy browser changes
+together before claiming the new skin is available on the hosted site.
 
 ## Remaining realism work
 
