@@ -10,7 +10,10 @@ for (const preset of CINEMATIC_PRESETS) {
     const view=frameTattoo(framing,adjustment,aspect,preset.fov);
     const camera=new PerspectiveCamera(view.fov,aspect,.001,100);
     camera.position.set(...view.position);camera.lookAt(...view.target);camera.updateMatrixWorld();
-    if(preset.id!=='detail') for(let i=0;i<framing.points.length;i+=3){
+    const wide=frameTattoo(framing,{...adjustment,zoom:1},aspect,preset.fov);
+    assert.ok(view.fov < wide.fov || new Vector3(...view.position).length() < new Vector3(...wide.position).length());
+    camera.fov=wide.fov;camera.position.set(...wide.position);camera.lookAt(...wide.target);camera.updateProjectionMatrix();camera.updateMatrixWorld();
+    for(let i=0;i<framing.points.length;i+=3){
       const point=new Vector3().fromArray(framing.points,i).project(camera);
       assert.ok(Math.abs(point.x)<=1/1.2+1e-6 && Math.abs(point.y)<=1/1.2+1e-6,'complete flat footprint retains margin');
     }

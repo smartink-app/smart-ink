@@ -18,7 +18,7 @@ visit(ast);
 async function callback(name, names) {
   const declaration = declarations.get(name);
   assert.ok(declaration?.initializer, `Workspace still declares ${name}`);
-  const { code } = await transform(`(function(${names.join(',')}) { const ${name} = ${declaration.initializer.getText(ast)}; return ${name}; })`, { loader: 'tsx' });
+  const { code } = await transform(`(function(${names.join(',')}) { const ${name} = ${declaration.initializer.getText(ast)}; return ${name}; })`, { loader: 'tsx', define: { 'import.meta.env.VITE_RENDER_INK_REGION': '"1"' } });
   const create = (0, eval)(code);
   return (scope) => create(...names.map((key) => {
     assert.ok(Object.hasOwn(scope, key), `test supplies the real callback's ${key} dependency`);
@@ -192,7 +192,7 @@ for (const guard of ['renderBusy', 'modelLoading', 'canvasHostSized']) {
   session.setQuality('detailed'); await session.render();
   assert.equal(requests.length, 2); assert.equal(f.calls.freeze, 2); assert.equal(f.calls.baked.length, 1, 'quality rerender reuses the frozen ink');
   assert.equal(requests[1].contract.camera.position[0], 3); assert.equal(requests[1].contract.lighting.lights[0].color, '#ffaa77');
-  assert.deepEqual(requests[1].contract.output, api.snapshotOutput(16 / 9, 'detailed'));
+  assert.deepEqual(requests[1].contract.output, api.snapshotOutput(16 / 9, 'detailed', {finish:'portfolio',regionalSkin:true}));
   assert.deepEqual(revoked, ['blob:shot-1']); session.close(); assert.deepEqual(revoked, ['blob:shot-1', 'blob:shot-2']); f.dispose();
 }
 for (const action of ['close', 'cancel']) {

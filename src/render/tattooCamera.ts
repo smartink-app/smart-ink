@@ -6,7 +6,7 @@ import { validateSurfaceAnchor, type SurfaceAnchor } from './surfacePlacement';
 export interface TattooCameraAdjustment { azimuth: number; elevation: number; zoom: number }
 export const DEFAULT_TATTOO_CAMERA_ADJUSTMENT: TattooCameraAdjustment = { azimuth: 0, elevation: 0, zoom: 1 };
 export const TATTOO_CAMERA_LIMITS = {
-  azimuth: { min: -55, max: 55 }, elevation: { min: -40, max: 40 }, zoom: { min: 0.65, max: 6 },
+  azimuth: { min: -55, max: 55 }, elevation: { min: -40, max: 40 }, zoom: { min: 0.65, max: 12 },
 } as const;
 export function normalizeTattooCamera(value?: Partial<TattooCameraAdjustment>): TattooCameraAdjustment {
   return Object.fromEntries(Object.entries(TATTOO_CAMERA_LIMITS).map(([name, bounds]) => {
@@ -164,6 +164,8 @@ export function frameTattoo(framing: TattooFraming, value: Partial<TattooCameraA
       }
     }
   }
-  const distance = Math.max(clearance, fittedDistance / adjustment.zoom);
-  return { position: target.clone().addScaledVector(direction, distance).toArray() as CameraView['position'], target: [...framing.center], fov };
+  const desiredDistance = fittedDistance / adjustment.zoom;
+  const distance = Math.max(clearance, desiredDistance);
+  const closeFov = desiredDistance >= clearance ? fov : THREE.MathUtils.radToDeg(2 * Math.atan(tanV * desiredDistance / distance));
+  return { position: target.clone().addScaledVector(direction, distance).toArray() as CameraView['position'], target: [...framing.center], fov: Math.max(5, closeFov) };
 }

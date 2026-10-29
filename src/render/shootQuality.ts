@@ -3,10 +3,10 @@ import { normalizeTattooCamera, type TattooCameraAdjustment } from './tattooCame
 import type { CameraView } from './cameraTransition';
 
 /** Starting artistic bounds, not a certification of image quality or visibility. */
-export function shootBounds(id: CinematicPresetId | null) {
+export function shootBounds(_id: CinematicPresetId | null) {
   return {
     azimuth: { min: -30, max: 30 }, elevation: { min: -20, max: 20 },
-    zoom: { min: .8, max: id === 'detail' ? 6 : 1 },
+    zoom: { min: .8, max: 12 },
   };
 }
 export function guidedCamera(value: TattooCameraAdjustment, id: CinematicPresetId | null): TattooCameraAdjustment {

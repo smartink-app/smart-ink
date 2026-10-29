@@ -1,8 +1,8 @@
 # Blender regional skin study
 
-This is an **opt-in local study**, not a production material or browser parity claim.
-`regionalSkin.apply_regional_skin(body)` is called only by the study runner. Existing
-shared skin defaults are untouched. The user-provided texture catalogue screenshots
+This recipe is available in Shoot → Detailed through the Regional skin texture checkbox.
+The render contract opts in with `skinVariation: "regional"`; Quick and legacy contracts
+retain shared skin. It is a Blender effect, not a browser parity claim. The user-provided texture catalogue screenshots
 and arm photograph inform visual pattern choices; no source pixels are bundled.
 
 ## Recipe

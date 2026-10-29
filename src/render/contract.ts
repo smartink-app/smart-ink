@@ -27,6 +27,7 @@ export interface RenderContract {
   /** Opt-in calibrated skin. Missing retains the previous render material. */
   skinMaterial?: 'legacy' | 'studio';
   skinProfileVersion?: 3;
+  skinVariation?: 'regional';
   /** Local bounded motion endpoint only; still renders reject this field. */
   reveal?: RevealSettings;
   bodyMeshId: string;
@@ -89,6 +90,7 @@ export interface RenderContract {
     focusDistance?: number;
   };
   output: {
+    finish?: 'portfolio';
     qualityTier: QualityTier;
     width: number;
     height: number;

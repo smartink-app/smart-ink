@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { RenderStatus, RenderProgress } from './services/cloudRenderService';
 import './snapshot-mode.css';
+import type { DetailedSettings } from './render/snapshot';
 
 export interface SnapshotOverlayProps {
   mode: 'compose' | 'result';
@@ -13,6 +14,8 @@ export interface SnapshotOverlayProps {
   elapsed: number;
   quality: 'quick' | 'detailed';
   onQualityChange: (quality: 'quick' | 'detailed') => void;
+  detailedSettings?: DetailedSettings;
+  onDetailedSettingsChange?: (settings: DetailedSettings) => void;
   onRender: () => void;
   onCancel: () => void;
   onClose: () => void;
@@ -39,7 +42,7 @@ function elapsedLabel(seconds: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, progress, message, elapsed, quality, onQualityChange, onRender, onCancel, onClose, onDownload, onAdjust, presetControls, cameraControls, tattooControls, lightingControls, motionControls, exportControls, onOpenRenders, renderDisabled = false, previewing = false, framingHint, warning, comparisonAvailable = true, comparisonUnavailableReason }: SnapshotOverlayProps) {
+export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, progress, message, elapsed, quality, onQualityChange, detailedSettings, onDetailedSettingsChange, onRender, onCancel, onClose, onDownload, onAdjust, presetControls, cameraControls, tattooControls, lightingControls, motionControls, exportControls, onOpenRenders, renderDisabled = false, previewing = false, framingHint, warning, comparisonAvailable = true, comparisonUnavailableReason }: SnapshotOverlayProps) {
   const id = useId(), [compare, setCompare] = useState(false);
   const [panel, setPanel] = useState<'camera' | 'tattoo' | 'lighting' | 'motion' | 'export'>('camera');
   const [panelOpen, setPanelOpen] = useState(() => typeof window === 'undefined' || !window.matchMedia?.('(max-width: 700px)').matches);
@@ -48,6 +51,14 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
   const fraction = progress?.phase === 'final' && progress.total && progress.sample !== undefined ? progress.sample / progress.total : 0;
   const composing = mode === 'compose' && !busy;
   const containerRef = useRef<HTMLElement>(null), closeRef = useRef<HTMLButtonElement>(null);
+  const footerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const footer = footerRef.current, container = containerRef.current;
+    if (!footer || !container || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => container.style.setProperty('--snapshot-footer-height', `${footer.getBoundingClientRect().height}px`));
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, []);
   const previousComposing = useRef(composing);
   const previousFocusRef = useRef<HTMLElement | null>(typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null);
   useEffect(() => {
@@ -132,7 +143,7 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
       </div>
     </aside>}
 
-    <footer className="snapshot-footer">
+    <footer ref={footerRef} className="snapshot-footer">
       {busy && progress?.phase === 'final' && <div className="snapshot-progress">
         <div className="snapshot-progress-copy"><span>{fraction === 1 ? 'Finishing details…' : 'Refining details…'}</span><span aria-hidden="true">{progress.total ? `${progress.sample ?? 0} / ${progress.total} samples` : 'Rendering'}</span></div>
         <progress aria-label="Final render samples" max={1} value={progress.total ? fraction : undefined} />
@@ -150,7 +161,7 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
           <button type="button" aria-pressed={quality === 'quick'} onClick={() => onQualityChange('quick')}>Quick</button>
           <button type="button" aria-pressed={quality === 'detailed'} onClick={() => onQualityChange('detailed')}>Detailed</button>
         </fieldset>
-        <span id={`${id}-quality-hint`} className="snapshot-quality-hint">{quality === 'quick' ? 'Faster preview' : '2560 px · finer detail · longer render'}</span>
+        <span id={`${id}-quality-hint`} className="snapshot-quality-hint">{quality === 'quick' ? 'Faster preview' : detailedSettings?.finish === 'portfolio' ? '4000 px · portfolio finish · several minutes' : '2560 px · finer detail · longer render'}</span>
         <div className="snapshot-action-buttons">
           {!composing && !busy && <button type="button" className="snapshot-button" onClick={onAdjust}>Adjust shot</button>}
           {!composing && <button type="button" className={`snapshot-button snapshot-button--compare ${showLive ? 'is-active' : ''}`} aria-pressed={showLive} aria-describedby={hasImage && !comparisonAvailable ? `${id}-comparison-hint` : undefined} disabled={!hasImage || !comparisonAvailable || (busy && hasPreview)} onClick={() => { if (hasImage && comparisonAvailable) setCompare(value => !value); }}>{showLive ? 'Show snapshot' : comparisonAvailable ? 'Compare with live' : 'Compare unavailable'}</button>}
@@ -158,6 +169,15 @@ export default function SnapshotOverlay({ mode, status, imageUrl, previewUrl, pr
           {busy ? <button type="button" className="snapshot-button snapshot-button--cancel" onClick={onCancel}>Cancel render</button> : <button type="button" className="snapshot-button snapshot-button--primary" disabled={previewing || renderDisabled} onClick={onRender}>{renderLabel}</button>}
         </div>
       </div>
+      {quality === 'detailed' && detailedSettings && onDetailedSettingsChange && !(composing && panel === 'motion') && <fieldset className="snapshot-detail-settings" disabled={busy || previewing}>
+        <legend>Detailed render settings</legend>
+        <label>Finish <select aria-label="Detailed render finish" value={detailedSettings.finish} onChange={event => onDetailedSettingsChange({ ...detailedSettings, finish: event.target.value as DetailedSettings['finish'] })}>
+          <option value="standard">Standard · 2560 px · 512 samples</option>
+          <option value="portfolio">Portfolio · 4000 px · 2048 samples</option>
+        </select></label>
+        <label><input type="checkbox" checked={detailedSettings.regionalSkin} onChange={event => onDetailedSettingsChange({ ...detailedSettings, regionalSkin: event.target.checked })} /> Regional skin texture</label>
+        <p>Portfolio uses careful denoising and a 16-bit PNG. Allow several minutes. Regional texture varies across arms, legs, torso and joints; it appears in the finished render.</p>
+      </fieldset>}
     </footer>
   </section>;
 }

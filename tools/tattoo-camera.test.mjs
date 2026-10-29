@@ -15,7 +15,7 @@ const anchor = (faceIndex, barycentric = [1 / 3, 1 / 3, 1 / 3]) => ({ faceIndex,
 const identity = new THREE.Matrix4();
 assert.deepEqual(normalizeTattooCamera(), { azimuth: 0, elevation: 0, zoom: 1 });
 assert.deepEqual(normalizeTattooCamera({ azimuth: Infinity, elevation: NaN, zoom: -3 }), { azimuth: 0, elevation: 0, zoom: .65 });
-assert.deepEqual(normalizeTattooCamera({ azimuth: 300, elevation: -300, zoom: 20 }), { azimuth: 55, elevation: -40, zoom: 6 });
+assert.deepEqual(normalizeTattooCamera({ azimuth: 300, elevation: -300, zoom: 20 }), { azimuth: 55, elevation: -40, zoom: 12 });
 function addMasks(geometry) {
   const count = geometry.attributes.position.count;
   for (const [name, fill] of [['aTattooMask', 1], ['aFocusMask', 1], ['aClothingMask', -1]]) geometry.setAttribute(name, new THREE.Float32BufferAttribute(new Float32Array(count).fill(fill), 1));

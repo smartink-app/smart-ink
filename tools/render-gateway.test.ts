@@ -120,3 +120,8 @@ Deno.test('localized atlas rejects invalid bounds before provider submission', a
  }
  validateInput({contract:{...contract,inkUvRegion:[.2,.3,.1,.2]},ink_base64:img});
 });
+
+Deno.test('portfolio accepted and unsupported finish/skin rejected before compute',()=>{
+ validateInput({contract:{...contract,output:{qualityTier:'final',width:3200,height:4000,samples:2048,finish:'portfolio'},skinMaterial:'studio',skinProfileVersion:3,skinVariation:'regional'},ink_base64:img});
+ for(const extra of [{output:{...contract.output,samples:2049}},{output:{...contract.output,finish:'unknown'}},{skinVariation:'regional'}]){let failed=false;try{validateInput({contract:{...contract,...extra},ink_base64:img});}catch{failed=true;}assert(failed);}
+});

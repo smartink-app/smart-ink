@@ -135,7 +135,7 @@ OUTPUT_TIERS: Dict[str, Dict[str, int]] = {
 
 # Bounds of the final-quality slider; mirrors FINAL_SAMPLES in src/render/registry.ts.
 FINAL_SAMPLES_MIN = 64
-FINAL_SAMPLES_MAX = 1024
+FINAL_SAMPLES_MAX = 2048
 
 # Tuned for Cycles preview to approximate the browser Lambert shader (not final Blender truth).
 BLENDER_BASE_ENERGY = {
@@ -3908,6 +3908,14 @@ def setup_output(output: Dict[str, Any], contract_dir: str) -> str:
     scene.cycles.samples = resolve_samples(tier_id, tier, output.get("samples"))
     scene.cycles.use_denoising = tier_id != "preview"
     apply_render_quality(tier_id, backend)
+    if output.get("finish") == "portfolio" and tier_id == "final":
+        scene.cycles.adaptive_threshold = .003
+        scene.cycles.diffuse_bounces = 4
+        scene.render.filter_size = .7
+        scene.cycles.denoiser = 'OPENIMAGEDENOISE'
+        scene.cycles.denoising_prefilter = 'ACCURATE'
+    scene.render.image_settings.color_depth = '16' if output.get('finish') == 'portfolio' else '8'
+    scene.render.image_settings.color_mode = 'RGB'
 
     width = int(output.get("width", tier["max_dim"]))
     height = int(output.get("height", tier["max_dim"]))
@@ -4103,6 +4111,9 @@ def build_scene(contract_path: str) -> str:
     if cinematic:
         # After the ink, because focus is pulled to the tattoo itself.
         apply_camera_realism(cam_obj, body, ink_path, camera_cfg)
+    if shared_skin and contract.get('skinVariation') == 'regional':
+        from regionalSkin import apply_regional_skin
+        apply_regional_skin(body)
     if shared_skin:
         from studioGeometry import add_focus_caps, refine_body
         field = body.data.attributes.get('SmartInkFocus')

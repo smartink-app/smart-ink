@@ -49,12 +49,14 @@ export function validateInput(body: Obj): Obj {
   if (JSON.stringify(contract).length > 65536 || contract.schemaVersion !== 1
     || !['body_full','body_full_female'].includes(String(contract.bodyMeshId))
     || contract.inkTextureUrl !== 'ink.png') throw new Fault(400, 'Unsupported render contract.');
+  if (output.finish !== undefined && (output.finish !== 'portfolio' || output.qualityTier !== 'final')) throw new Fault(400, 'Unsupported render finish.');
+  if (contract.skinVariation !== undefined && (contract.skinVariation !== 'regional' || contract.skinProfileVersion !== 3 || contract.skinMaterial !== 'studio')) throw new Fault(400, 'Regional skin requires studio v3.');
   if (!['preview','final'].includes(String(output.qualityTier))
     || !Number.isInteger(output.width) || !Number.isInteger(output.height)
     || Number(output.width)<64 || Number(output.height)<64
-    || Number(output.width)>2560 || Number(output.height)>2560
-    || (output.samples !== undefined && (!Number.isInteger(output.samples) || Number(output.samples)<1 || Number(output.samples)>512)))
-    throw new Fault(400, 'Beta renders support up to 2560 pixels and 512 samples.');
+    || Number(output.width)>4000 || Number(output.height)>4000
+    || (output.samples !== undefined && (!Number.isInteger(output.samples) || Number(output.samples)<1 || Number(output.samples)>2048)))
+    throw new Fault(400, 'Beta renders support up to 4000 pixels and 2048 samples.');
   if (contract.inkUvRegion !== undefined) {
     const region=contract.inkUvRegion;
     if (!Array.isArray(region) || region.length!==4
