@@ -1742,6 +1742,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
             fingerPlacement={nativeHost && fingerPlacement}
             key={`${currentScene?.id}:${bodyMeshId}`}
             ref={uvPlacementRef}
+            closeupPreview={snapshot.open}
             uploadedImage={uploadedImage}
             skinToneId={skinToneId}
             bodyMeshId={bodyMeshId}

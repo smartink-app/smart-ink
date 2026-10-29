@@ -1,3 +1,4 @@
+import { closeupGeometry } from './render/closeupGeometry';
 import FeedbackScene, { type FeedbackSceneProps } from './feedback/FeedbackScene';
 import { deformFit, heightWarp, type BodyFit } from './measurements/fitter';
 import { bindSkinRestCoordinates, SKIN_DETAIL, SKIN_DETAIL_GLSL } from './render/skinDetail';
@@ -272,7 +273,7 @@ function createSkinTexture(hexColor: string): THREE.CanvasTexture {
   ctx.fillRect(0, 0, size, size);
   const imgData = ctx.getImageData(0, 0, size, size);
   for (let i = 0; i < imgData.data.length; i += 4) {
-    const noise = (Math.random() - 0.5) * 12;
+    const noise = (Math.sin(i * 12.9898) * 43758.5453 % 1) * 1.5;
     imgData.data[i] += noise;
     imgData.data[i + 1] += noise * 0.8;
     imgData.data[i + 2] += noise * 0.5;
@@ -328,6 +329,7 @@ interface ModelWithUVTattooProps {
   visible?: boolean;
   /** Photo mode keeps camera navigation available while blocking edits. */
   editingEnabled?: boolean;
+  closeupPreview?: boolean;
   showTattooControls?: boolean;
   onHideTattooControls?: () => void;
   fingerPlacement?: boolean;
@@ -382,6 +384,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       setDecalVisible,
       visible = true,
       editingEnabled = true,
+      closeupPreview = false,
       showTattooControls = true,
       onHideTattooControls,
       fingerPlacement = false,
@@ -525,7 +528,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       () => new THREE.ShaderMaterial({
         vertexShader, fragmentShader,
         uniforms: {
-          skinTexture: { value: null }, normalMap: { value: null }, normalMapStrength: { value: 1 },
+          skinTexture: { value: null }, normalMap: { value: null }, normalMapStrength: { value: .75 },
           skinDetailMap: { value: null }, skinDetailStrength: { value: SKIN_DETAIL.strength }, skinDetailScale: { value: SKIN_DETAIL.scale },
           sleeveEnabled: { value: 0 }, sleeveShoulderTexture: { value: null }, sleeveChestTexture: { value: null },
           tattooTexture: { value: null }, tattooAspect: { value: 1 },
@@ -1214,6 +1217,27 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
       };
     }, [onPointerDown, onPointerMove, finishPointer, gl]);
+
+    useEffect(() => {
+      const mesh = bodyMeshRef.current;
+      if (!closeupPreview || !mesh || !cloneGroup) return;
+      const geometry = closeupGeometry(mesh.geometry);
+      const visual = new THREE.Mesh(geometry, shaderMaterial);
+      // Picking and baking continue to use original face indices. The visual
+      // shell is deliberately excluded from all placement raycasts.
+      visual.raycast = () => {};
+      visual.castShadow = true;
+      visual.customDepthMaterial = shadowMaterials.depth;
+      visual.customDistanceMaterial = shadowMaterials.distance;
+      const originalMaterial = mesh.material;
+      const pickMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, visible: false });
+      mesh.material = pickMaterial;
+      mesh.add(visual);
+      return () => {
+        mesh.remove(visual); geometry.dispose(); pickMaterial.dispose();
+        mesh.material = originalMaterial;
+      };
+    }, [closeupPreview, cloneGroup, chartVersion, bodyShape, bodyPose, bodyFit, bodyAppearance, isolateRegion, shaderMaterial, shadowMaterials]);
 
     if (!cloneGroup) return null;
     return <>

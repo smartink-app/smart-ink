@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 /** Baked from our Soft cells material. 16 mm tile, 30 µm encoded height range.
  * This is an artistic preview, not a measured scan or the Blender material. */
-export const SKIN_DETAIL = { texture: '/textures/soft-cells-height.png', strength: .4, scale: 1 } as const;
+export const SKIN_DETAIL = { texture: '/textures/soft-cells-height.png', strength: .25, scale: 1 } as const;
 
 /** Bind once before proportions or pose are applied, preserving skin anchors. */
 export function bindSkinRestCoordinates(geometry: THREE.BufferGeometry, matrixWorld: THREE.Matrix4, metresPerUnit = 1.75 / 4.2): void {
@@ -23,13 +23,23 @@ export const SKIN_DETAIL_GLSL = `
   uniform float skinDetailScale;
   varying vec3 vSkinRest;
   varying vec3 vSkinNormal;
+  float skinDetailVisibility() {
+    // Metres covered by one pixel: fine relief fades out before it can shimmer.
+    float footprint = max(length(dFdx(vSkinRest)), length(dFdy(vSkinRest)));
+    return 1.0 - smoothstep(.00012, .00065, footprint);
+  }
   float skinHeight() {
     vec3 p = vSkinRest / (.016 * skinDetailScale);
     vec3 w = pow(abs(normalize(vSkinNormal)), vec3(6.0));
     w /= max(w.x + w.y + w.z, .00001);
-    return texture2D(skinDetailMap, p.yz).r * w.x
+    float broad = texture2D(skinDetailMap, p.yz).r * w.x
       + texture2D(skinDetailMap, p.xz).r * w.y
       + texture2D(skinDetailMap, p.xy).r * w.z;
+    vec3 fine = p * 4.0 + vec3(.27, .61, .43);
+    float pores = texture2D(skinDetailMap, fine.yz).r * w.x
+      + texture2D(skinDetailMap, fine.xz).r * w.y
+      + texture2D(skinDetailMap, fine.xy).r * w.z;
+    return .5 + (broad - .5) * .35 + (pores - .5) * .25 * skinDetailVisibility();
   }
   vec3 skinDetailNormal(vec3 N, float height) {
     if (skinDetailStrength <= 0.0) return N;
