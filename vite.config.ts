@@ -2,8 +2,9 @@ import { defineConfig, loadEnv } from 'vite'
 import { googleFeedbackBridge } from './integrations/google-feedback/localBridge'
 import react from '@vitejs/plugin-react'
 
-// Keep this experiment's render traffic separate from the active beta server.
-const shootRenderTarget = `http://127.0.0.1:${process.env.FOCUS_RENDER_PORT || 4341}`
+// Allow isolated previews while preserving the existing local service defaults.
+const renderTarget = `http://127.0.0.1:${process.env.FOCUS_RENDER_PORT || 8000}`
+const videoTarget = `http://127.0.0.1:${process.env.FOCUS_RENDER_PORT || 4321}`
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -24,11 +25,11 @@ export default defineConfig(({ mode }) => ({
     // Honor PORT so a second dev server (e.g. a tool-driven preview) can coexist.
     port: Number(process.env.PORT) || 5173,
     proxy: {
-      '/video-jobs': shootRenderTarget,
-      '/health': shootRenderTarget,
-      '/sync-live': shootRenderTarget,
+      '/video-jobs': videoTarget,
+      '/health': renderTarget,
+      '/sync-live': renderTarget,
       '/render-v2': {
-        target: shootRenderTarget,
+        target: renderTarget,
         configure(proxy) {
           // The upload has finished before Blender renders. Forward a browser
           // disconnect during that wait so the server can stop its process.
