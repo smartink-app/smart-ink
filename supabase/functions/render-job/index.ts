@@ -55,6 +55,13 @@ export function validateInput(body: Obj): Obj {
     || Number(output.width)>2560 || Number(output.height)>2560
     || (output.samples !== undefined && (!Number.isInteger(output.samples) || Number(output.samples)<1 || Number(output.samples)>512)))
     throw new Fault(400, 'Beta renders support up to 2560 pixels and 512 samples.');
+  if (contract.inkUvRegion !== undefined) {
+    const region=contract.inkUvRegion;
+    if (!Array.isArray(region) || region.length!==4
+      || region.some(v=>typeof v!=='number' || !Number.isFinite(v) || v<0 || v>1)
+      || Math.min(region[2],region[3])<1/8192 || region[0]+region[2]>1.000001 || region[1]+region[3]>1.000001)
+      throw new Fault(400,'Invalid tattoo UV region.');
+  }
   png(base64(body.ink_base64, 6 * 1024 * 1024));
   return contract;
 }

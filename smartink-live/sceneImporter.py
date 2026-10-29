@@ -3520,7 +3520,7 @@ def setup_lights_from_list(lights: List[Dict[str, Any]], intensity_scale: float 
             light_obj.rotation_euler = rot_quat.to_euler()
 
 
-def apply_uv_ink_layer(body: bpy.types.Object, ink_path: str) -> None:
+def apply_uv_ink_layer(body: bpy.types.Object, ink_path: str, region=None) -> None:
     if not os.path.exists(ink_path):
         print(f"Ink layer not found: {ink_path}")
         return
@@ -3545,6 +3545,18 @@ def apply_uv_ink_layer(body: bpy.types.Object, ink_path: str) -> None:
         uv_node = nodes.new(type="ShaderNodeUVMap")
         uv_node.uv_map = body.data.uv_layers.active.name
         links.new(uv_node.outputs["UV"], ink_tex.inputs["Vector"])
+
+    if region is not None:
+        u, v, width, height = region
+        body['smartink_ink_uv_region'] = list(region)
+        subtract = nodes.new('ShaderNodeVectorMath'); subtract.operation = 'SUBTRACT'
+        subtract.inputs[1].default_value = (u, v, 0.)
+        scale = nodes.new('ShaderNodeVectorMath'); scale.operation = 'MULTIPLY'
+        scale.inputs[1].default_value = (1. / width, 1. / height, 1.)
+        links.new(uv_node.outputs['UV'], subtract.inputs[0])
+        links.new(subtract.outputs[0], scale.inputs[0])
+        links.new(scale.outputs[0], ink_tex.inputs['Vector'])
+        ink_tex.extension = 'CLIP'  # Never repeat a cropped tattoo on other body islands.
 
     mix = nodes.new(type="ShaderNodeMix")
     mix.data_type = "RGBA"
@@ -3733,6 +3745,11 @@ def _ink_focus_point(body: bpy.types.Object, ink_path: str) -> Optional[Vector]:
         loops = poly.loop_indices
         u = sum(uv_data[i].uv.x for i in loops) / len(loops)
         v = sum(uv_data[i].uv.y for i in loops) / len(loops)
+        region = body.get('smartink_ink_uv_region')
+        if region:
+            u, v = (u - region[0]) / region[2], (v - region[1]) / region[3]
+            if not (0 <= u <= 1 and 0 <= v <= 1):
+                continue
         px = min(width - 1, max(0, int(u * width)))
         py = min(height - 1, max(0, int(v * height)))
         weight = float(alpha[py, px])
@@ -4079,7 +4096,7 @@ def build_scene(contract_path: str) -> str:
     if ink_name.startswith("data:"):
         ink_name = "ink.png"
     ink_path = ink_name if os.path.isabs(ink_name) else os.path.join(contract_dir, os.path.basename(ink_name))
-    apply_uv_ink_layer(body, ink_path)
+    apply_uv_ink_layer(body, ink_path, contract.get('inkUvRegion'))
     if shared_skin:
         from studioSkin import apply_shared_hair_over_ink
         apply_shared_hair_over_ink(body)

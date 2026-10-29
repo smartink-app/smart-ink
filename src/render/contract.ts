@@ -58,6 +58,8 @@ export interface RenderContract {
   };
   /** UV-space RGBA ink layer (tattoo only, transparent elsewhere). Uploaded URL or data URL. */
   inkTextureUrl: string;
+  /** Optional tightly baked tattoo atlas; requires a compatible worker. */
+  inkUvRegion?: [number, number, number, number];
   /** Place eyeballs in the sockets. Off by default; the sculpt renders lids-closed. */
   showEyes?: boolean;
   /** Iris colour, as an sRGB hex. Only applies when showEyes is set. Defaults to dark brown. */

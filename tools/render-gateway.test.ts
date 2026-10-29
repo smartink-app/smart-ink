@@ -112,3 +112,11 @@ Deno.test('health checks provider access without submitting a render',async()=>{
   assert(!s.calls.some(c=>c.url.endsWith('/run') || c.url.includes('reserve')));
  }
 });
+
+Deno.test('localized atlas rejects invalid bounds before provider submission', async()=>{
+ for(const region of [[0,0,0,1],[.9,0,.2,1],[0,0,1],['0',0,1,1],[-1,0,1,1]]) {
+  const s=setup();assert((await s.request('submit',{contract:{...contract,inkUvRegion:region},ink_base64:img})).status===400);
+  assert(!s.calls.some(c=>c.url.endsWith('/run')));
+ }
+ validateInput({contract:{...contract,inkUvRegion:[.2,.3,.1,.2]},ink_base64:img});
+});
