@@ -7,11 +7,12 @@ export interface SnapshotCameraControlsProps {
   onChange: (adjustment: TattooCameraAdjustment) => void;
   onReset: () => void;
   hasTattoo: boolean;
+  limits?: Record<keyof TattooCameraAdjustment, { min: number; max: number }>;
 }
 
 type AdjustmentKey = keyof TattooCameraAdjustment;
 
-export default function SnapshotCameraControls({ adjustment, onChange, onReset, hasTattoo }: SnapshotCameraControlsProps) {
+export default function SnapshotCameraControls({ adjustment, onChange, onReset, hasTattoo, limits = TATTOO_CAMERA_LIMITS }: SnapshotCameraControlsProps) {
   const id = useId(), value = normalizeTattooCamera(adjustment);
   const update = (key: AdjustmentKey, next: number) => {
     if (Number.isFinite(next)) onChange(normalizeTattooCamera({ ...value, [key]: next }));
@@ -22,7 +23,7 @@ export default function SnapshotCameraControls({ adjustment, onChange, onReset, 
   };
   const control = (key: AdjustmentKey, label: string, less: string, more: string, description: string) => {
     const factor = key === 'zoom' ? 100 : 1, unit = key === 'zoom' ? '%' : '°';
-    const { min, max } = TATTOO_CAMERA_LIMITS[key];
+    const { min, max } = limits[key];
     const displayed = Math.round(value[key] * factor * 10) / 10;
     return <div className="snapshot-camera-control">
       <AdjustmentControl id={`${id}-${key}-range`} label={label} value={displayed}

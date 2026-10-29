@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// Keep this experiment's render traffic separate from the active beta server.
+const shootRenderTarget = `http://127.0.0.1:${process.env.FOCUS_RENDER_PORT || 4341}`
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -20,11 +23,11 @@ export default defineConfig({
     // Honor PORT so a second dev server (e.g. a tool-driven preview) can coexist.
     port: Number(process.env.PORT) || 5173,
     proxy: {
-      '/video-jobs': 'http://127.0.0.1:4321',
-      '/health': 'http://127.0.0.1:8000',
-      '/sync-live': 'http://127.0.0.1:8000',
+      '/video-jobs': shootRenderTarget,
+      '/health': shootRenderTarget,
+      '/sync-live': shootRenderTarget,
       '/render-v2': {
-        target: 'http://127.0.0.1:8000',
+        target: shootRenderTarget,
         configure(proxy) {
           // The upload has finished before Blender renders. Forward a browser
           // disconnect during that wait so the server can stop its process.
