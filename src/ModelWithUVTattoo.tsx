@@ -17,7 +17,7 @@ import { loadFitAsset } from './measurements/service';
 import { measurementGuide, type MeasurementGuide } from './measurements/geometry';
 import { createPreviewEyes } from './render/previewEyes';
 import { tattooFramingFromGeometry, type TattooFraming } from './render/tattooCamera';
-import { resolveTattooSource } from './render/tattooSource';
+import { isStarterTattoo, resolveTattooSource } from './render/tattooSource';
 import { applyBodyPose, DEFAULT_BODY_POSE, type BodyPose } from './render/bodyPose';
 import { createRegionMasks } from './render/bodyRegionMask';
 import { DEFAULT_BODY_APPEARANCE, type BodyAppearance } from './render/bodyAppearance';
@@ -551,7 +551,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
           skinTexture: { value: null }, normalMap: { value: null }, normalMapStrength: { value: .75 },
           skinDetailMap: { value: null }, skinDetailStrength: { value: SKIN_DETAIL.strength }, skinDetailScale: { value: SKIN_DETAIL.scale },
           sleeveEnabled: { value: 0 }, sleeveShoulderTexture: { value: null }, sleeveChestTexture: { value: null },
-          tattooTexture: { value: null }, tattooAspect: { value: 1 },
+          starterInkOnly: { value: 0 }, tattooTexture: { value: null }, tattooAspect: { value: 1 },
           tattooColor: { value: new THREE.Color('#ffffff') }, tattooOpacity: { value: 1 },
           tattooScale: { value: TATTOO_BASE_SIZE }, tattooRotation: { value: 0 }, tattooVisible: { value: 0 }, tattooWrap: { value: 0 },
           ...createSkinLightUniforms(resolveStudioLightRig([])),
@@ -567,6 +567,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       shaderMaterial.uniforms.normalMap.value = normalMap;
       shaderMaterial.uniforms.skinDetailMap.value = detailMap;
       shaderMaterial.uniforms.tattooTexture.value = tattooTexture;
+      shaderMaterial.uniforms.starterInkOnly.value = isStarterTattoo(tattooTexture.name) ? 1 : 0;
     }, [shaderMaterial, skinTexture, normalMap, tattooTexture, detailMap, sleeveShoulderTexture, sleeveChestTexture]);
     useEffect(() => { shaderMaterial.uniforms.skinDetailStrength.value = performanceMode ? 0 : SKIN_DETAIL.strength; }, [shaderMaterial, performanceMode]);
     useEffect(() => () => shaderMaterial.dispose(), [shaderMaterial]);

@@ -1,6 +1,25 @@
+// Shared by the viewport and baked export, so white never becomes opaque ink.
+const STARTER_INK_GLSL = /* glsl */ `
+#ifndef SMARTINK_STARTER_INK
+#define SMARTINK_STARTER_INK
+uniform float starterInkOnly;
+vec4 starterInk(vec4 pixel) {
+  if (starterInkOnly < 0.5) return pixel;
+  // Textures are sampled in linear colour. Convert back to authored greyscale
+  // before interpreting shading as black-ink coverage over bare skin.
+  vec3 srgb = mix(pixel.rgb * 12.92,
+    1.055 * pow(max(pixel.rgb, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055,
+    step(vec3(0.0031308), pixel.rgb));
+  float paper = dot(srgb, vec3(0.2126, 0.7152, 0.0722));
+  return vec4(vec3(0.0), pixel.a * clamp(1.0 - paper, 0.0, 1.0));
+}
+#endif
+`;
+
 // Shared GLSL: samples the tattoo at a UV using the same center/scale/rotation/edge-fade
 // convention as ModelWithUVTattoo. Returns straight-alpha RGBA (tattoo only).
 export const TATTOO_LAYER_GLSL = /* glsl */ `
+${STARTER_INK_GLSL}
 vec4 sampleTattooLayer(
   sampler2D tattooTexture, vec2 uv,
   vec2 tattooCenter, float tattooScale, float tattooRotation
@@ -11,7 +30,7 @@ vec4 sampleTattooLayer(
   offset = vec2(c * offset.x + s * offset.y, -s * offset.x + c * offset.y);
   vec2 tUV = offset / tattooScale + 0.5;
   if (tUV.x < 0.0 || tUV.x > 1.0 || tUV.y < 0.0 || tUV.y > 1.0) return vec4(0.0);
-  vec4 t = texture2D(tattooTexture, tUV);
+  vec4 t = starterInk(texture2D(tattooTexture, tUV));
   float fw = 0.04;
   float fade = 1.0;
   fade *= smoothstep(0.0, fw, tUV.x);
@@ -28,6 +47,7 @@ vec4 sampleTattooLayer(
  * Texture and tint are linear colours; the result has straight alpha.
  */
 export const SURFACE_TATTOO_GLSL = /* glsl */ `
+${STARTER_INK_GLSL}
 vec4 sampleSurfaceTattoo(
   sampler2D tattooTexture, vec2 offset, float mask,
   float size, float aspect, float rotation, vec3 tint, float opacity
@@ -40,7 +60,7 @@ vec4 sampleSurfaceTattoo(
   vec2 tUV = rotated / dimensions + 0.5;
   if (tUV.x < 0.0 || tUV.x > 1.0 || tUV.y < 0.0 || tUV.y > 1.0) return vec4(0.0);
 
-  vec4 ink = texture2D(tattooTexture, tUV);
+  vec4 ink = starterInk(texture2D(tattooTexture, tUV));
   // Only soften the image boundary by about half a screen pixel. Broad fades
   // visibly erase lettering and strokes that reach the source image edge.
   vec2 feather = min(vec2(0.005), max(fwidth(tUV) * 0.5, vec2(0.00001)));
@@ -53,10 +73,11 @@ vec4 sampleSurfaceTattoo(
 /** Periodic artwork: no fade on the horizontal join, and continuous texture
  * derivatives across it. Both preview and bake use a RepeatWrapping texture. */
 export const WRAP_TATTOO_GLSL = /* glsl */ `
+${STARTER_INK_GLSL}
 vec4 sampleWrapTattoo(sampler2D image, vec2 strip, float mask, vec3 tint, float opacity) {
   if (mask < 0.9999 || abs(strip.y) > 0.5) return vec4(0.0);
   vec2 uv = vec2(strip.x, strip.y + 0.5);
-  vec4 ink = texture2D(image, uv);
+  vec4 ink = starterInk(texture2D(image, uv));
   float feather = min(0.005, max(fwidth(uv.y) * 0.5, 0.00001));
   float fade = smoothstep(0.0, feather, min(uv.y, 1.0 - uv.y));
   return vec4(ink.rgb * tint, ink.a * clamp(opacity, 0.0, 1.0) * fade);

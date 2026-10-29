@@ -46,3 +46,8 @@ assert.deepEqual(changes, [null], 'Late upload cannot replace chosen example');
 assert.equal(reset, 0, 'Choosing example preserves the existing placement');
 delete globalThis.__tattooHooks; delete globalThis.__readTattoo;
 console.log('Tattoo source passed: shared default, uploaded source, actual panel example/reset, pending upload cancellation and placement preservation.');
+
+assert.equal(m.isStarterTattoo(m.resolveTattooSource(null)), true);
+assert.equal(m.isStarterTattoo("/tattoos/wild-peony.png"), true);
+assert.equal(m.isStarterTattoo("/tattoos/ornamental-dagger.png?v=transparent-2"), true);
+for (const upload of ["data:image/png;base64,upload", "blob:upload", "https://example.com/tattoos/wild-peony.png", "/tattoos/custom.png"]) assert.equal(m.isStarterTattoo(upload), false, "Uploaded white ink must remain intact");
