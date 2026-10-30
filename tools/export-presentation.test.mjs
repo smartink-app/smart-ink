@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const { outputFiles } = await build({
-  stdin: { contents: "export * from './src/render/snapshot.ts'; export * from './src/render/exportPresentation.ts'; export * from './src/render/buildContract.ts'; export * from './src/render/studioSettings.ts'; export * as THREE from 'three';", resolveDir: root },
+  stdin: { contents: "export * from './src/render/snapshot.ts'; export * from './src/render/exportPresentation.ts'; export * from './src/render/buildContract.ts'; export * from './src/render/studioSettings.ts'; export * from './src/render/shootQuality.ts'; export * as THREE from 'three';", resolveDir: root },
   bundle: true, platform: 'node', format: 'esm', write: false,
 });
 const helpers = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
@@ -55,13 +55,13 @@ for (const aspect of [0.25, 0.5625, 1, 2]) for (const direction of [[0, 0, 8], [
 const source = await fs.readFile(new URL('../src/Workspace.tsx', import.meta.url), 'utf8');
 const snippet = source.slice(source.indexOf('  const buildShot ='), source.indexOf('  const handleLookChange'));
 assert.ok(snippet.includes('const buildShot ='));
-const names = ['snapshotLook', 'shotBlur', 'cinematicPreset', 'bodyFit', 'resolveTattooSource', 'modelLoading', 'canvasHostRef', 'snapshotOutput', 'useCallback', 'uvPlacementRef', 'uploadedImage', 'decalVisible', 'orbitControlsRef', 'cameraState', 'bakeInkLayer', 'blankInkLayer', 'exportDimensions', 'buildRenderContract', 'exportPreset', 'bodyMeshId', 'skinToneId', 'poseId', 'lookId', 'qualityTier', 'finalSamples', 'bodyShape', 'bodyPose', 'bodyAppearance', 'studio', 'studioForExport', 'background', 'BACKGROUNDS', 'isolateRegion', 'lightingPreset', 'lights', 'LIGHTING_PRESETS'];
-const compiled = await transform(`(function(${names.join(',')}) { ${snippet}; return buildShot; })`, { loader: 'ts' });
+const names = ['guidedShot', 'shotBrightness', 'guidedLights', 'snapshotLook', 'shotBlur', 'cinematicPreset', 'bodyFit', 'resolveTattooSource', 'modelLoading', 'canvasHostRef', 'snapshotOutput', 'useCallback', 'uvPlacementRef', 'uploadedImage', 'decalVisible', 'orbitControlsRef', 'cameraState', 'bakeInkLayer', 'blankInkLayer', 'exportDimensions', 'buildRenderContract', 'exportPreset', 'bodyMeshId', 'skinToneId', 'poseId', 'lookId', 'qualityTier', 'finalSamples', 'bodyShape', 'bodyPose', 'bodyAppearance', 'studio', 'studioForExport', 'background', 'BACKGROUNDS', 'isolateRegion', 'lightingPreset', 'lights', 'LIGHTING_PRESETS'];
+const compiled = await transform(`(function(${names.join(',')}) { ${snippet}; return buildShot; })`, { loader: 'ts', define: { 'import.meta.env.VITE_RENDER_INK_REGION': '"1"' } });
 const createShot = (0, eval)(compiled.code);
-for (const visible of [false, true]) {
+for (const guidedShot of [false, true]) for (const visible of [false, true]) {
   let baked = 0, blank = 0;
   const environment = {
-    snapshotLook: null, shotBlur: 0, cinematicPreset: () => undefined,
+    guidedShot, shotBrightness: 1, guidedLights: helpers.guidedLights, snapshotLook: null, shotBlur: 0, cinematicPreset: () => undefined,
     modelLoading: false, canvasHostRef: { current: { clientWidth: 1600, clientHeight: 900 } }, snapshotOutput: helpers.snapshotOutput,
     useCallback: (fn) => fn, resolveTattooSource: (source) => source || '/logo.png',
     uvPlacementRef: { current: { getPlacement: () => ({ hasPlaced: true, visible, center: [0, 0], scaleUV: 0, rotationRad: 0, surface: {} }) } },
@@ -89,8 +89,8 @@ for (const visible of [false, true]) {
 }
 // A history outage must not turn a completed render into an error or block retry.
 const renderSnippet = source.slice(source.indexOf('  const handleCloudRender ='), source.indexOf('  const openSnapshot ='));
-const renderNames = ['renderController', 'setCloudRenderStatus', 'setCloudRenderMessage', 'setHistoryWarning', 'setRenderElapsed', 'setCloudRenderImage', 'buildShot', 'renderContract', 'addRenderHistory', 'fetch', 'currentScene', 'renderServer', 'usesRunpodGateway'];
-const renderCode = await transform(`(function(${renderNames.join(',')}) { ${renderSnippet}; return handleCloudRender; })`, { loader: 'ts' });
+const renderNames = ['renderController', 'setCloudRenderStatus', 'setCloudRenderMessage', 'setHistoryWarning', 'setRenderElapsed', 'setCloudRenderImage', 'buildShot', 'renderContract', 'addRenderHistory', 'fetch', 'currentScene', 'renderServer', 'usesRunpodGateway', 'recordJourney', 'session'];
+const renderCode = await transform(`(function(${renderNames.join(',')}) { ${renderSnippet}; return handleCloudRender; })`, { loader: 'ts', define: { 'import.meta.env.VITE_RENDER_INK_REGION': '"1"' } });
 const createRender = (0, eval)(renderCode.code);
 let status, image, warning, releaseHistory;
 const controller = { current: null };
@@ -98,7 +98,7 @@ const handler = createRender(controller, (s) => { status = s; }, () => {}, (s) =
   async () => ({ contract: { output: { width: 512, height: 512, qualityTier: 'preview' }, lookId: 'studio_softbox' }, inkBlob: new Blob() }),
   async () => 'blob:completed-image',
   () => new Promise((_, reject) => { releaseHistory = () => reject(new Error('history unavailable')); }),
-  async () => ({ blob: async () => new Blob(['render']) }), { name: 'Test scene' }, { cancellationSupported: true }, () => false);
+  async () => ({ blob: async () => new Blob(['render']) }), { name: 'Test scene' }, { cancellationSupported: true }, () => false, async () => {}, {email:'tester@example.invalid'});
 const completion = handler();
 await new Promise((resolve) => setImmediate(resolve));
 assert.equal(status, 'done');

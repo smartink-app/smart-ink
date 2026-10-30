@@ -4,7 +4,7 @@ const img='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAA
 const contract={schemaVersion:1,bodyMeshId:'body_full',inkTextureUrl:'ink.png',lookId:'studio_softbox',output:{width:512,height:512,qualityTier:'preview'}};
 const config={url:'https://db.test',serviceKey:'server-only',runpodKey:'gpu-secret',endpoint:'endpoint',origins:['https://app.test']};
 const assert=(x:unknown,message='Assertion failed')=>{if(!x)throw new Error(message);};
-function setup(options: {anonymous?:boolean; active?:boolean; missing?:boolean; reserve?:boolean; limited?:boolean; status?:string; failedUpload?:boolean; direct?:boolean; wrongPath?:boolean; wrongSize?:boolean; signFailure?:boolean}={}) {
+function setup(options: {anonymous?:boolean; active?:boolean; missing?:boolean; reserve?:boolean; limited?:boolean; status?:string; failedUpload?:boolean; direct?:boolean; wrongPath?:boolean; wrongSize?:boolean; signFailure?:boolean; providerStatus?:number}={}) {
  const calls:{url:string;body:unknown;method:string}[]=[];
  const row={id:jobId,owner:uid,status:'IN_QUEUE',runpod_id:'provider-job',contract,result_path:null,expires_at:new Date(Date.now()+100000).toISOString()};
  const handler=createHandler(config,(async(input,init)=>{
@@ -18,6 +18,8 @@ function setup(options: {anonymous?:boolean; active?:boolean; missing?:boolean; 
    assert(url.includes(`owner=eq.${uid}`),'Every job query must include authenticated owner');
    if(method==='PATCH')Object.assign(row,body);return Response.json(options.missing?[]:[row]);
   }
+  if(url.endsWith('/health'))return new Response(null,{status:options.providerStatus??200});
+  if(url.endsWith('/run') && options.providerStatus)return new Response(null,{status:options.providerStatus});
   if(url.endsWith('/run'))return Response.json({id:'provider-job',status:'IN_QUEUE'});
   if(url.includes('/status/'))return Response.json({status:options.status??'IN_PROGRESS',output:options.direct?[{type:'final',path:options.wrongPath?'another-owner/image.png':`${uid}/${jobId}.png`,mimeType:'image/png',width:512,height:512,bytes:8*1024*1024}]:[{type:'final',image:img}]});
   if(url.includes('/stream/'))return Response.json({stream:[{output:{type:'progress',phase:'final',sample:3,total:16}},{output:{type:'preview',image:img}}]});
@@ -93,4 +95,33 @@ Deno.test('missing, mismatched or foreign stored image cannot complete job',asyn
 });
 Deno.test('Detailed 2560 dimensions accepted without rescaling',()=>{
  validateInput({contract:{...contract,output:{width:2560,height:1440,qualityTier:'final',samples:512}},ink_base64:img});
+});
+
+Deno.test('explicit provider rejection releases reservation but ambiguous failure keeps it locked',async()=>{
+ for(const status of [400,401,403,404,422,429,500,503]) {
+  const s=setup({providerStatus:status});
+  assert((await s.request('submit',{contract,ink_base64:img})).status>=400);
+  assert(s.calls.some(c=>c.method==='PATCH' && (c.body as {status:string}).status==='FAILED') === (status<500));
+  assert(s.calls.filter(c=>c.url.endsWith('/run')).length===1);
+ }
+});
+Deno.test('health checks provider access without submitting a render',async()=>{
+ for(const status of [200,401,403,404,503]) {
+  const s=setup({providerStatus:status});const reply=await(await s.request('health')).json();
+  assert(reply.ready===(status===200));
+  assert(!s.calls.some(c=>c.url.endsWith('/run') || c.url.includes('reserve')));
+ }
+});
+
+Deno.test('localized atlas rejects invalid bounds before provider submission', async()=>{
+ for(const region of [[0,0,0,1],[.9,0,.2,1],[0,0,1],['0',0,1,1],[-1,0,1,1]]) {
+  const s=setup();assert((await s.request('submit',{contract:{...contract,inkUvRegion:region},ink_base64:img})).status===400);
+  assert(!s.calls.some(c=>c.url.endsWith('/run')));
+ }
+ validateInput({contract:{...contract,inkUvRegion:[.2,.3,.1,.2]},ink_base64:img});
+});
+
+Deno.test('portfolio accepted and unsupported finish/skin rejected before compute',()=>{
+ validateInput({contract:{...contract,output:{qualityTier:'final',width:3200,height:4000,samples:2048,finish:'portfolio'},skinMaterial:'studio',skinProfileVersion:3,skinVariation:'regional'},ink_base64:img});
+ for(const extra of [{output:{...contract.output,samples:2049}},{output:{...contract.output,finish:'unknown'}},{skinVariation:'regional'}]){let failed=false;try{validateInput({contract:{...contract,...extra},ink_base64:img});}catch{failed=true;}assert(failed);}
 });

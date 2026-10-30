@@ -159,6 +159,8 @@ def validate_contract(data: bytes) -> dict:
     ):
         if name in contract and (not isinstance(contract[name], str) or contract[name] not in allowed):
             _invalid(f"Unknown {name}")
+    if "skinProfileVersion" in contract and (type(contract["skinProfileVersion"]) is not int or contract["skinProfileVersion"] != 3 or contract.get("skinMaterial") != "studio" or contract.get("renderStyle") != "cinematic"):
+        _invalid("skinProfileVersion requires supported studio v3 cinematic material")
     if "inkUvRegion" in contract:
         region = contract["inkUvRegion"]
         if (not isinstance(region, list) or len(region) != 4
@@ -176,10 +178,14 @@ def validate_contract(data: bytes) -> dict:
         value = output.get(name)
         if type(value) is not int or not 1 <= value <= MAX_OUTPUT_DIMENSION:
             _invalid(f"output.{name} must be an integer between 1 and {MAX_OUTPUT_DIMENSION}")
+    if "finish" in output and (output["finish"] != "portfolio" or output.get("qualityTier") != "final"):
+        _invalid("Unsupported output.finish")
+    if "skinVariation" in contract and (contract["skinVariation"] != "regional" or contract.get("skinProfileVersion") != 3):
+        _invalid("Regional skin requires studio v3")
     if "samples" in output:
         if type(output["samples"]) is not int:
             _invalid("output.samples must be an integer")
-        _number(output["samples"], "output.samples", 64, 1024)
+        _number(output["samples"], "output.samples", 64, 2048)
     camera = contract.get("camera")
     if not isinstance(camera, dict):
         _invalid("camera is required")

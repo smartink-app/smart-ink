@@ -7,7 +7,7 @@ const landingSource = await fs.readFile('src/LandingPage.tsx','utf8');
 const requestForm = landingSource.slice(landingSource.indexOf('const RequestAccessForm:'), landingSource.indexOf('const LandingPage:'));
 let lazyId = 0;
 globalThis.__focusLazy = () => `Lazy${lazyId++}`;
-const stubNames = /^(\.\/)(client\/ClientProjectSpace|artist\/ArtistPanel|discovery\/ArtistDiscovery|moodboard\/MoodboardPortal|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryPage|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
+const stubNames = /^(\.\/)(beta-feedback\/BetaFeedback|beta-journey\/JourneyTracking|client\/ClientProjectSpace|artist\/ArtistPanel|discovery\/ArtistDiscovery|moodboard\/MoodboardPortal|AccountSettings|FocusDialog|TattooLibrary|RenderHistoryPage|TemplatePreviewRenderer|LandingPage|LoginPage|InvitePage|InviteCodeEntry|BetaAdminPage|Workspace|PublicDemo)$/;
 const { outputFiles } = await build({
   stdin: { contents: `export {default as Dashboard} from './src/ScenesDashboard'; export {default as App} from './src/App'; export {default as Rail} from './src/StudioRail'; export {default as More} from './src/MoreControls'; export {ThemeRoot} from './src/Theme'; export {usePreference} from './src/usePreference'; export {RequestAccessForm} from 'focus-request-form';`, resolveDir: root },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', logLevel: 'silent',
@@ -58,7 +58,7 @@ const savedGlobals = new Map(['window','document','localStorage'].map(key=>[key,
 const events = new EventTarget(), storage = new Map(); let writesFail=false, readsFail=false;
 globalThis.localStorage={getItem(key){if(readsFail)throw Error('blocked');return storage.get(key)??null;},setItem(key,value){if(writesFail)throw Error('quota');storage.set(key,value);}};
 globalThis.document={documentElement:{dataset:{}},getElementById:()=>null};
-globalThis.window={addEventListener:events.addEventListener.bind(events),removeEventListener:events.removeEventListener.bind(events),dispatchEvent:events.dispatchEvent.bind(events),confirm:()=>true,location:{href:'http://local/',search:''},history:{replaceState(_,__,url){window.location={href:new URL(url,'http://local/').href,search:new URL(url,'http://local/').search};}},setTimeout};
+globalThis.window={matchMedia:()=>({matches:true,addEventListener(){},removeEventListener(){}}),addEventListener:events.addEventListener.bind(events),removeEventListener:events.removeEventListener.bind(events),dispatchEvent:events.dispatchEvent.bind(events),confirm:()=>true,location:{href:'http://local/',search:''},history:{replaceState(_,__,url){window.location={href:new URL(url,'http://local/').href,search:new URL(url,'http://local/').search};}},setTimeout};
 const session={email:'test@example.invalid',displayName:'Test artist',userId:'local-test',method:'email'};
 try {
   // The beta always opens in dark mode, even with an old saved light preference.
@@ -85,7 +85,7 @@ try {
   dashboard.button('New project').props.onClick();assert.ok(dashboard.render().some(n=>n.type==='FocusDialog'));
   dashboard.render().find(n=>n.type==='input'&&n.props.placeholder?.startsWith('e.g.')).props.onChange({target:{value:'Rose sleeve'}});
   const create=dashboard.button('Create project');create.props.onClick();create.props.onClick();await dashboard.settle();assert.equal(created.length,1);assert.equal(opened.length,0);
-  assert.equal(created[0].name,'Rose sleeve');assert.equal(created[0].studio.color,'#30343c');
+  assert.equal(created[0].name,'Rose sleeve');assert.equal(created[0].studio.color,'#91857b');assert.equal(created[0].camera.fov,36);assert.ok(created[0].camera.position[0] > created[0].camera.target[0], 'Full-body introduction opens at an angle even before previews load');assert.ok(created[0].lights.every(light => light.color !== '#aaffee'), 'Introduction uses neutral fill');
   resolveCreate();await dashboard.settle();assert.equal(opened.length,1);dashboard.unmount();
 
   created=[];opened=[];failCreate=true;
@@ -115,7 +115,7 @@ try {
   assert.ok(!searchDashboard.render().some(n=>n.type==='FocusDialog'));
   searchDashboard.render().find(n=>n.type==='RenderHistoryPage').props.onOpenStudio();
   searchDashboard.button('Start from a template').props.onClick();
-  assert.equal(searchDashboard.render().find(n=>n.type==='input'&&n.props.placeholder?.startsWith('e.g.')).props.value,'Rose placement study');
+  assert.equal(searchDashboard.render().find(n=>n.type==='input'&&n.props.placeholder?.startsWith('e.g.')).props.value,'Peony placement study');
   searchDashboard.unmount();
 
   // Private beta routing: old sample URLs and guessed app URLs cannot expose an editor.

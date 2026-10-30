@@ -35,8 +35,10 @@ COPY public/measurements/ /app/public/measurements/
 COPY server/runpod/handler.py /app/server/runpod/handler.py
 COPY server/runpod/check_gpu.py /app/server/runpod/check_gpu.py
 COPY smartink-live/sceneImporter.py smartink-live/body_full.blend smartink-live/body_full_female.blend /app/smartink-live/
-COPY smartink-live/studioSkin.py smartink-live/revealRender.py /app/smartink-live/
+COPY smartink-live/regionalSkin.py smartink-live/studioGeometry.py smartink-live/skinAtlasManifest.json smartink-live/skinProfile.json smartink-live/studioSkin.py smartink-live/revealRender.py /app/smartink-live/
 COPY smartink-live/assets/skins.blend /app/smartink-live/assets/skins.blend
+COPY smartink-live/environments/ /app/smartink-live/environments/
 COPY server/runpod/textures/ /app/smartink-live/assets/
+COPY public/textures/skin-*-v3.png /app/smartink-live/assets/
 RUN blender --background --factory-startup --python-expr 'import bpy; print(bpy.app.version_string)'
 CMD ["sh", "-c", "blender --background --factory-startup --python-exit-code 1 --python server/runpod/check_gpu.py && exec python -m server.runpod.handler"]

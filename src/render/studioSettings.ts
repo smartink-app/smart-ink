@@ -9,6 +9,7 @@ export interface StudioSettings {
 
 export const DEFAULT_STUDIO: StudioSettings = { mode: 'sweep', color: '#d6cdc1', shadow: 0.4, showGuides: false };
 export const STUDIO_PAPERS = [
+  { name: 'Warm taupe', color: '#91857b' },
   { name: 'Warm paper', color: '#d6cdc1' }, { name: 'White', color: '#ededeb' },
   { name: 'Charcoal', color: '#30343c' }, { name: 'Slate blue', color: '#657b91' },
   { name: 'Rose', color: '#b99093' }, { name: 'Sage', color: '#929c89' },

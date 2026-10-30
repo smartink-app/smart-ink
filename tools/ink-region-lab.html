@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>Tattoo export precision test</title><style>body{background:#222;color:white;font:16px system-ui}img{width:45%;background:#cda774}pre{white-space:pre-wrap}</style><h1>Tattoo export precision test</h1><button id="run">Compare exports</button><pre id="status">Ready</pre><div id="images"></div>
+<script type="module">
+import * as THREE from 'three';
+import {bakeInkLayer} from '/src/render/bakeInkLayer.ts';
+document.querySelector('#run').onclick=async()=>{try{
+ const geo=new THREE.PlaneGeometry(1,1,8,8), uv=geo.getAttribute('uv'),pos=geo.getAttribute('position');
+ const coords=new Float32Array(uv.count*2),mask=new Float32Array(uv.count).fill(1);
+ for(let i=0;i<uv.count;i++){coords[i*2]=pos.getX(i);coords[i*2+1]=pos.getY(i);uv.setXY(i,.42+uv.getX(i)*.12,.32+uv.getY(i)*.16);}
+ geo.setAttribute('aTattooUv',new THREE.BufferAttribute(coords,2));geo.setAttribute('aTattooMask',new THREE.BufferAttribute(mask,1));
+ const surface={geometry:geo,size:.8,aspect:1,color:'#ffffff',opacity:1};
+ for(const localized of [false,true]){
+  let region=[0,0,1,1];document.querySelector('#status').textContent='Baking '+(localized?'localized':'full atlas');
+  const blob=await bakeInkLayer({tattooImage:'/tattoos/botanical-rose.png',surface,size:2048,onUvRegion:localized?r=>region=r:undefined});
+  const img=document.createElement('img');img.src=URL.createObjectURL(blob);img.alt=localized?'Localized original-artwork bake':'Full-body atlas bake';document.querySelector('#images').append(img);
+  const link=document.createElement('a');link.href=img.src;link.download=localized?'localized-bake.png':'atlas-bake.png';link.textContent=link.download;document.querySelector('#images').append(link);
+  document.querySelector('#status').textContent=JSON.stringify({localized,region,bytes:blob.size});
+ }
+ geo.dispose();
+}catch(e){document.querySelector('#status').textContent=e.stack;}};
+</script>

@@ -2,13 +2,15 @@
 Run with Blender -b smartink-live/environments/heritage-atelier.blend -P this script.
 Original .blend is unchanged. Specular reflections remain live in the browser.
 """
-import bpy, math
+import bpy, math, sys
 from pathlib import Path
 from mathutils import Vector
 root=Path(__file__).resolve().parents[1]
 out=root/'public/environments/heritage-atelier'
+cache=root/'reports/heritage-bake'
+cache.mkdir(parents=True,exist_ok=True)
 s=bpy.context.scene
-s.render.engine='CYCLES';s.cycles.samples=32;s.cycles.use_denoising=True
+s.render.engine='CYCLES';s.cycles.samples=256;s.cycles.use_denoising=True
 s.cycles.max_bounces=6
 meshes=[o for o in s.objects if o.type=='MESH']
 bpy.ops.object.select_all(action='DESELECT')
@@ -43,12 +45,30 @@ for m in room.data.materials:
 s.render.bake.use_pass_direct=True;s.render.bake.use_pass_indirect=True;s.render.bake.use_pass_color=True
 s.render.bake.margin=8
 print('BAKING_HERITAGE',len(room.data.polygons),flush=True)
-if (out/'diffuse-lighting.png').exists():
- cached=bpy.data.images.load(str(out/'diffuse-lighting.png'))
+if '--reuse-bake' in sys.argv and (cache/'diffuse-lighting.png').exists():
+ cached=bpy.data.images.load(str(cache/'diffuse-lighting.png'))
  image.pixels.foreach_set(list(cached.pixels));bpy.data.images.remove(cached)
 else:
  bpy.ops.object.bake(type='DIFFUSE')
-image.filepath_raw=str(out/'diffuse-lighting.png');image.file_format='PNG';image.save()
+image.filepath_raw=str(cache/'diffuse-lighting.png');image.file_format='PNG';image.save()
+# Denoise the static irradiance once offline; no per-frame browser cost.
+denoise_scene=bpy.data.scenes.new('Offline lightmap denoise')
+denoise_scene.render.engine='CYCLES';denoise_scene.cycles.samples=1
+denoise_scene.render.resolution_x=4096;denoise_scene.render.resolution_y=4096
+denoise_scene.render.resolution_percentage=100
+denoise_scene.camera=bpy.data.objects.new('Bake camera',bpy.data.cameras.new('Bake camera'))
+denoise_scene.collection.objects.link(denoise_scene.camera)
+tree=bpy.data.node_groups.new('Offline lightmap denoise','CompositorNodeTree')
+denoise_scene.compositing_node_group=tree
+tree.interface.new_socket(name='Image',in_out='OUTPUT',socket_type='NodeSocketColor')
+source=tree.nodes.new('CompositorNodeImage');source.image=image
+denoise=tree.nodes.new('CompositorNodeDenoise');output=tree.nodes.new('NodeGroupOutput')
+tree.links.new(source.outputs['Image'],denoise.inputs['Image']);tree.links.new(denoise.outputs['Image'],output.inputs['Image'])
+denoise_scene.view_settings.view_transform='Standard'
+denoise_scene.render.image_settings.file_format='PNG'
+denoise_scene.render.filepath=str(cache/'diffuse-clean.png')
+bpy.ops.render.render(scene=denoise_scene.name,write_still=True)
+image=bpy.data.images.load(str(cache/'diffuse-clean.png'))
 # Expose baked diffuse as glTF base color; retain original metallic materials/emission.
 for m in room.data.materials:
  p=m.node_tree.nodes.get('Principled BSDF')
@@ -58,5 +78,5 @@ for m in room.data.materials:
  for link in list(p.inputs['Base Color'].links):tree.links.remove(link)
  n=tree.nodes.new('ShaderNodeTexImage');n.image=image
  tree.links.new(n.outputs['Color'],p.inputs['Base Color']);m.name+=' · BakedDiffuse'
-bpy.ops.export_scene.gltf(filepath=str(out/'scene-baked.glb'),use_selection=True,export_apply=True,export_format='GLB',export_image_format='AUTO')
+bpy.ops.export_scene.gltf(filepath=str(out/'scene-baked.glb'),use_selection=True,export_apply=True,export_format='GLB',export_image_format='JPEG',export_jpeg_quality=92)
 print('HERITAGE_BAKE_COMPLETE',flush=True)

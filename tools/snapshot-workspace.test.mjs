@@ -26,13 +26,13 @@ async function callback(name, names) {
   }));
 }
 const { outputFiles } = await build({
-  stdin: { contents: `export * from './src/render/buildContract'; export * from './src/render/cinematicPresets'; export * from './src/render/reveal'; export * from './src/render/snapshot'; export * from './src/render/tattooSource'; export * from './src/render/tattooCamera'; export * from './src/render/studioSettings'; export * from './src/render/exportPresentation'; export * from './src/services/snapshotSession'; export * as THREE from 'three';`, resolveDir: root },
+  stdin: { contents: `export * from './src/render/shootQuality'; export * from './src/render/buildContract'; export * from './src/render/cinematicPresets'; export * from './src/render/reveal'; export * from './src/render/snapshot'; export * from './src/render/tattooSource'; export * from './src/render/tattooCamera'; export * from './src/render/studioSettings'; export * from './src/render/exportPresentation'; export * from './src/services/snapshotSession'; export * as THREE from 'three';`, resolveDir: root },
   bundle: true, platform: 'node', format: 'esm', write: false,
 });
 const api = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
-const dependencies = ['snapshotLook', 'shotBlur', 'cinematicPreset', 'bodyFit', 'useCallback', 'uvPlacementRef', 'uploadedImage', 'decalVisible', 'orbitControlsRef', 'cameraState', 'canvasHostRef', 'modelLoading', 'bakeInkLayer', 'blankInkLayer', 'snapshotOutput', 'exportDimensions', 'buildRenderContract', 'exportPreset', 'bodyMeshId', 'skinToneId', 'poseId', 'lookId', 'qualityTier', 'finalSamples', 'bodyShape', 'bodyPose', 'bodyAppearance', 'studio', 'studioForExport', 'background', 'BACKGROUNDS', 'isolateRegion', 'lightingPreset', 'lights', 'LIGHTING_PRESETS', 'resolveTattooSource'];
+const dependencies = ['guidedShot', 'shotBrightness', 'guidedLights', 'snapshotLook', 'shotBlur', 'cinematicPreset', 'bodyFit', 'useCallback', 'uvPlacementRef', 'uploadedImage', 'decalVisible', 'orbitControlsRef', 'cameraState', 'canvasHostRef', 'modelLoading', 'bakeInkLayer', 'blankInkLayer', 'snapshotOutput', 'exportDimensions', 'buildRenderContract', 'exportPreset', 'bodyMeshId', 'skinToneId', 'poseId', 'lookId', 'qualityTier', 'finalSamples', 'bodyShape', 'bodyPose', 'bodyAppearance', 'studio', 'studioForExport', 'background', 'BACKGROUNDS', 'isolateRegion', 'lightingPreset', 'lights', 'LIGHTING_PRESETS', 'resolveTattooSource'];
 const makeShot = await callback('buildShot', dependencies);
-const makeOpen = await callback('openSnapshot', ['nativeHost', 'shotFormat', 'setShotFormat', 'setSnapshotLook', 'cinematicPreset', 'setShotBrightness', 'setShotBlur', 'frameTattoo', 'viewportAspect', 'setLightingPreset', 'setLights', 'cinematicLights', 'LIGHTING_PRESETS', 'setStudio', 'renderBusy', 'modelLoading', 'canvasHostSized', 'setShapeMenu', 'setHoverRegion', 'setPanelRegions', 'setAccountMenuOpen', 'snapshotSession', 'currentShotBuilder', 'snapshotReturnCamera', 'snapshotReturnStudio', 'studio', 'lights', 'lightingPreset', 'selectedLight', 'orbitControlsRef', 'cameraState', 'setTattooFraming', 'setSnapshotHasTattoo', 'setSnapshotFramingHint', 'regionSnapshotFraming', 'setSnapshotCamera', 'uvPlacementRef', 'DEFAULT_TATTOO_CAMERA_ADJUSTMENT', 'currentScene']);
+const makeOpen = await callback('openSnapshot', ['dismissShootHint', 'guidedShot', 'guidedCamera', 'nativeHost', 'shotFormat', 'setShotFormat', 'setSnapshotLook', 'cinematicPreset', 'setShotBrightness', 'setShotBlur', 'frameTattoo', 'viewportAspect', 'setLightingPreset', 'setLights', 'cinematicLights', 'LIGHTING_PRESETS', 'setStudio', 'renderBusy', 'modelLoading', 'canvasHostSized', 'setShapeMenu', 'setHoverRegion', 'setPanelRegions', 'setAccountMenuOpen', 'snapshotSession', 'currentShotBuilder', 'snapshotReturnCamera', 'snapshotReturnStudio', 'studio', 'lights', 'lightingPreset', 'selectedLight', 'orbitControlsRef', 'cameraState', 'setTattooFraming', 'setSnapshotHasTattoo', 'setSnapshotFramingHint', 'regionSnapshotFraming', 'setSnapshotCamera', 'uvPlacementRef', 'DEFAULT_TATTOO_CAMERA_ADJUSTMENT', 'currentScene']);
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const deferred = () => {
   let resolve, reject;
@@ -48,6 +48,7 @@ function fixture(overrides = {}) {
   const calls = { freeze: 0, freezeFlags: [], snapshot: 0, baked: [], blank: 0 };
   const ink = new Blob(['snapshot ink'], { type: 'image/png' });
   const scope = {
+    guidedShot: false, shotBrightness: 1, guidedLights: api.guidedLights,
     useCallback: (fn) => fn, modelLoading: false, bodyFit: null, snapshotLook: null, shotBlur: 0, cinematicPreset: () => undefined,
     uvPlacementRef: { current: { getPlacement: () => placement, getTattooFraming: () => api.regionSnapshotFraming({ center: [.2, .8, .1], radius: .4 }, [0,0,1]), getRegionFraming: () => ({ center: [0, 0, 0], radius: 1 }) } },
     uploadedImage: 'data:image/png;base64,dGVzdA==', decalVisible: true,
@@ -150,10 +151,10 @@ for (const reason of ['model-loading', 'body-unavailable', 'image-loading', 'pre
 function openerScope(f, session, overrides = {}) {
   const menuChanges = [];
   return {
-    nativeHost: false, shotFormat: 'view', setShotFormat: () => {}, setSnapshotLook: () => {}, cinematicPreset: api.cinematicPreset, setShotBrightness: () => {}, setShotBlur: () => {}, frameTattoo: api.frameTattoo, viewportAspect: 16/9, setLightingPreset: () => {}, setLights: () => {}, cinematicLights: api.cinematicLights, LIGHTING_PRESETS: f.scope.LIGHTING_PRESETS, setStudio: () => {}, renderBusy: false, modelLoading: false, canvasHostSized: true,
+    guidedShot: false, guidedCamera: api.guidedCamera, nativeHost: false, shotFormat: 'view', setShotFormat: () => {}, setSnapshotLook: () => {}, cinematicPreset: api.cinematicPreset, setShotBrightness: () => {}, setShotBlur: () => {}, frameTattoo: api.frameTattoo, viewportAspect: 16/9, setLightingPreset: () => {}, setLights: () => {}, cinematicLights: api.cinematicLights, LIGHTING_PRESETS: f.scope.LIGHTING_PRESETS, setStudio: () => {}, renderBusy: false, modelLoading: false, canvasHostSized: true,
     setShapeMenu: (value) => menuChanges.push(['shape', value]), setHoverRegion: (value) => menuChanges.push(['hover', value]),
     setPanelRegions: (value) => menuChanges.push(['regions', value]), setAccountMenuOpen: (value) => menuChanges.push(['account', value]),
-    snapshotSession: session, currentShotBuilder: { current: f.build() }, snapshotReturnCamera: { current: null }, snapshotReturnStudio: { current: null }, studio: f.scope.studio, lights: f.scope.lights, lightingPreset: f.scope.lightingPreset, selectedLight: 1, orbitControlsRef: f.scope.orbitControlsRef, cameraState: f.scope.cameraState, uvPlacementRef: f.scope.uvPlacementRef, setTattooFraming: () => {}, setSnapshotHasTattoo: () => {}, setSnapshotFramingHint: () => {}, regionSnapshotFraming: api.regionSnapshotFraming, setSnapshotCamera: () => {}, DEFAULT_TATTOO_CAMERA_ADJUSTMENT: api.DEFAULT_TATTOO_CAMERA_ADJUSTMENT, currentScene: { name: 'My current figure' }, menuChanges, ...overrides,
+    dismissShootHint: () => {}, snapshotSession: session, currentShotBuilder: { current: f.build() }, snapshotReturnCamera: { current: null }, snapshotReturnStudio: { current: null }, studio: f.scope.studio, lights: f.scope.lights, lightingPreset: f.scope.lightingPreset, selectedLight: 1, orbitControlsRef: f.scope.orbitControlsRef, cameraState: f.scope.cameraState, uvPlacementRef: f.scope.uvPlacementRef, setTattooFraming: () => {}, setSnapshotHasTattoo: () => {}, setSnapshotFramingHint: () => {}, regionSnapshotFraming: api.regionSnapshotFraming, setSnapshotCamera: () => {}, DEFAULT_TATTOO_CAMERA_ADJUSTMENT: api.DEFAULT_TATTOO_CAMERA_ADJUSTMENT, currentScene: { name: 'My current figure' }, menuChanges, ...overrides,
   };
 }
 for (const guard of ['renderBusy', 'modelLoading', 'canvasHostSized']) {
@@ -191,7 +192,7 @@ for (const guard of ['renderBusy', 'modelLoading', 'canvasHostSized']) {
   session.setQuality('detailed'); await session.render();
   assert.equal(requests.length, 2); assert.equal(f.calls.freeze, 2); assert.equal(f.calls.baked.length, 1, 'quality rerender reuses the frozen ink');
   assert.equal(requests[1].contract.camera.position[0], 3); assert.equal(requests[1].contract.lighting.lights[0].color, '#ffaa77');
-  assert.deepEqual(requests[1].contract.output, api.snapshotOutput(16 / 9, 'detailed'));
+  assert.deepEqual(requests[1].contract.output, api.snapshotOutput(16 / 9, 'detailed', {finish:'portfolio',regionalSkin:true}));
   assert.deepEqual(revoked, ['blob:shot-1']); session.close(); assert.deepEqual(revoked, ['blob:shot-1', 'blob:shot-2']); f.dispose();
 }
 for (const action of ['close', 'cancel']) {
@@ -210,7 +211,7 @@ console.log('Snapshot Workspace passed: actual builder/open callbacks, live came
 // The built-in example is a real image source for every export path.
 for (const options of [undefined, {snapshot:'quick'}, {snapshot:'detailed'}]) {
  const f=fixture({uploadedImage:null});
- await f.build()(options);assert.equal(f.calls.baked[0].tattooImage,'/logo.png');
+ await f.build()(options);assert.equal(f.calls.baked[0].tattooImage,'/tattoos/starter-2026/peony.png');
  f.placement.imageSource='data:image/png;base64,already-loaded';
  await f.build()(options);assert.equal(f.calls.baked[1].tattooImage,f.placement.imageSource,'the loaded texture is authoritative');f.dispose();
 }
@@ -330,4 +331,14 @@ console.log('Reveal preview lifecycle passed: motion, stop restoration, and no c
   assert.deepEqual(shot.contract.inkUvRegion, region);
   assert.deepEqual(api.snapshotContract(shot.contract, 'quick').inkUvRegion, region);
   f.dispose();
+}
+// Guided rendering enforces the rig and sharp lens even when manual state is stale.
+{
+ const f = fixture({guidedShot:true, shotBrightness:.01, snapshotLook:'sculpted', shotBlur:1, cinematicPreset:api.cinematicPreset});
+ const shot = await f.build()({snapshot:'detailed'});
+ assert.equal(shot.contract.camera.depthOfField,false);
+ const lights=shot.contract.lighting.lights;
+ assert.ok(lights[2].intensity/lights[1].intensity>=.28-1e-9);
+ assert.ok(lights[3].intensity/lights[1].intensity<=.25+1e-9);
+ f.dispose();
 }

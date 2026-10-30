@@ -16,7 +16,7 @@ globalThis.__tattooStore={get:async key=>values.get(key),update:(key,fn)=>{const
 await build({stdin:{contents:"export * from './src/storage/tattooLibrary'; export {default as Panel} from './src/EditorLeftPanel';",resolveDir:process.cwd()},bundle:true,jsx:'automatic',format:'esm',platform:'node',outfile:fileURLToPath(file),packages:'external',plugins:[{name:'local-store',setup(b){b.onResolve({filter:/^idb-keyval$/},()=>({path:'idb',namespace:'test'}));b.onResolve({filter:/auth\/betaAuthService$/},()=>({path:'auth',namespace:'test'}));b.onLoad({filter:/.*/,namespace:'test'},args=>({contents:args.path==='auth'?'export const subscribeSession=(...args)=>globalThis.__tattooAuth.subscribeSession(...args);':'export const get=(...args)=>globalThis.__tattooStore.get(...args);export const update=(...args)=>globalThis.__tattooStore.update(...args);'}));}}]});
 try{
 const {STARTER_TATTOOS,loadTattooLibrary,rememberTattoo,removeTattoo,subscribeTattooLibrary,Panel}=await import(file.href);
-assert.equal(STARTER_TATTOOS.length,3);assert.equal(new Set(STARTER_TATTOOS.map(a=>a.source)).size,3);
+assert.equal(STARTER_TATTOOS.length,10);assert.equal(new Set(STARTER_TATTOOS.map(a=>a.source)).size,10);
 assert.deepEqual(await loadTattooLibrary(),[],'Unowned legacy artwork is not assigned to the next account');
 const updatesA=[],unsubscribeA=subscribeTattooLibrary(items=>updatesA.push(items));
 const png='data:image/png;base64,example';
@@ -50,8 +50,8 @@ assert.deepEqual(values.get('smartink:tattoo-library:v1'),legacy,'Legacy artwork
 unsubscribeA();unsubscribeB();
 const props={bodyLabel:'Full figure',studioLabel:'Studio sweep',activeTab:'tattoo',onSelect:()=>{},collapsed:false,onToggleCollapsed:()=>{},tattooVisible:true,onToggleTattoo:()=>{},currentImage:STARTER_TATTOOS[0].source,onChooseArtwork:()=>{}};
 const html=renderToStaticMarkup(React.createElement(Panel,props));
-for(const name of ['Botanical rose','Lunar moth','Ornamental dagger','Search tattoo designs','Starter designs','My uploads','Add artwork'])assert.ok(html.includes(name),name);
-assert.match(html,/aria-label="Use Botanical rose" aria-pressed="true"/);
+for(const name of ['Botanical peony','Luna moth','Olive dagger','Search tattoo designs','Starter designs','My uploads','Add artwork'])assert.ok(html.includes(name),name);
+assert.match(html,/aria-label="Use Botanical peony" aria-pressed="true"/);
 assert.match(html,/multiple=""/);assert.match(html,/Your uploads are saved for this account in this browser/);
 const collapsed=renderToStaticMarkup(React.createElement(Panel,{...props,collapsed:true}));assert.match(collapsed,/class="asset-library-body" hidden=""/);
 console.log('Tattoo library: account isolation, listener isolation, sign-out, interrupted writes, preserved legacy data, concurrent imports, removal, starter separation and library markup passed.');

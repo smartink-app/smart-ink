@@ -7,6 +7,7 @@ const MAX_BODY = 9 * 1024 * 1024;
 const MAX_IMAGE = 5 * 1024 * 1024; // Compatibility with workers returning inline images.
 const MAX_STORED_IMAGE = 50 * 1024 * 1024;
 const terminal = new Set(['COMPLETED', 'FAILED', 'CANCELLED', 'TIMED_OUT']);
+class SubmissionRejected extends Error {}
 class Fault extends Error { constructor(public status: number, message: string) { super(message); } }
 function object(value: unknown): Obj {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Fault(400, 'Expected a JSON object.');
@@ -48,12 +49,21 @@ export function validateInput(body: Obj): Obj {
   if (JSON.stringify(contract).length > 65536 || contract.schemaVersion !== 1
     || !['body_full','body_full_female'].includes(String(contract.bodyMeshId))
     || contract.inkTextureUrl !== 'ink.png') throw new Fault(400, 'Unsupported render contract.');
+  if (output.finish !== undefined && (output.finish !== 'portfolio' || output.qualityTier !== 'final')) throw new Fault(400, 'Unsupported render finish.');
+  if (contract.skinVariation !== undefined && (contract.skinVariation !== 'regional' || contract.skinProfileVersion !== 3 || contract.skinMaterial !== 'studio')) throw new Fault(400, 'Regional skin requires studio v3.');
   if (!['preview','final'].includes(String(output.qualityTier))
     || !Number.isInteger(output.width) || !Number.isInteger(output.height)
     || Number(output.width)<64 || Number(output.height)<64
-    || Number(output.width)>2560 || Number(output.height)>2560
-    || (output.samples !== undefined && (!Number.isInteger(output.samples) || Number(output.samples)<1 || Number(output.samples)>512)))
-    throw new Fault(400, 'Beta renders support up to 2560 pixels and 512 samples.');
+    || Number(output.width)>4000 || Number(output.height)>4000
+    || (output.samples !== undefined && (!Number.isInteger(output.samples) || Number(output.samples)<1 || Number(output.samples)>2048)))
+    throw new Fault(400, 'Beta renders support up to 4000 pixels and 2048 samples.');
+  if (contract.inkUvRegion !== undefined) {
+    const region=contract.inkUvRegion;
+    if (!Array.isArray(region) || region.length!==4
+      || region.some(v=>typeof v!=='number' || !Number.isFinite(v) || v<0 || v>1)
+      || Math.min(region[2],region[3])<1/8192 || region[0]+region[2]>1.000001 || region[1]+region[3]>1.000001)
+      throw new Fault(400,'Invalid tattoo UV region.');
+  }
   png(base64(body.ink_base64, 6 * 1024 * 1024));
   return contract;
 }
@@ -110,7 +120,11 @@ export function createHandler(config: Config, fetcher: typeof fetch = fetch) {
       const body=await limitedJson(req);
       if(!['health','submit','status','cancel'].includes(String(body.action))) throw new Fault(400,'Unknown render action.');
       const configured=Boolean(config.runpodKey && /^[a-z0-9]+$/.test(config.endpoint));
-      if(body.action==='health') return json(200,{ready:configured,message:configured?'Ready to render':'RunPod connection is not configured.',cancellationSupported:true});
+      if(body.action==='health') {
+        if(!configured) return json(200,{ready:false,message:'RunPod connection is not configured.',cancellationSupported:true});
+        const health=await fetcher(`https://api.runpod.ai/v2/${config.endpoint}/health`,{headers:{Authorization:`Bearer ${config.runpodKey}`},signal:AbortSignal.timeout(10000)});
+        return json(200,{ready:health.ok,message:health.ok?'Ready to render':health.status===401 || health.status===403?'The render server needs an updated RunPod API key.':health.status===404?'The configured RunPod endpoint was not found.':'The GPU service is temporarily unavailable.',cancellationSupported:true});
+      }
       if(!configured) throw new Fault(503,'RunPod connection is not configured.');
       if(typeof body.jobId!=='string' || !UUID.test(body.jobId)) throw new Fault(400,'Invalid job ID.');
       const id=body.jobId;
@@ -121,7 +135,17 @@ export function createHandler(config: Config, fetcher: typeof fetch = fetch) {
       };
       async function provider(path:string, method='GET', data?:unknown): Promise<Obj> {
         const res=await fetcher(`https://api.runpod.ai/v2/${config.endpoint}/${path}`,{method,headers:{Authorization:`Bearer ${config.runpodKey}`,'Content-Type':'application/json'},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(20000)});
-        if(!res.ok) throw new Fault(502,'The GPU service is temporarily unavailable. Please retry.');
+        if(!res.ok) {
+          // Explicit client-side rejection means no job was accepted. Keep reservations
+          // on timeouts/5xx: those outcomes may already have created a billable job.
+          if(path==='run' && [400,401,403,404,422,429].includes(res.status)) {
+            throw new SubmissionRejected(res.status===401 || res.status===403
+              ? 'The render server needs an updated RunPod API key.'
+              : res.status===404 ? 'The configured RunPod endpoint was not found.'
+              : 'The GPU service rejected the render. Please try again later.');
+          }
+          throw new Fault(502,'The GPU service is temporarily unavailable. Please retry.');
+        }
         return object(await res.json());
       }
       if(body.action==='submit') {
@@ -149,7 +173,16 @@ export function createHandler(config: Config, fetcher: typeof fetch = fetch) {
             await db(filter,'PATCH',{status:'FAILED'});
             throw new Fault(503,'Could not prepare image storage. Please start a new render.');
           }
-          const submitted=await provider('run','POST',{input:{contract,ink_base64:body.ink_base64,result_upload:{url:uploadUrl,path}},policy:{executionTimeout:660000,ttl:900000}});
+          let submitted: Obj;
+          try {
+            submitted=await provider('run','POST',{input:{contract,ink_base64:body.ink_base64,result_upload:{url:uploadUrl,path}},policy:{executionTimeout:660000,ttl:900000}});
+          } catch(error) {
+            if(error instanceof SubmissionRejected) {
+              await db(filter,'PATCH',{status:'FAILED'});
+              throw new Fault(503,error.message);
+            }
+            throw error;
+          }
           if(typeof submitted.id!=='string' || !/^[a-zA-Z0-9_-]+$/.test(submitted.id)) throw new Fault(502,'Invalid GPU job response.');
           try { await db(filter,'PATCH',{runpod_id:submitted.id,status:'IN_QUEUE'}); }
           catch(error) { await provider(`cancel/${submitted.id}`,'POST').catch(()=>{}); throw error; }

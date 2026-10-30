@@ -92,6 +92,10 @@ const select = suffix => nodes().find(node => node.type === 'select' && node.pro
 const button = label => nodes().find(node => node.type === 'button' && content(node) === label);
 const settings = () => nodes().find(node => node.type === 'details');
 try {
+  assert.equal(button('Focus').props.disabled, true);
+  props.canFocus = true; props.onFocus = () => calls.push(['focus']);
+  assert.equal(button('Focus').props.disabled, false);
+  button('Focus').props.onClick(); assert.deepEqual(calls.at(-1), ['focus']);
   for (const key of Object.keys(real.CAMERA_PRESETS)) {
     select('-view').props.onChange({ currentTarget: { value: key } });
     assert.deepEqual(calls.at(-1), ['camera', key]);

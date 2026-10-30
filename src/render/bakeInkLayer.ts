@@ -1,4 +1,5 @@
 import { inkUvRegion, type InkUvRegion } from './inkUvRegion';
+import { isStarterTattoo } from './tattooSource';
 import * as THREE from 'three';
 import { SLEEVE_SOURCES } from './sleeveTypes';
 import { SLEEVE_VERTEX_DECL, SLEEVE_VERTEX_ASSIGN, SLEEVE_GLSL } from './sleeveShader';
@@ -261,6 +262,7 @@ export async function bakeInkLayer(params: BakeParams): Promise<Blob> {
 
     const uniforms: Record<string, THREE.IUniform> = {
       inkRegion: { value: new THREE.Vector4(0, 0, 1, 1) },
+      starterInkOnly: { value: isStarterTattoo(params.tattooImage) ? 1 : 0 },
       tattooTexture: { value: texture },
       tattooRotation: { value: params.rotationRad ?? 0 },
     };

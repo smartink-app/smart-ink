@@ -1,5 +1,5 @@
 import type { CloudRenderOptions, RenderStatus, RenderProgress } from './cloudRenderService';
-import { snapshotContract, type SnapshotQuality, type SnapshotShot } from '../render/snapshot';
+import { snapshotContract, DEFAULT_DETAILED_SETTINGS, type DetailedSettings, type SnapshotQuality, type SnapshotShot } from '../render/snapshot';
 import type { RenderContract } from '../render/contract';
 
 export interface SnapshotState {
@@ -7,6 +7,7 @@ export interface SnapshotState {
   mode: 'compose' | 'result';
   status: RenderStatus;
   quality: SnapshotQuality;
+  detailedSettings: DetailedSettings;
   imageUrl: string | null;
   previewUrl: string | null;
   progress: RenderProgress | null;
@@ -26,7 +27,7 @@ interface Dependencies {
 
 /** Compose freely, then freeze one shot per render/retry with owned cancellation and URLs. */
 export function createSnapshotSession({ render, retain, revoke = URL.revokeObjectURL, now = Date.now }: Dependencies) {
-  let state: SnapshotState = { open: false, mode: 'compose', status: 'idle', quality: 'quick', imageUrl: null, previewUrl: null, progress: null, imageMatchesView: false, message: '', warning: '', startedAt: 0, aspect: null };
+  let state: SnapshotState = { open: false, mode: 'compose', status: 'idle', quality: 'quick', detailedSettings: { ...DEFAULT_DETAILED_SETTINGS }, imageUrl: null, previewUrl: null, progress: null, imageMatchesView: false, message: '', warning: '', startedAt: 0, aspect: null };
   const listeners = new Set<() => void>();
   let controller: AbortController | null = null;
   let prepare: ((signal: AbortSignal) => Promise<SnapshotShot>) | null = null;
@@ -45,6 +46,7 @@ export function createSnapshotSession({ render, retain, revoke = URL.revokeObjec
     const visit = generation;
     const sequence = ++attempt;
     const quality = state.quality;
+    const settings = { ...state.detailedSettings };
     controller = request;
     const owns = () => visit === generation && controller === request && !request.signal.aborted;
     if (state.mode === 'compose') frozen = null;
@@ -56,7 +58,7 @@ export function createSnapshotSession({ render, retain, revoke = URL.revokeObjec
       if (!owns()) return;
       frozen = { ...source, contract: structuredClone(source.contract) };
       update({ aspect: frozen.contract.camera.aspect });
-      const shot = { ...source, contract: snapshotContract(source.contract, quality) };
+      const shot = { ...source, contract: snapshotContract(source.contract, quality, settings) };
       const imageUrl = await render(shot.contract, shot.inkBlob, {
         signal: request.signal,
         onPreview(url) {
@@ -104,6 +106,7 @@ export function createSnapshotSession({ render, retain, revoke = URL.revokeObjec
       releasePreview();
       update({ previewUrl: null, progress: null, mode: 'compose', status: 'idle', imageMatchesView: false, message: '', warning: '', aspect: null, startedAt: 0 });
     },
+    setDetailedSettings(detailedSettings: DetailedSettings) { if (!controller) update({ detailedSettings: { ...detailedSettings } }); },
     setQuality(quality: SnapshotQuality) { if (!controller) update({ quality }); },
     cancel() {
       if (!controller) return;

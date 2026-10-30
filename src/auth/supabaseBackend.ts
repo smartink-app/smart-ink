@@ -1,3 +1,4 @@
+import { pendingInvite, setPendingInvite } from './pendingInvite';
 import { rememberOfflineApproval, forgetOfflineApproval, hasOfflineApproval } from '../ipad/offlineAccess';
 /**
  * Hosted beta gate on Supabase. See supabase/migrations/*_beta_gate.sql for
@@ -105,6 +106,15 @@ function sessionFromUser(user: User): BetaSession {
 async function resolveAccess(session: Session | null): Promise<SessionState> {
   if (!session?.user) return { session: null, accessError: null };
   const supabase = getSupabase();
+  const invitation = pendingInvite();
+  if (invitation) {
+    const { error } = await supabase.rpc('redeem_invite', { p_code: invitation, p_email: session.user.email ?? '' });
+    if (error) {
+      await supabase.auth.signOut();
+      return { session: null, accessError: error.message };
+    }
+    setPendingInvite();
+  }
   const { data, error, status: httpStatus } = await supabase.rpc('my_access');
   if (error) {
     if (httpStatus === 0 && hasOfflineApproval(session.user.id, session.expires_at)) {
@@ -129,6 +139,14 @@ async function assertInvited(email: string): Promise<void> {
   if (error) fail(error.message, 'Could not check beta access.');
   const status = typeof data === 'string' ? data : 'none';
   if (status !== 'invited' && status !== 'active') throw new Error(accessMessage(status));
+}
+
+async function validateInvitation(code: string, email?: string): Promise<void> {
+  const invite = await supabaseBackend.getInvite(code);
+  if (!invite) throw new Error('This invitation could not be found. Ask the sender for a new link.');
+  if (invite.redeemed) throw new Error('This invitation has already been used. Sign in to your account instead.');
+  if (invite.expiresAt <= Date.now()) throw new Error('This invitation has expired. Ask the sender for a new link.');
+  if (email && invite.email && normalizeEmail(email) !== normalizeEmail(invite.email)) throw new Error('Use the email this invitation was sent to.');
 }
 
 /** Passwords authenticate through Supabase; the existing beta gate still applies. */
@@ -213,10 +231,11 @@ export const supabaseBackend: BetaAuthBackend = {
     if (error) fail(error.message, 'Could not redeem invite.');
   },
 
-  async requestEmailCode(rawEmail) {
+  async requestEmailCode(rawEmail, inviteCode) {
     const email = normalizeEmail(rawEmail);
     if (!isValidEmail(email)) throw new Error('Enter a valid email address.');
-    await assertInvited(email);
+    if (inviteCode) await validateInvitation(inviteCode, email);
+    else await assertInvited(email);
     const { error } = await getSupabase().auth.signInWithOtp({
       email,
       options: { shouldCreateUser: true },
@@ -225,10 +244,11 @@ export const supabaseBackend: BetaAuthBackend = {
     return {};
   },
 
-  async verifyEmailCode(rawEmail, code) {
+  async verifyEmailCode(rawEmail, code, inviteCode) {
     const email = normalizeEmail(rawEmail);
     const token = code.trim();
     if (!token) throw new Error('Enter the code from your email.');
+    setPendingInvite(inviteCode);
     const { data, error } = await getSupabase().auth.verifyOtp({ email, token, type: 'email' });
     if (error) fail(error.message, 'Incorrect or expired code.');
     const state = await resolveAccess(data.session);
@@ -236,11 +256,13 @@ export const supabaseBackend: BetaAuthBackend = {
     return state.session;
   },
 
-  async signInWithGoogle() {
+  async signInWithGoogle(emailHint, inviteCode) {
+    if (inviteCode) await validateInvitation(inviteCode, emailHint || undefined);
+    setPendingInvite(inviteCode);
     const redirectTo = `${window.location.origin}${window.location.pathname}`;
     const { error } = await getSupabase().auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo },
+      options: { redirectTo, queryParams: { prompt: 'select_account', ...(emailHint ? { login_hint: emailHint } : {}) } },
     });
     if (error) fail(error.message, 'Could not start Google sign-in.');
     // The browser is now navigating to Google; the session arrives through

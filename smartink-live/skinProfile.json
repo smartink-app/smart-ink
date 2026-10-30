@@ -1,0 +1,64 @@
+{
+  "version": 3,
+  "seed": 34,
+  "coordinates": "rest metres; centred body; +Y up, +Z forward; reference height 1.75m",
+  "tileMetres": 0.016,
+  "heightMetres": 7.5e-05,
+  "hairCellMetres": 0.006,
+  "hairRadiusMetres": 1.8e-05,
+  "regions": {
+    "torso": {
+      "hairDensity": 0.12,
+      "hairLengthMetres": 0.0018,
+      "relief": 0.8,
+      "pigment": 0.85
+    },
+    "head": {
+      "hairDensity": 0,
+      "hairLengthMetres": 0.001,
+      "relief": 0.65,
+      "pigment": 0.65
+    },
+    "arm": {
+      "hairDensity": 0.44,
+      "hairLengthMetres": 0.0045,
+      "relief": 1,
+      "pigment": 1
+    },
+    "leg": {
+      "hairDensity": 0.55,
+      "hairLengthMetres": 0.0055,
+      "relief": 1.1,
+      "pigment": 0.9
+    }
+  },
+  "exclusions": {
+    "armHeightFade": [
+      0.53,
+      0.59
+    ],
+    "legHeightFade": [
+      0.065,
+      0.105
+    ],
+    "torsoHeightFade": [
+      0.54,
+      0.64
+    ]
+  },
+  "status": "Artistic reference-guided preview. Regional masks are conservative A-pose approximations, not anatomical segmentations.",
+  "pigment": {
+    "spotSpacingMetres": 0.0023,
+    "spotThreshold": [
+      0.84,
+      0.98
+    ],
+    "spotContrast": 0.12,
+    "follicleSpacingMetres": 0.00045,
+    "follicleContrast": 0.04
+  },
+  "surfaceLines": {
+    "tileMetres": 0.112,
+    "heightMetres": 8.5e-05
+  }
+}

@@ -22,7 +22,7 @@ const converted=snapshotContract(contract,'detailed');assert.equal(converted.cam
  session.setQuality('detailed');assert.equal(session.getState().quality,'quick');
  calls[0].options.onStatusChange('rendering','Working');assert.equal(session.getState().message,'Working');
  pending[0].resolve('blob:first');await tick();assert.equal(session.getState().status,'done');assert.equal(history.length,1);
- original.contract.camera.position[0]=999;session.setQuality('detailed');const again=session.render();await tick();assert.equal(builds,1);assert.equal(calls.length,2);assert.equal(calls[1].c.camera.position[0],3);assert.equal(calls[1].c.output.width,2560);assert.equal(calls[1].ink,original.inkBlob);assert.equal(session.getState().imageUrl,'blob:first');
+ original.contract.camera.position[0]=999;session.setQuality('detailed');const again=session.render();await tick();assert.equal(builds,1);assert.equal(calls.length,2);assert.equal(calls[1].c.camera.position[0],3);assert.equal(calls[1].c.output.width,4000);assert.equal(calls[1].ink,original.inkBlob);assert.equal(session.getState().imageUrl,'blob:first');
  pending[1].resolve('blob:second');await tick();assert.deepEqual(revoked,['blob:first']);history[0].reject(Error('old history failure'));await tick();assert.equal(session.getState().warning,'');history[1].reject(Error('history offline'));await again;assert.match(session.getState().warning,/ready to download/);assert.equal(session.getState().status,'done');
  session.close();assert.deepEqual(revoked,['blob:first','blob:second']);assert.equal(session.getState().open,false);const count=events;unsubscribe();session.setQuality('quick');assert.equal(events,count);
 }
@@ -57,7 +57,7 @@ console.log('Snapshot session passed: viewport crop, frozen inputs, quality, dup
  await session.render();assert.equal(prepared,1);assert.equal(session.getState().mode,'result');assert.deepEqual(sent[0].camera.target,[.4,1,.2]);
  session.adjust();assert.equal(session.getState().mode,'compose');assert.equal(session.getState().imageUrl,'blob:compose-1');
  current=shot();current.contract.camera.target=[.6,.8,.2];current.contract.lighting.lights=[{type:'ambient',intensity:.12,color:'#ffccaa'}];
- session.setQuality('detailed');await session.render();assert.equal(prepared,2);assert.deepEqual(sent[1].camera.target,[.6,.8,.2]);assert.equal(sent[1].lighting.lights[0].color,'#ffccaa');assert.equal(sent[1].output.width,2560);assert.deepEqual(revoked,['blob:compose-1']);session.close();
+ session.setQuality('detailed');await session.render();assert.equal(prepared,2);assert.deepEqual(sent[1].camera.target,[.6,.8,.2]);assert.equal(sent[1].lighting.lights[0].color,'#ffccaa');assert.equal(sent[1].output.width,4000);assert.deepEqual(revoked,['blob:compose-1']);session.close();
 }
 console.log('Snapshot composition passed: no automatic request, edited camera/lights captured on Render, Adjust recaptures, previous image retained.');
 
@@ -71,3 +71,8 @@ console.log('Snapshot composition passed: no automatic request, edited camera/li
  rendering=session.render();await tick();pending[3].resolve('blob:new');await rendering;assert.equal(session.getState().imageMatchesView,true);session.close();assert.equal(session.getState().imageMatchesView,false);
 }
 console.log('Comparison provenance passed: changed shots disable previous-image comparison until their own render succeeds.');
+
+const portfolio=snapshotContract({...contract,skinMaterial:'studio',skinProfileVersion:3},'detailed',{finish:'portfolio',regionalSkin:true});
+assert.equal(portfolio.output.samples,2048);assert.equal(portfolio.output.width,4000);assert.equal(portfolio.output.finish,'portfolio');assert.equal(portfolio.skinVariation,'regional');
+assert.equal(snapshotContract(portfolio,'quick',{finish:'portfolio',regionalSkin:true}).skinVariation,undefined);
+assert.equal(snapshotContract(portfolio,'detailed',{finish:'standard',regionalSkin:false}).output.finish,undefined);

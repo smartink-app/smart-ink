@@ -163,6 +163,13 @@ if '--progressive' in sys.argv:
             with self.assertRaises(HTTPException):
                 validate_png(bad)
 
+    def test_ink_uv_region_validation(self):
+        for region in ([0, 0, 0, 1], [.9, 0, .2, 1], [0, 0, 1], [True, 0, 1, 1], [10**400, 0, 1, 1]):
+            with self.assertRaises(HTTPException):
+                validate_contract(json.dumps({**contract(), 'inkUvRegion': region}).encode())
+        shot = {**contract(), 'inkUvRegion': [.2, .3, .1, .2]}
+        self.assertEqual(validate_contract(json.dumps(shot).encode()), shot)
+
     def test_02_rejected_before_process_start(self):
         before = list(self.live.glob('*.pid'))
         for shot, ink in ((b'{broken', png()), (contract(), b'not a PNG'), ({**contract(), 'bodyRegion': []}, png())):

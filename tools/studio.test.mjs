@@ -90,6 +90,7 @@ assert.ok(Math.abs(stage.position.y-(.2-2.1*1.3-.02))<1e-5); assert.equal(dispos
 assert.equal(stage.children[0].geometry,stage.children[1].geometry,'shadow overlay shares the sweep');
 render(choices,'armLeft'); assert.equal(stage.visible,false); assert.equal(scene.background.getHexString(),'657b91');
 render(choices,null,true); assert.equal(stage.visible,true); assert.equal(stage.children[1].visible,false);
+camera.position.y=stage.position.y + .35; render(choices); assert.ok(stage.children[0].material.opacity > 0 && stage.children[0].material.opacity < 1, 'sweep fades before crossing the floor'); assert.ok(stage.children[1].material.opacity < choices.shadow, 'shadows fade with the paper');
 camera.position.y=-8; render(choices); assert.equal(stage.visible,false,'bottom views cannot be blocked by floor');
 camera.position.y=2; render(choices); assert.equal(stage.visible,true); assert.equal(stage.children[1].visible,true);
 render(defaults); assert.equal(stage.visible,true,'default backdrop shows sweep');

@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><title>Real body tattoo export proof</title><h1>Real body tattoo export proof</h1><button id="run">Prepare arm comparison</button><pre id="status">Ready</pre><div id="files"></div><script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
+import {createSurfaceTopology,buildSurfaceChart} from '/src/render/surfacePlacement.ts';
+import {bakeInkLayer} from '/src/render/bakeInkLayer.ts';
+import {frameTattoo} from '/src/render/tattooCamera.ts';
+import {cinematicPreset} from '/src/render/cinematicPresets.ts';
+import {guidedLights} from '/src/render/shootQuality.ts';
+function link(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.textContent=name;document.querySelector('#files').append(a,document.createElement('br'));}
+document.querySelector('#run').onclick=async()=>{try{
+ const loader=new GLTFLoader(),draco=new DRACOLoader();draco.setDecoderPath('/draco/');loader.setDRACOLoader(draco);
+ const group=(await loader.loadAsync('/models/body_male_realistic.glb')).scene, meshes=[];
+ group.traverse(o=>{if(o.isMesh)meshes.push(o)});const body=meshes.reduce((a,b)=>a.geometry.attributes.position.count>b.geometry.attributes.position.count?a:b);
+ for(const m of meshes)if(m!==body)m.removeFromParent();
+ const bounds=new THREE.Box3().setFromObject(group);group.scale.multiplyScalar(4.2/(bounds.max.y-bounds.min.y));group.updateMatrixWorld(true);bounds.setFromObject(group);group.position.sub(bounds.getCenter(new THREE.Vector3()));group.updateMatrixWorld(true);
+ body.geometry=body.geometry.index?body.geometry.toNonIndexed():body.geometry.clone();body.material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+ const hit=new THREE.Raycaster(new THREE.Vector3(.81,.4,3),new THREE.Vector3(0,0,-1)).intersectObject(body)[0];if(!hit)throw Error('Arm not hit');
+ const geo=body.geometry,pos=geo.attributes.position, point=body.worldToLocal(hit.point.clone());const bary=new THREE.Triangle(...[hit.face.a,hit.face.b,hit.face.c].map(i=>new THREE.Vector3().fromBufferAttribute(pos,i))).getBarycoord(point,new THREE.Vector3());
+ const anchor={bodyMeshId:'body_full',faceIndex:hit.faceIndex,barycentric:bary.toArray()};const chart=buildSurfaceChart(createSurfaceTopology(geo),geo,body.matrixWorld,anchor);
+ geo.setAttribute('aTattooUv',new THREE.BufferAttribute(chart.uv,2));const mask=chart.mask.slice();for(let i=0;i<chart.faceMask.length;i++)if(!chart.faceMask[i])mask.fill(0,i*3,i*3+3);geo.setAttribute('aTattooMask',new THREE.BufferAttribute(mask,1));
+ const normal=hit.face.normal.clone().transformDirection(body.matrixWorld),center=hit.point.toArray(),preset=cinematicPreset('editorial');
+ const camera=frameTattoo({center,normal:normal.toArray(),up:[0,1,0],radius:.36,minDistance:.18,points:new Float32Array([-1,1].flatMap(x=>[-1,1].flatMap(y=>new THREE.Vector3(...center).addScaledVector(new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),normal).normalize(),x*.25).add(new THREE.Vector3(0,y*.36,0)).toArray())))},preset.adjustment,.8,preset.fov);
+ const art=new Image();art.src='/tattoos/botanical-rose.png';await art.decode();
+ for(const localized of [false,true]){
+  const name=localized?'arm-localized':'arm-baseline';document.querySelector('#status').textContent='Preparing '+name;
+  const c={schemaVersion:1,bodyMeshId:'body_full',skinToneId:'tone_03',poseId:'neutral',lookId:'studio_softbox',inkTextureUrl:'ink.png',skinMaterial:'studio',skinProfileVersion:3,renderStyle:'cinematic',bodyRegion:'armLeft',camera:{...camera,aspect:.8,preserveFraming:true,depthOfField:false},lighting:{presetName:'studio',intensityScale:1.1,lights:guidedLights('editorial',camera,1,1.1)},studio:{mode:'plain',color:'#323337',shadow:0},output:{qualityTier:'final',width:1280,height:1600,samples:256}};
+  const ink=await bakeInkLayer({tattooImage:art.src,surface:{geometry:geo,size:.65,aspect:art.naturalWidth/art.naturalHeight,color:'#ffffff',opacity:1},size:4096,onUvRegion:localized?r=>c.inkUvRegion=r:undefined});
+  link(name+'.png',ink);link(name+'.json',new Blob([JSON.stringify(c)],{type:'application/json'}));document.querySelector('#status').textContent=JSON.stringify({name,bytes:ink.size,region:c.inkUvRegion});
+ }draco.dispose();
+}catch(e){document.querySelector('#status').textContent=e.stack;}};
+</script>

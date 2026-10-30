@@ -91,17 +91,21 @@ export function validateContract(c: RenderContract): string[] {
   if (!findById(REGISTRY.looks, c.lookId)) errs.push(`unknown lookId ${c.lookId}`);
   if (c.renderStyle !== undefined && !['preview', 'cinematic'].includes(c.renderStyle)) errs.push('unknown renderStyle');
   if (c.camera.preserveFraming !== undefined && typeof c.camera.preserveFraming !== 'boolean') errs.push('camera.preserveFraming must be a boolean');
+  const maxSamples = c.output.finish === 'portfolio' ? 2048 : FINAL_SAMPLES.max;
+  if (c.output.finish !== undefined && (c.output.finish !== 'portfolio' || c.output.qualityTier !== 'final')) errs.push('unsupported render finish');
+  if (c.skinVariation !== undefined && (c.skinVariation !== 'regional' || c.skinProfileVersion !== 3)) errs.push('unsupported regional skin');
   const samples = c.output.samples;
   if (samples !== undefined) {
     if (
       typeof samples !== 'number' ||
       !Number.isFinite(samples) ||
       samples < FINAL_SAMPLES.min ||
-      samples > FINAL_SAMPLES.max
+      samples > maxSamples
     ) {
-      errs.push(`output.samples must be a number in [${FINAL_SAMPLES.min}, ${FINAL_SAMPLES.max}]`);
+      errs.push(`output.samples must be a number in [${FINAL_SAMPLES.min}, ${maxSamples}]`);
     }
   }
+  if (c.skinProfileVersion !== undefined && (c.skinProfileVersion !== 3 || c.skinMaterial !== 'studio' || c.renderStyle !== 'cinematic')) errs.push('unsupported shared skin material');
   if (!c.inkTextureUrl) errs.push('missing inkTextureUrl');
   if (c.bodyFit !== undefined) {
     if (!normalizeBodyFit(c.bodyFit, c.bodyMeshId)) errs.push('invalid bodyFit for this model');

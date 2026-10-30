@@ -15,7 +15,7 @@ export default function HeritageAtelier() {
     const textures = new Set<THREE.Texture>();
     let probe: THREE.WebGLRenderTarget | undefined;
     scene.add(root);
-    new GLTFLoader().load('/environments/heritage-atelier/scene-baked.glb', asset => {
+    new GLTFLoader().load('/environments/heritage-atelier/scene-baked.glb?v=2', asset => {
       if (cancelled) { asset.scene.traverse(o => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); } }); return; }
       asset.scene.updateMatrixWorld(true);
       const batches = new Map<THREE.Material, THREE.BufferGeometry[]>();

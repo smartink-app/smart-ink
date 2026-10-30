@@ -840,3 +840,6 @@
 .white-removal-previews img { background: white; }
 .white-removal-checker { background: repeating-conic-gradient(#b9b9bd 0% 25%,#ededf0 0% 50%) 0 / 14px 14px; }
 .white-removal-previews figcaption { margin-top: 5px; font-size: 11px; opacity: .7; }
+/* Show starter flash as ink over the preview surface, matching the body. */
+.ep-preview img[src^="/tattoos/"],
+.tattoo-asset-art img[src^="/tattoos/"] { mix-blend-mode: multiply; }

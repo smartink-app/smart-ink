@@ -12,7 +12,7 @@ import LightingControls from './LightingControls';
 import type { LightDefinition, LightingPresetKey } from './config/lightingPresets';
 import { resolveRig } from './config/lightingPresets';
 import type { BodyShape } from './render/bodyShape';
-import type { BodyRegionId } from './render/bodyRegions';
+import { regionLabel, type BodyRegionId } from './render/bodyRegions';
 import { REGISTRY } from './render/registry';
 import { readTattooPng } from './utils/tattooUpload';
 import { resolveTattooSource } from './render/tattooSource';
@@ -48,6 +48,7 @@ interface TopMenuBarProps extends PoseControlsProps, AppearanceControlsProps, St
   uploadedImage: string | null;
   decalVisible: boolean;
   hasPlacement: boolean;
+  placementRegion?: BodyRegionId;
   decalRotation: number;
   decalScale: number;
   decalColor: string;
@@ -128,6 +129,7 @@ export default function TopMenuBar({
   uploadedImage,
   decalVisible,
   hasPlacement,
+  placementRegion,
   decalRotation,
   decalScale,
   decalColor,
@@ -239,6 +241,7 @@ export default function TopMenuBar({
         <div className="ep-inspector-tabs" role="tablist" aria-label="Inspector sections">
           {INSPECTOR_TABS.map((tab) => <button key={tab.id} type="button" role="tab"
             className="ep-inspector-tab" id={`${inspectorId}-${tab.id}-tab`}
+            title={tab.id === 'figure' ? 'Change the body, skin tone, and appearance' : tab.id === 'studio' ? 'Create a studio photo of your tattoo' : 'Place your tattoo and see how it fits'}
             aria-controls={`${inspectorId}-${tab.id}-panel`} aria-selected={activeTab === tab.id}
             tabIndex={activeTab === tab.id ? 0 : -1}
             ref={(element) => { if (element) tabButtons.current[tab.id] = element; else delete tabButtons.current[tab.id]; }}
@@ -246,6 +249,8 @@ export default function TopMenuBar({
             {tab.label}
           </button>)}
         </div>
+        {isolateRegion && <div className="studio-focus-context"><span>{regionLabel(isolateRegion)} only</span><button type="button" onClick={() => onIsolateRegionChange(null)}>Show full body</button></div>}
+        <p className="studio-mode-purpose">{activeTab === 'tattoo' ? 'Place your tattoo and see how it fits.' : activeTab === 'figure' ? 'Change the body, skin tone, and appearance.' : 'Turn your placement into a studio photo.'}</p>
       </header>
 
       {panel('tattoo', <>
@@ -276,6 +281,11 @@ export default function TopMenuBar({
             ? `Click the skin to place ${uploadedImage === null ? 'the example tattoo' : 'your tattoo'}.`
             : decalVisible ? 'Click another spot on the skin to move the tattoo. Its size stays the same.'
               : 'Tattoo hidden for a before view. Show tattoo to see your design again.'}</p>
+          {hasPlacement && decalVisible && isolateRegion && placementRegion && isolateRegion !== placementRegion &&
+            <div className="studio-placement-context" role="status">
+              <p className="ep-hint">Your tattoo is placed on {regionLabel(placementRegion).toLowerCase()}. This view shows {regionLabel(isolateRegion).toLowerCase()}.</p>
+              <button type="button" className="ep-btn ep-btn--block" onClick={() => onIsolateRegionChange(placementRegion)}>View tattoo area</button>
+            </div>}
           {hasPlacement && <button type="button" className="ep-btn ep-btn--block"
             aria-pressed={!decalVisible} onClick={() => onDecalVisibleChange(!decalVisible)}>
             {decalVisible ? 'Show before' : 'Show tattoo'}
@@ -284,7 +294,7 @@ export default function TopMenuBar({
 
         <section className="ep-section" aria-label="Tattoo adjustments">
           <p className="ep-section-label">Adjust tattoo</p>
-          {wrapControls}
+          {isWrap && wrapControls}
           {!isWrap && <><AdjustmentControl label="Size" ariaLabel="Tattoo size" value={decalScale * 100}
             min={10} max={300} step={1} unit="%" resetValue={100}
             onChange={(value) => onDecalScaleChange(value / 100)} />
@@ -318,6 +328,7 @@ export default function TopMenuBar({
             disabled={decalScale === 1 && decalRotation === 0 && decalColor.toLowerCase() === '#ffffff' && decalOpacity === 1}>
             <FaUndo aria-hidden /> Reset tattoo adjustments
           </button>
+          {!isWrap && <MoreControls id="wrap-experiments" label="Wrap & sleeve" summary="Experimental">{wrapControls}</MoreControls>}
         </section>
       </>)}
 
@@ -356,9 +367,9 @@ export default function TopMenuBar({
           <button type="button" className="ep-btn ep-btn--primary ep-btn--block" onClick={() => onShoot?.('editorial')}>Open photo studio</button>
           <p className="ep-hint">Create a photo or a short camera reveal from the same placement.</p>
         </section>
-        <MoreControls id="studio" summary="Backdrop and individual lights">
         <StudioControls compact studio={studio} onStudioChange={onStudioChange} isolateRegion={isolateRegion}
           background={background} onBackgroundChange={onBackgroundChange} />
+        <MoreControls id="studio" label="Lighting controls" summary="Individual lights and guides">
         <section className="ep-section" aria-label="Studio lighting">
           <LightingControls compact lights={lights} selectedIndex={selectedLight} onSelectLight={onSelectLight}
             onChange={onLightsChange} onReset={() => onLightsChange(resolveRig(lightingPreset))}

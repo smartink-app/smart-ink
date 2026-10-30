@@ -38,9 +38,9 @@ export async function renderOnRunpod(contract: RenderContract, ink: Blob, opts: 
   let submitted = false;
   let completed = false;
   try {
-    const scale = Math.min(1, 2560 / Math.max(contract.output.width, contract.output.height));
+    const scale = Math.min(1, 4000 / Math.max(contract.output.width, contract.output.height));
     const output = { ...contract.output, width: Math.round(contract.output.width * scale), height: Math.round(contract.output.height * scale) };
-    opts.onStatusChange?.('uploading', scale < 1 ? 'Sending your scene… Beta renders use up to 2560 pixels.' : 'Sending your scene…');
+    opts.onStatusChange?.('uploading', scale < 1 ? 'Sending your scene… Beta renders use up to 4000 pixels.' : 'Sending your scene…');
     // Let submission finish on user abort, then cancel its known ID. Aborting /submit
     // in flight would hide whether a billable job was accepted.
     submitted = true;

@@ -1,7 +1,8 @@
+import { closeupGeometry } from './render/closeupGeometry';
 import { createFocusCaps } from './render/focusCaps';
 import FeedbackScene, { type FeedbackSceneProps } from './feedback/FeedbackScene';
 import { deformFit, heightWarp, type BodyFit } from './measurements/fitter';
-import { bindSkinRestCoordinates, SKIN_DETAIL, SKIN_DETAIL_GLSL } from './render/skinDetail';
+import { bindSkinRestCoordinates, SKIN_DETAIL, SKIN_DETAIL_GLSL, SKIN_REGION_GLSL } from './render/skinDetail';
 import { isTattooHit, tattooAnchorPoint } from './model/tattooHit';
 import TattooViewportControls from './model/TattooViewportControls';
 import SleeveTattooControls from './model/SleeveTattooControls';
@@ -16,7 +17,7 @@ import { loadFitAsset } from './measurements/service';
 import { measurementGuide, type MeasurementGuide } from './measurements/geometry';
 import { createPreviewEyes } from './render/previewEyes';
 import { tattooFramingFromGeometry, type TattooFraming } from './render/tattooCamera';
-import { resolveTattooSource } from './render/tattooSource';
+import { isStarterTattoo, resolveTattooSource } from './render/tattooSource';
 import { applyBodyPose, DEFAULT_BODY_POSE, type BodyPose } from './render/bodyPose';
 import { createRegionMasks } from './render/bodyRegionMask';
 import { DEFAULT_BODY_APPEARANCE, type BodyAppearance } from './render/bodyAppearance';
@@ -95,6 +96,9 @@ const vertexShader = `
   attribute vec3 aSkinNormal;
   varying vec3 vSkinRest;
   varying vec3 vSkinNormal;
+  varying float vSkinArm;
+  varying vec4 vSkinProfile;
+  ${SKIN_REGION_GLSL}
 
   varying vec2 vUv;
   varying vec2 vTattooUv;
@@ -114,7 +118,9 @@ const vertexShader = `
     ${SLEEVE_VERTEX_ASSIGN}
     vUv = uv;
     vSkinRest = aSkinRest;
+    vSkinProfile = skinRegion(aRegion, aSkinRest);
     vSkinNormal = aSkinNormal;
+    vSkinArm = 1.0 - step(.1, min(abs(aRegion - 2.0), abs(aRegion - 3.0)));
     vTattooUv = aTattooUv;
     vTattooMask = aTattooMask;
     vTattooBoundary = aTattooBoundary;
@@ -199,9 +205,19 @@ const fragmentShader = `
     vec4 skin = texture2D(skinTexture, vUv);
     // Compute relief before branching on ink coverage; both surfaces share it.
     float microHeight = skinHeight();
-    vec3 N = skinDetailNormal(surfaceNormal(), microHeight);
-    vec3 skinLighting = studioLighting(N, vWorldPosition);
-    float roughness = clamp(.56 + (microHeight - .5) * .14, .48, .64);
+    vec3 appearance = skinAppearance();
+    vec3 baseSkinColor = skin.rgb;
+    // Colour irregularity works at normal shot distance, independent of bump.
+    skin.rgb *= vec3(1.0) + appearance.z * vec3(.45, 1.0, 1.15);
+    skin.rgb *= 1.0 - appearance.x;
+    float veins = skinVeins();
+    skin.rgb *= vec3(1.0) + veins * vec3(-.075,-.012,.018);
+    vec3 broadNormal = surfaceNormal();
+    vec3 N = skinDetailNormal(broadNormal, microHeight);
+    // Diffuse softens fine relief; surface reflections retain pore definition.
+    // A preview approximation, not true subsurface light transport.
+    vec3 skinLighting = studioLighting(normalize(mix(broadNormal, N, .4)), vWorldPosition);
+    float roughness = clamp(.56 + (microHeight - .5) * .14 + appearance.z * .7, .44, .68);
     vec3 reflection = skinSpecular(N, roughness);
     skin.rgb = skin.rgb * skinLighting + reflection;
 
@@ -216,6 +232,10 @@ const fragmentShader = `
         skin.rgb = mix(skin.rgb, tattooLayer.rgb * 0.85 * skinLighting + reflection, tattooLayer.a);
       }
     }
+
+    // Fine hairs sit over both bare and tattooed skin, with the same light rig.
+    skin.rgb = mix(skin.rgb, baseSkinColor * skinLighting * .38 + reflection * .6,
+      min(.65, appearance.y));
 
     bool lit = vHighlightMask > 0.5;
     if (lit) {
@@ -271,14 +291,6 @@ function createSkinTexture(hexColor: string): THREE.CanvasTexture {
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = hexColor;
   ctx.fillRect(0, 0, size, size);
-  const imgData = ctx.getImageData(0, 0, size, size);
-  for (let i = 0; i < imgData.data.length; i += 4) {
-    const noise = (Math.random() - 0.5) * 12;
-    imgData.data[i] += noise;
-    imgData.data[i + 1] += noise * 0.8;
-    imgData.data[i + 2] += noise * 0.5;
-  }
-  ctx.putImageData(imgData, 0, 0);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
@@ -304,6 +316,7 @@ export interface ModelWithUVTattooHandle {
   getSleeveFraming: (section?: SleeveSectionId) => TattooFraming | null;
   setWrap: (value: WrapSettings | null) => boolean;
   placeInView: () => boolean;
+  nudgeInView: (dx: number, dy: number) => boolean;
   getPlacement: () => UVTattooPlacementSnapshot;
   getRegionFraming: () => RegionFraming | null;
   getMeasurementGuide: (key: string) => MeasurementGuide | null;
@@ -328,6 +341,7 @@ interface ModelWithUVTattooProps {
   visible?: boolean;
   /** Photo mode keeps camera navigation available while blocking edits. */
   editingEnabled?: boolean;
+  closeupPreview?: boolean;
   showTattooControls?: boolean;
   onHideTattooControls?: () => void;
   fingerPlacement?: boolean;
@@ -382,6 +396,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       setDecalVisible,
       visible = true,
       editingEnabled = true,
+      closeupPreview = false,
       showTattooControls = true,
       onHideTattooControls,
       fingerPlacement = false,
@@ -468,6 +483,11 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       draco.setDecoderPath(DRACO_DECODER_PATH);
       (loader as GLTFLoader).setDRACOLoader(draco);
     });
+    const skinSex = bodyDef.id === 'body_full_female' ? 'female' : 'male';
+    const [skinAppearanceMap, skinRegionsMap] = useLoader(TextureLoader, [
+      `/textures/skin-${skinSex}-appearance-v3.png`, `/textures/skin-${skinSex}-regions-v3.png`,
+    ]);
+    for (const map of [skinAppearanceMap, skinRegionsMap]) { map.colorSpace = THREE.NoColorSpace; map.flipY = false; }
     const normalMap = useLoader(TextureLoader, bodyDef.normalMapUrl);
     const [sleeveShoulderTexture, sleeveChestTexture] = useLoader(TextureLoader, [SLEEVE_SOURCES.shoulder, SLEEVE_SOURCES.chest]);
     useEffect(() => { for (const texture of [sleeveShoulderTexture, sleeveChestTexture]) { texture.colorSpace = THREE.SRGBColorSpace; texture.needsUpdate = true; } }, [sleeveShoulderTexture, sleeveChestTexture]);
@@ -525,10 +545,10 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       () => new THREE.ShaderMaterial({
         vertexShader, fragmentShader,
         uniforms: {
-          skinTexture: { value: null }, normalMap: { value: null }, normalMapStrength: { value: 1 },
-          skinDetailMap: { value: null }, skinDetailStrength: { value: SKIN_DETAIL.strength }, skinDetailScale: { value: SKIN_DETAIL.scale },
+          skinTexture: { value: null }, normalMap: { value: null }, normalMapStrength: { value: .75 },
+          skinAppearanceMap: { value: null }, skinRegionsMap: { value: null }, skinDetailMap: { value: null }, skinDetailStrength: { value: SKIN_DETAIL.strength }, skinDetailScale: { value: SKIN_DETAIL.scale },
           sleeveEnabled: { value: 0 }, sleeveShoulderTexture: { value: null }, sleeveChestTexture: { value: null },
-          tattooTexture: { value: null }, tattooAspect: { value: 1 },
+          starterInkOnly: { value: 0 }, tattooTexture: { value: null }, tattooAspect: { value: 1 },
           tattooColor: { value: new THREE.Color('#ffffff') }, tattooOpacity: { value: 1 },
           tattooScale: { value: TATTOO_BASE_SIZE }, tattooRotation: { value: 0 }, tattooVisible: { value: 0 }, tattooWrap: { value: 0 },
           ...createSkinLightUniforms(resolveStudioLightRig([])),
@@ -543,8 +563,11 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       shaderMaterial.uniforms.skinTexture.value = skinTexture;
       shaderMaterial.uniforms.normalMap.value = normalMap;
       shaderMaterial.uniforms.skinDetailMap.value = detailMap;
+      shaderMaterial.uniforms.skinAppearanceMap.value = skinAppearanceMap;
+      shaderMaterial.uniforms.skinRegionsMap.value = skinRegionsMap;
       shaderMaterial.uniforms.tattooTexture.value = tattooTexture;
-    }, [shaderMaterial, skinTexture, normalMap, tattooTexture, detailMap, sleeveShoulderTexture, sleeveChestTexture]);
+      shaderMaterial.uniforms.starterInkOnly.value = isStarterTattoo(tattooTexture.name) ? 1 : 0;
+    }, [shaderMaterial, skinTexture, normalMap, tattooTexture, detailMap, skinAppearanceMap, skinRegionsMap, sleeveShoulderTexture, sleeveChestTexture]);
     useEffect(() => { shaderMaterial.uniforms.skinDetailStrength.value = performanceMode ? 0 : SKIN_DETAIL.strength; }, [shaderMaterial, performanceMode]);
     useEffect(() => () => shaderMaterial.dispose(), [shaderMaterial]);
     const shadowMaterials = useMemo(() => createBodyShadowMaterials(shaderMaterial.uniforms.uIsolateRegion), [shaderMaterial]);
@@ -1031,8 +1054,23 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       return false;
     }, [gl, camera, editingEnabled, pick, applyAnchor, onPlacementStatus]);
 
+    // Explicit Shoot controls may edit while canvas dragging stays locked.
+    const nudgeInView = useCallback((dx: number, dy: number): boolean => {
+      const mesh = bodyMeshRef.current, anchor = anchorRef.current;
+      if (!mesh || !anchor || anchor.wrap || anchor.sleeve || !visible ||
+          !Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > 8 || Math.abs(dy) > 8) return false;
+      const rect = gl.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return false;
+      camera.updateMatrixWorld(true); mesh.updateWorldMatrix(true, false);
+      const point = tattooAnchorPoint(mesh, anchor, new THREE.Vector3()).project(camera);
+      if (point.z < -1 || point.z > 1) return false;
+      const hit = pick({ clientX: rect.left + (point.x + 1) * rect.width / 2 + dx,
+        clientY: rect.top + (1 - point.y) * rect.height / 2 + dy });
+      return !!hit && applyAnchor({ ...hit.anchor, bounds: anchor.bounds });
+    }, [gl, camera, visible, pick, applyAnchor]);
+
     useImperativeHandle(ref, () => ({
-      placeInView, setWrap, setSleeve, getSleeveFraming,
+      placeInView, nudgeInView, setWrap, setSleeve, getSleeveFraming,
       limitScale, limitRotation, setAreaLock, fitToArea,
       getPlacement: () => ({
         imageSource: resolveTattooSource(uploadedImage),
@@ -1068,7 +1106,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
           size, aspect: imageAspect, rotationRad, wrap: !!anchor.wrap, hairCoverage: hairCoverageRef.current,
         });
       },
-    }), [placeInView, setWrap, setSleeve, getSleeveFraming, size, imageAspect, decalColor, decalOpacity, rotationRad, uploadedImage, visible, regionFraming, isolateRegion, assessment, limitScale, limitRotation, setAreaLock, fitToArea]);
+    }), [placeInView, nudgeInView, setWrap, setSleeve, getSleeveFraming, size, imageAspect, decalColor, decalOpacity, rotationRad, uploadedImage, visible, regionFraming, isolateRegion, assessment, limitScale, limitRotation, setAreaLock, fitToArea]);
 
     const setOrbitEnabled = useCallback(
       (enabled: boolean) => {
@@ -1214,6 +1252,27 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
         if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
       };
     }, [onPointerDown, onPointerMove, finishPointer, gl]);
+
+    useEffect(() => {
+      const mesh = bodyMeshRef.current;
+      if (!closeupPreview || !mesh || !cloneGroup) return;
+      const geometry = closeupGeometry(mesh.geometry);
+      const visual = new THREE.Mesh(geometry, shaderMaterial);
+      // Picking and baking continue to use original face indices. The visual
+      // shell is deliberately excluded from all placement raycasts.
+      visual.raycast = () => {};
+      visual.castShadow = true;
+      visual.customDepthMaterial = shadowMaterials.depth;
+      visual.customDistanceMaterial = shadowMaterials.distance;
+      const originalMaterial = mesh.material;
+      const pickMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, visible: false });
+      mesh.material = pickMaterial;
+      mesh.add(visual);
+      return () => {
+        mesh.remove(visual); geometry.dispose(); pickMaterial.dispose();
+        mesh.material = originalMaterial;
+      };
+    }, [closeupPreview, cloneGroup, chartVersion, bodyShape, bodyPose, bodyFit, bodyAppearance, isolateRegion, shaderMaterial, shadowMaterials]);
 
     if (!cloneGroup) return null;
     return <>

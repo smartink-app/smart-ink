@@ -27,7 +27,7 @@ const { outputFiles } = await build({
     builder.onResolve({ filter: /^\.\/(PoseControls|AppearanceControls|StudioControls|CharacterBuilderSections|LightingControls|AdjustmentControl|MoreControls)$/ }, args => ({ path: args.path.slice(2), namespace: 'stub' }));
     builder.onLoad({ filter: /.*/, namespace: 'stub' }, args => ({ contents: args.path === 'icons'
       ? 'export const FaUpload="upload",FaUndo="undo",FaRegImage="image";'
-      : args.path === 'upload' ? 'export const readTattooPng=(...args)=>globalThis.__inspectorRead(...args);'
+      : args.path === 'upload' ? 'export const MAX_TATTOO_DIMENSION=8192, MAX_TATTOO_PIXELS=32*1024*1024;export const readTattooPng=(...args)=>globalThis.__inspectorRead(...args);'
         : `export default ${JSON.stringify(args.path)};` }));
   } }],
 });
@@ -95,7 +95,7 @@ for (const node of byRole('tab')) {
   assert.equal(node.props.tabIndex, node.props['aria-selected'] ? 0 : -1);
   assert.equal(byRole('tabpanel').find(panel => panel.props.id === node.props['aria-controls']).props['aria-labelledby'], node.props.id);
 }
-assert.ok(render().some(node => node.type === 'img' && node.props.src === '/logo.png'));
+assert.ok(render().some(node => node.type === 'img' && node.props.src === '/tattoos/starter-2026/peony.png'));
 assert.ok(text(render()).includes('Click the skin to place the example tattoo.'));
 assert.equal(button('Show before'), undefined, 'Before/after is offered once a tattoo is placed');
 assert.equal(render().filter(node => node.type === 'LightingControls').length, 1, 'One lighting editor');

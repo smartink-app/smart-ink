@@ -15,13 +15,13 @@ import RenderHistoryPage from './RenderHistoryPage';
 import { FiSearch, FiPlus, FiArrowUpRight, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import './dashboard.css';
 import TemplatePreviewRenderer from './TemplatePreviewRenderer';
-import { SCENE_TEMPLATES, templatePreviewCache, type TemplatePreview } from './sceneTemplates';
+import { SCENE_TEMPLATES, TEMPLATE_STUDIO, TEMPLATE_LIGHTS, fallbackTemplateCamera, templatePreviewCache, type TemplatePreview } from './sceneTemplates';
 
 interface Props {
   onSelectScene: (scene: SceneData) => void;
   onOpenLanding?: () => void;
   session: BetaSession;
-  onSignOut: () => void;
+  onSignOut: (opts?: { everywhere?: boolean }) => void | Promise<void>;
   onResume?: () => void;
   initialSection?: StudioSection;
   initialClientProject?: string; initialClientRole?: ProjectRole; initialVersionId?: string;
@@ -134,13 +134,10 @@ export default function ScenesDashboard({ onSelectScene, onOpenLanding, session,
       decalNormal: null,
       lightingPreset: 'studio',
       background: 'dark',
-      studio: { mode: 'sweep', color: '#30343c', shadow: .4, showGuides: false },
+      studio: { ...TEMPLATE_STUDIO },
+      lights: structuredClone(TEMPLATE_LIGHTS),
       thumbnail: previews[template]?.image ?? null,
-      camera: previews[template]?.camera ?? {
-        position: [6, 4, 6],
-        target: [0, 0, 0],
-        fov: 45,
-      },
+      camera: previews[template]?.camera ?? fallbackTemplateCamera(templates.find(item => item.id === template) ?? templates[0]),
       bodyMeshId: 'body_full',
       skinToneId: 'tone_03',
       poseId: 'neutral',

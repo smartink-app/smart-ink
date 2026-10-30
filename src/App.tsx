@@ -1,3 +1,6 @@
+import JourneyTracking from './beta-journey/JourneyTracking'
+import { pendingInvite, setPendingInvite } from './auth/pendingInvite'
+import BetaFeedback from './beta-feedback/BetaFeedback'
 import type { PortfolioImage } from './discovery/artists'
 import type { StudioSection } from './StudioRail'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -53,8 +56,19 @@ function App() {
     const boot = initialGateView()
     if (boot.view === 'invite' || boot.view === 'admin' || boot.view === 'artists' || boot.view === 'moodboard' || boot.view === 'client') return
     if (betaAuth.session) setGateView('app')
-    else if (betaAuth.accessError) setGateView('login')
+    else if (betaAuth.accessError) {
+      const pending = pendingInvite()
+      if (pending) { setInviteCode(pending); setGateView('invite') }
+      else setGateView('login')
+    }
   }, [betaAuth.ready, betaAuth.session, betaAuth.accessError])
+
+  // A failed OAuth redemption may emit SIGNED_OUT before its error arrives.
+  // Recover the invitation even when the initial boot event already completed.
+  useEffect(() => {
+    const pending = pendingInvite()
+    if (betaAuth.accessError && pending) { setInviteCode(pending); setGateView('invite') }
+  }, [betaAuth.accessError])
 
   // Signed out from another tab or via "sign out everywhere".
   useEffect(() => {
@@ -196,7 +210,7 @@ function App() {
   }
 
   if (gateView === 'invite' && inviteCode) {
-    return <InvitePage code={inviteCode} onBack={goHome} onAuthenticated={enterApp} />
+    return <InvitePage key={inviteCode} code={inviteCode} onBack={goHome} onLogin={() => { setPendingInvite(); clearInviteQuery(); clearAccessError(); setGateView('login') }} notice={betaAuth.accessError} onAuthenticated={enterApp} />
   }
 
   if (gateView === 'login' || gateView === 'moodboard' || (gateView === 'client' && !betaAuth.session) || (gateView === 'invite' && !inviteCode)) {
@@ -217,7 +231,9 @@ function App() {
 
   return (
     <Suspense fallback={<div className="app-loading">Loading Smart Ink…</div>}>
-      <Workspace initialSection={workspaceSection} initialClientProject={clientProjectId} onMoodboard={() => openMoodboard()} onExplore={exploreArtists} session={session} onHome={goHome} onSignOut={(opts) => void signOut(opts)} />
+      <JourneyTracking session={session} />
+      <BetaFeedback key={session.userId ?? session.email} tester={session.email} owner={session.userId} />
+      <Workspace initialSection={workspaceSection} initialClientProject={clientProjectId} onMoodboard={() => openMoodboard()} onExplore={exploreArtists} session={session} onHome={goHome} onSignOut={signOut} />
     </Suspense>
   )
 }

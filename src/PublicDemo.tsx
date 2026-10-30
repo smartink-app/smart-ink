@@ -65,7 +65,7 @@ export default function PublicDemo({ onHome, onRequestAccess }: { onHome: () => 
         <div className="ep-sidebar-body">
           <section className="ep-section" hidden={tab !== 'tattoo'}>
             <p className="ep-section-label">Choose a sample</p>
-            <div className="demo-samples">{samples.map(sample => <button type="button" key={sample.image} aria-pressed={artwork === sample.image} onClick={() => { setArtwork(sample.image); setVisible(true); }}><img src={sample.image} alt="" /><span>{sample.name}</span></button>)}</div>
+            <div className="demo-samples">{samples.map(sample => <button type="button" key={sample.image} aria-pressed={artwork === sample.image} onClick={() => { setArtwork(sample.image); setVisible(true); }}><img src={sample.image} alt="" loading="lazy" /><span>{sample.name}</span></button>)}</div>
             <button type="button" className="ep-btn" disabled={!ready} onClick={() => model.current?.placeInView()}>Place on visible skin</button>
             <AdjustmentControl label="Size" value={scale * 100} min={10} max={300} step={1} unit="%" resetValue={100} onChange={value => setScale(value / 100)} />
             <AdjustmentControl label="Rotation" value={rotation} min={-180} max={180} step={1} unit="°" resetValue={0} onChange={setRotation} />

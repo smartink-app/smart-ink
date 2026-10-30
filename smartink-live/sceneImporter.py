@@ -135,7 +135,7 @@ OUTPUT_TIERS: Dict[str, Dict[str, int]] = {
 
 # Bounds of the final-quality slider; mirrors FINAL_SAMPLES in src/render/registry.ts.
 FINAL_SAMPLES_MIN = 64
-FINAL_SAMPLES_MAX = 1024
+FINAL_SAMPLES_MAX = 2048
 
 # Tuned for Cycles preview to approximate the browser Lambert shader (not final Blender truth).
 BLENDER_BASE_ENERGY = {
@@ -3267,7 +3267,7 @@ def apply_render_quality(quality_tier: str, backend: Optional[str] = None) -> No
     cycles.blur_glossy = 1.0
     cycles.caustics_reflective = False
     cycles.caustics_refractive = False
-    bpy.context.scene.render.filter_size = 1.0 if cycles.samples >= 512 else 1.5
+    bpy.context.scene.render.filter_size = .8 if cycles.samples >= 512 else 1.5
     if quality_tier != "preview":
         cycles.use_denoising = True
         # OptiX denoises on the RT cores, so on NVIDIA it is far cheaper than
@@ -3615,7 +3615,8 @@ def apply_uv_ink_layer(body: bpy.types.Object, ink_path: str, region=None) -> No
     links.new(ink_tex.outputs["Alpha"], mix.inputs["Factor"])
     links.new(mix.outputs["Result"], base_color_socket)
 
-    _apply_ink_surface_response(mat, bsdf, ink_tex)
+    if body.get('smartink_skin_material') != 'studio-v3':
+        _apply_ink_surface_response(mat, bsdf, ink_tex)
 
 
 def _apply_ink_surface_response(mat: bpy.types.Material, bsdf, ink_tex) -> None:
@@ -3933,6 +3934,14 @@ def setup_output(output: Dict[str, Any], contract_dir: str) -> str:
     scene.cycles.samples = resolve_samples(tier_id, tier, output.get("samples"))
     scene.cycles.use_denoising = tier_id != "preview"
     apply_render_quality(tier_id, backend)
+    if output.get("finish") == "portfolio" and tier_id == "final":
+        scene.cycles.adaptive_threshold = .003
+        scene.cycles.diffuse_bounces = 4
+        scene.render.filter_size = .7
+        scene.cycles.denoiser = 'OPENIMAGEDENOISE'
+        scene.cycles.denoising_prefilter = 'ACCURATE'
+    scene.render.image_settings.color_depth = '16' if output.get('finish') == 'portfolio' else '8'
+    scene.render.image_settings.color_mode = 'RGB'
 
     width = int(output.get("width", tier["max_dim"]))
     height = int(output.get("height", tier["max_dim"]))
@@ -4006,6 +4015,9 @@ def build_scene(contract_path: str) -> str:
 
     if not is_render_contract(contract):
         raise ValueError("Expected RenderContract JSON (schemaVersion, bodyMeshId, output)")
+    shared_skin = contract.get('skinProfileVersion') == 3
+    if 'skinProfileVersion' in contract and (not shared_skin or contract.get('skinMaterial') != 'studio' or contract.get('renderStyle') != 'cinematic'):
+        raise ValueError('Unsupported shared skin material version')
     appearance = _body_appearance(contract)
     studio = _studio_settings(contract)
 
@@ -4072,7 +4084,7 @@ def build_scene(contract_path: str) -> str:
     if landmarks:
         add_hair(body, landmarks, eye_radius, appearance['hairTone'] if appearance else contract.get("hairTone") or DEFAULT_HAIR_TONE,
                  prepared_regions=True, scalp_style='none' if appearance is not None else None)
-    if cinematic:
+    if cinematic and not shared_skin:
         add_body_hair(
             body,
             contract.get("bodyHair") or BODY_HAIR_DEFAULTS.get(contract["bodyMeshId"], DEFAULT_BODY_HAIR),
@@ -4105,7 +4117,10 @@ def build_scene(contract_path: str) -> str:
     )
     if cinematic:
         enhance_skin_realism(body, contract["bodyMeshId"], contract_dir)
-        if contract.get('skinMaterial') == 'studio':
+        if shared_skin:
+            from studioSkin import apply_shared_skin
+            apply_shared_skin(body, contract['bodyMeshId'], contract.get('skinToneId', 'tone_03'), contract_dir, _world_scale(body))
+        elif contract.get('skinMaterial') == 'studio':
             from studioSkin import apply_studio_skin
             apply_studio_skin(body, _resolve_texture(contract_dir, 'soft-cells-height.png'), _world_scale(body))
         enhance_appearance_materials(body)
@@ -4115,10 +4130,22 @@ def build_scene(contract_path: str) -> str:
     if ink_name.startswith("data:"):
         ink_name = "ink.png"
     ink_path = ink_name if os.path.isabs(ink_name) else os.path.join(contract_dir, os.path.basename(ink_name))
-    apply_uv_ink_layer(body, ink_path, contract.get("inkUvRegion"))
+    apply_uv_ink_layer(body, ink_path, contract.get('inkUvRegion'))
+    if shared_skin:
+        from studioSkin import apply_shared_hair_over_ink
+        apply_shared_hair_over_ink(body)
     if cinematic:
         # After the ink, because focus is pulled to the tattoo itself.
         apply_camera_realism(cam_obj, body, ink_path, camera_cfg)
+    if shared_skin and contract.get('skinVariation') == 'regional':
+        from regionalSkin import apply_regional_skin
+        apply_regional_skin(body)
+    if shared_skin:
+        from studioGeometry import add_focus_caps, refine_body
+        field = body.data.attributes.get('SmartInkFocus')
+        if contract.get('bodyRegion') and field:
+            add_focus_caps(body, [x.value for x in field.data], tuple(srgb_to_linear(c) for c in SKIN_TONES[contract.get('skinToneId', 'tone_03')]))
+        refine_body(body)
     focus_viewport_on_camera()
     output_path = setup_output(contract.get("output", {}), contract_dir)
     if studio and studio['mode'] == 'plain' and studio.get('gradient'):
