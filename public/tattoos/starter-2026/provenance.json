@@ -1,0 +1,56 @@
+{
+  "cleanupPercent": 2,
+  "processing": "Smart Ink removeWhite; full resolution, continuous alpha, black ink",
+  "artworks": [
+    {
+      "name": "swallow",
+      "url": "https://www.midjourney.com/jobs/a96c0fdd-b12c-46a8-9c9f-61628c22d9c6?index=0",
+      "file": "swallow.png"
+    },
+    {
+      "name": "moth",
+      "url": "https://www.midjourney.com/jobs/ddeb951a-051d-4221-a078-754b96168859?index=0",
+      "file": "moth.png"
+    },
+    {
+      "name": "peony",
+      "url": "https://www.midjourney.com/jobs/cf105b01-1d4a-4512-b81d-97de4f718716?index=0",
+      "file": "peony.png"
+    },
+    {
+      "name": "snake",
+      "url": "https://www.midjourney.com/jobs/b715f5fd-6e21-422f-9786-7a9ee7d8a3c8?index=0",
+      "file": "snake.png"
+    },
+    {
+      "name": "koi",
+      "url": "https://www.midjourney.com/jobs/26ad4f8c-0196-4964-9ab3-e5c3cc236a1a?index=0",
+      "file": "koi.png"
+    },
+    {
+      "name": "dagger",
+      "url": "https://www.midjourney.com/jobs/6c09965b-1204-4991-a360-e9bc4fb2d76a?index=0",
+      "file": "dagger.png"
+    },
+    {
+      "name": "botanical",
+      "url": "https://www.midjourney.com/jobs/3a827bd1-c0af-4195-8b7a-9d9cde8bc7b4?index=0",
+      "file": "botanical.png"
+    },
+    {
+      "name": "celestial",
+      "url": "https://www.midjourney.com/jobs/8f1b8f35-2e63-4c66-91bb-21a7ddcdba06?index=0",
+      "file": "celestial.png"
+    },
+    {
+      "name": "skull",
+      "url": "https://www.midjourney.com/jobs/424fca0c-e666-460f-8056-218ccf957d98?index=0",
+      "file": "skull.png"
+    },
+    {
+      "name": "filigree",
+      "url": "https://www.midjourney.com/jobs/6526644d-d3cf-4367-ae19-7cbedfb77eed?index=0",
+      "file": "filigree.png"
+    }
+  ]
+}

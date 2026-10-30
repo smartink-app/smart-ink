@@ -12,9 +12,10 @@ export default function HeritageAtelier() {
     const root = new THREE.Group(); root.name = 'Heritage Atelier'; root.userData.studioBackdrop = true;
     root.scale.setScalar(2); root.position.y = -2.12;
     const materials = new Set<THREE.Material>();
+    const textures = new Set<THREE.Texture>();
     let probe: THREE.WebGLRenderTarget | undefined;
     scene.add(root);
-    new GLTFLoader().load('/environments/heritage-atelier/scene.glb', asset => {
+    new GLTFLoader().load('/environments/heritage-atelier/scene-baked.glb', asset => {
       if (cancelled) { asset.scene.traverse(o => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); } }); return; }
       asset.scene.updateMatrixWorld(true);
       const batches = new Map<THREE.Material, THREE.BufferGeometry[]>();
@@ -22,7 +23,19 @@ export default function HeritageAtelier() {
         if (!(o instanceof THREE.Mesh)) return;
         const m = o.material as THREE.MeshStandardMaterial;
         materials.add(m);
-        if (m.name.startsWith('Oak plank')) { m.color.setRGB(.23, .12, .052); m.roughness = .45; }
+        for (const value of Object.values(m)) if (value instanceof THREE.Texture) textures.add(value);
+        if (m.name.includes('BakedDiffuse')) {
+          // Cycles already integrated direct + indirect diffuse. Keep live specular
+          // reflections, but do not light the baked color a second time.
+          m.onBeforeCompile = shader => {
+            shader.fragmentShader = shader.fragmentShader.replace(
+              'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
+              'vec3 outgoingLight = diffuseColor.rgb + totalSpecular + totalEmissiveRadiance;'
+            );
+          };
+          m.customProgramCacheKey = () => 'heritage-baked-diffuse-v1';
+          if (m.map) m.map.anisotropy = Math.min(4, gl.capabilities.getMaxAnisotropy());
+        }
         m.envMapIntensity = .7;
         const geometry = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
         geometry.applyMatrix4(o.matrixWorld);
@@ -42,7 +55,7 @@ export default function HeritageAtelier() {
       });
       invalidate();
     }, undefined, error => { if (!cancelled) console.error('Heritage Atelier could not load', error); });
-    return () => { cancelled = true; scene.remove(root); root.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.dispose(); }); materials.forEach(m => m.dispose()); probe?.dispose(); invalidate(); };
+    return () => { cancelled = true; scene.remove(root); root.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.dispose(); }); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose()); probe?.dispose(); invalidate(); };
   }, [scene, invalidate, gl]);
   return null;
 }

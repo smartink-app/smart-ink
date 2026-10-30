@@ -1,3 +1,4 @@
+import { createFocusCaps } from './render/focusCaps';
 import FeedbackScene, { type FeedbackSceneProps } from './feedback/FeedbackScene';
 import { deformFit, heightWarp, type BodyFit } from './measurements/fitter';
 import { bindSkinRestCoordinates, SKIN_DETAIL, SKIN_DETAIL_GLSL } from './render/skinDetail';
@@ -772,6 +773,20 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       recenterGroup(cloneGroup, mesh);
     }, [cloneGroup, bodyShape, bodyPose, bodyFit, fitAsset]);
 
+    // Neutral matte ends make isolated parts read as solid display forms.
+    // Rebuild after posing, and never allow ink to be placed on these closures.
+    useEffect(() => {
+      const mesh = bodyMeshRef.current, field = isolateRegion && regionMasksRef.current?.[isolateRegion];
+      if (!cloneGroup || !mesh || !field) return;
+      const geometry = createFocusCaps(mesh.geometry, field);
+      const material = new THREE.MeshStandardMaterial({ map: skinTexture, roughness: .58, metalness: 0, side: THREE.DoubleSide });
+      const caps = new THREE.Mesh(geometry, material);
+      caps.name = 'Closed focus ends'; caps.userData.focusCap = true;
+      caps.castShadow = true; caps.receiveShadow = false;
+      mesh.add(caps);
+      return () => { mesh.remove(caps); geometry.dispose(); material.dispose(); };
+    }, [cloneGroup, isolateRegion, bodyShape, bodyPose, bodyFit, fitAsset, skinTexture]);
+
     // Garments are separate local-space meshes; their size must never change
     // the figure's origin or its saved tattoo anchors. Focus exposes the skin.
     useEffect(() => {
@@ -957,6 +972,7 @@ const ModelWithUVTattoo = forwardRef<ModelWithUVTattooHandle, ModelWithUVTattooP
       const target = pickTargetRef.current;
       if (!target) return null;
       for (const hit of raycaster.current.intersectObject(target, true)) {
+        if (hit.object.userData.focusCap) { pickBlockedRef.current = true; return null; }
         const appearance = appearanceHit(hit.object);
         if (appearance === 'hidden') continue;
         if (appearance) {

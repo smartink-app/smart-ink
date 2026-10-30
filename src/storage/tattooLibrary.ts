@@ -1,12 +1,8 @@
 import { get, update } from 'idb-keyval';
 import { subscribeSession } from '../auth/betaAuthService';
 
-export interface TattooAsset { id: string; name: string; source: string; category: string }
-export const STARTER_TATTOOS: TattooAsset[] = [
-  { id: 'rose', name: 'Botanical rose', source: '/tattoos/botanical-rose.png', category: 'Botanical' },
-  { id: 'moth', name: 'Lunar moth', source: '/tattoos/lunar-moth.png', category: 'Celestial' },
-  { id: 'dagger', name: 'Ornamental dagger', source: '/tattoos/ornamental-dagger.png', category: 'Ornamental' },
-];
+export interface TattooAsset { id: string; name: string; source: string; category: string; originalSource?: string; paperCleanup?: number }
+export { STARTER_TATTOOS } from '../config/starterTattoos';
 type Listener = { scope: string | null; bound: boolean; notify: (items: TattooAsset[]) => void };
 const listeners = new Set<Listener>();
 let activeScope: string | null = null;
@@ -62,18 +58,20 @@ export async function loadTattooLibrary(): Promise<TattooAsset[]> {
   assertScope(scope);
   return assets(stored);
 }
-export async function rememberTattoo(source: string, name = 'Imported artwork'): Promise<TattooAsset[]> {
+export async function rememberTattoo(source: string, name = 'Imported artwork', cleanup?: { originalSource: string; paperCleanup: number }): Promise<TattooAsset[]> {
   if (!source.startsWith('data:image/png;base64,')) return loadTattooLibrary();
   const scope = await currentScope();
   let result: TattooAsset[] = [];
   await update(scope, (stored) => {
     assertScope(scope);
     const current = assets(stored);
-    if (current.some(item => item.source === source)) { result = current; return current; }
-    if (current.length >= 100 || current.reduce((size, item) => size + item.source.length, source.length) > 120 * 1024 * 1024) {
+    const existing = current.find(item => item.source === source);
+    if (existing && !cleanup) { result = current; return current; }
+    const others = current.filter(item => item.source !== source);
+    if (others.length >= 100 || others.reduce((size, item) => size + item.source.length + (item.originalSource?.length ?? 0), source.length + (cleanup?.originalSource.length ?? 0)) > 120 * 1024 * 1024) {
       throw new Error('Your local library is full. Remove an unused design before adding more.');
     }
-    result = [{ id: crypto.randomUUID(), name: name.replace(/\.png$/i, '').trim().slice(0, 80) || 'Imported artwork', source, category: 'Your upload' }, ...current];
+    result = [{ id: existing?.id ?? crypto.randomUUID(), name: name.replace(/\.png$/i, '').trim().slice(0, 80) || 'Imported artwork', source, category: 'Your upload', ...cleanup }, ...others];
     return result;
   });
   assertScope(scope);

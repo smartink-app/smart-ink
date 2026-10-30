@@ -1,3 +1,4 @@
+import { STARTER_TATTOOS } from './config/starterTattoos';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { FiArrowLeft, FiMaximize, FiEdit3 } from 'react-icons/fi';
@@ -15,11 +16,7 @@ import type { CameraView } from './render/cameraTransition';
 import type { SurfaceAnchor } from './render/surfacePlacement';
 
 // Deliberately no account, storage, upload, or render-service dependency.
-const samples = [
-  { name: 'Botanical rose', image: '/tattoos/botanical-rose.png' },
-  { name: 'Lunar moth', image: '/tattoos/lunar-moth.png' },
-  { name: 'Ornamental dagger', image: '/tattoos/ornamental-dagger.png' },
-];
+const samples = STARTER_TATTOOS.map(({ name, source }) => ({ name, image: source }));
 const initialCamera: CameraView = { position: [0, 0, 8], target: [0, 0, 0], fov: 45 };
 
 export default function PublicDemo({ onHome, onRequestAccess }: { onHome: () => void; onRequestAccess: () => void }) {

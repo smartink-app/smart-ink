@@ -17,11 +17,11 @@ const { outputFiles } = await build({ stdin: { contents: "export * from './src/r
     b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.path === 'icons'
       ? 'export const FaUpload="upload",FaUndo="undo",FaRegImage="image";'
       : a.path === 'auth' ? 'export const subscribeSession=cb=>{cb({session:{userId:"panel-test",email:"panel@example.invalid"}});return()=>{};};'
-        : a.path === 'upload' ? 'export const readTattooPng=(...args)=>globalThis.__readTattoo(...args);' : 'export default ()=>null;' }));
+        : a.path === 'upload' ? 'export const MAX_TATTOO_DIMENSION=8192, MAX_TATTOO_PIXELS=32*1024*1024;export const readTattooPng=(...args)=>globalThis.__readTattoo(...args);' : 'export default ()=>null;' }));
   } }] });
 const m = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
-assert.equal(m.DEFAULT_TATTOO_SOURCE, '/logo.png');
-assert.equal(m.resolveTattooSource(null), '/logo.png');
+assert.equal(m.DEFAULT_TATTOO_SOURCE, '/tattoos/starter-2026/peony.png');
+assert.equal(m.resolveTattooSource(null), '/tattoos/starter-2026/peony.png');
 assert.equal(m.resolveTattooSource('data:image/png;base64,upload'), 'data:image/png;base64,upload');
 let cursor = 0, uploaded = 'data:image/png;base64,upload', changes = [], reset = 0, deferred, signal;
 const slots = [];
@@ -39,7 +39,7 @@ example().props.onClick();
 assert.equal(signal.aborted, true, 'Choosing example cancels the pending upload');
 assert.equal(uploaded, null);
 assert.equal(example().props['aria-pressed'], true);
-assert.equal(render().find(n => n.type === 'img').props.src, '/logo.png');
+assert.equal(render().find(n => n.type === 'img').props.src, '/tattoos/starter-2026/peony.png');
 assert.ok(render().some(n => n.props?.children === 'Example tattoo'));
 deferred('data:image/png;base64,stale'); await pending;
 assert.deepEqual(changes, [null], 'Late upload cannot replace chosen example');

@@ -17,6 +17,7 @@ import { REGISTRY } from './render/registry';
 import { readTattooPng } from './utils/tattooUpload';
 import { resolveTattooSource } from './render/tattooSource';
 import AdjustmentControl from './AdjustmentControl';
+import WhiteBackgroundControls from './WhiteBackgroundControls';
 
 interface TopMenuBarProps extends PoseControlsProps, AppearanceControlsProps, StudioControlsProps {
   onBrowseArtwork?: () => void;
@@ -270,6 +271,7 @@ export default function TopMenuBar({
           <p className="ep-hint">PNG, up to 20 MB. Transparent backgrounds work best.</p>
           {uploading && <p className="ep-hint" role="status">Checking the new artwork. Your current tattoo stays in place.</p>}
           {uploadError && <p className="ep-hint ep-upload-error" role="alert">{uploadError}</p>}
+          <WhiteBackgroundControls source={uploadedImage} onChange={setUploadedImage} disabled={disabled || uploading} />
           <p className="ep-hint ep-placement-hint" role="status">{isSleeve ? 'Sleeve test. Choose a section to adjust it; drag bare skin to orbit.' : isWrap ? '360° band. Use the band controls to position it; drag bare skin to orbit.' : !hasPlacement
             ? `Click the skin to place ${uploadedImage === null ? 'the example tattoo' : 'your tattoo'}.`
             : decalVisible ? 'Click another spot on the skin to move the tattoo. Its size stays the same.'
