@@ -2,6 +2,8 @@
 { archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
 797D2A53B5434C2CFAE2FC64 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledStudioServer.swift; sourceTree = "<group>"; };
 A08D7B18E80203B8688F0C4D = { isa = PBXBuildFile; fileRef = 797D2A53B5434C2CFAE2FC64; };
+C405EF84392E99E893B6DD39 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationScreen.swift; sourceTree = "<group>"; };
+7AF3D26E4B3BDAD095E3DC35 = { isa = PBXBuildFile; fileRef = C405EF84392E99E893B6DD39; };
 926441DEB2312C1BFC1088F6 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectGallery.swift; sourceTree = "<group>"; };
 107560D34F1AE44F0D848199 = { isa = PBXBuildFile; fileRef = 926441DEB2312C1BFC1088F6; };
 3EFCC6515EBA71412488EB1A = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderJobs.swift; sourceTree = "<group>"; };
@@ -15,10 +17,10 @@ BEA8BE8084C3A14246E142A8 = { isa = PBXBuildFile; fileRef = 38D0E72EB92869E2097CA
 50499185A0737359E500DE1F = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioState.swift; sourceTree = "<group>"; };
 F9FD23161AA7E4C76B93C545 = { isa = PBXBuildFile; fileRef = 50499185A0737359E500DE1F; };
 38A007151ABE87CC01A5B6E9 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = SmartInkStudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
-96DC7B6B5526E30EFB51C316 = { isa = PBXGroup; children = (797D2A53B5434C2CFAE2FC64, 926441DEB2312C1BFC1088F6, 3EFCC6515EBA71412488EB1A, E226A8F6D04EF693007C4EC9, E9DC369ABB3ABEDC1F984FE2, 38D0E72EB92869E2097CAF29, 50499185A0737359E500DE1F,); path = SmartInkStudio; sourceTree = "<group>"; };
+96DC7B6B5526E30EFB51C316 = { isa = PBXGroup; children = (797D2A53B5434C2CFAE2FC64, C405EF84392E99E893B6DD39, 926441DEB2312C1BFC1088F6, 3EFCC6515EBA71412488EB1A, E226A8F6D04EF693007C4EC9, E9DC369ABB3ABEDC1F984FE2, 38D0E72EB92869E2097CAF29, 50499185A0737359E500DE1F,); path = SmartInkStudio; sourceTree = "<group>"; };
 FBDC4F23F93125BBEEAE800C = { isa = PBXGroup; children = (38A007151ABE87CC01A5B6E9,); name = Products; sourceTree = "<group>"; };
 B28B7AF69320201D1CF206EB = { isa = PBXGroup; children = (96DC7B6B5526E30EFB51C316, FBDC4F23F93125BBEEAE800C,); sourceTree = "<group>"; };
-BCE16DD0260827ECF338C787 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A08D7B18E80203B8688F0C4D, 107560D34F1AE44F0D848199, E9BAF3793CF84519F144D5FB, 1D67CC4D30A91D91A9501F72, B75DEF848F5C0BBA5BF435D1, BEA8BE8084C3A14246E142A8, F9FD23161AA7E4C76B93C545,); runOnlyForDeploymentPostprocessing = 0; };
+BCE16DD0260827ECF338C787 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A08D7B18E80203B8688F0C4D, 7AF3D26E4B3BDAD095E3DC35, 107560D34F1AE44F0D848199, E9BAF3793CF84519F144D5FB, 1D67CC4D30A91D91A9501F72, B75DEF848F5C0BBA5BF435D1, BEA8BE8084C3A14246E142A8, F9FD23161AA7E4C76B93C545,); runOnlyForDeploymentPostprocessing = 0; };
 7561BFB015D8F536760CB671 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 0189424A5A60FED329FA868E = { isa = PBXShellScriptBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/sh; shellScript = "set -eu\nBUNDLE=\"$SRCROOT/Bundled/$CONFIGURATION/Web\"\nif [ ! -f \"$BUNDLE/index.html\" ]; then echo \"error: Run npm run build:ipad (Debug) or npm run build:ipad:release (Release) first.\"; exit 1; fi\nmkdir -p \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Web\"\nrsync -a --delete \"$BUNDLE/\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Web/\"\n"; };
 ED8772ADEC3A6C25161BC957 = { isa = XCBuildConfiguration; name = Debug; buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; CLANG_ENABLE_MODULES = YES; }; };

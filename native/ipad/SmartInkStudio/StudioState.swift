@@ -27,6 +27,11 @@ struct NativeWorkspace: Decodable {
     let shape: [String: Double]
     let shapeParams: [ShapeParameter]
     let shot: NativeShot
+    let present: NativePresent?
+}
+struct NativePresent: Decodable {
+    let motion: String
+    let canShowcase: Bool
 }
 struct ShapeParameter: Decodable, Identifiable {
     let key: String

@@ -20,12 +20,25 @@ struct StudioView: View {
     @State private var showConnection = false
     @State private var address = "http://127.0.0.1:4322"
     @State private var dropping = false
+    @ObservedObject private var screen = PresentationScreen.shared
+    @State private var controlsShown = true
+    @State private var hideControls: Task<Void, Never>?
 
     private var editor: Bool { model.workspace?.page == "editor" }
+    private var external: Bool { screen.external(for: model) }
+    private func revealControls() {
+        controlsShown = true
+        hideControls?.cancel()
+        hideControls = Task { try? await Task.sleep(for: .seconds(4)); if !Task.isCancelled { controlsShown = false } }
+    }
     var body: some View {
         NavigationStack {
             ZStack {
-                StudioWebView(webView: model.webView)
+                if external { PresentRemote(model: model, screen: screen) }
+                else { StudioWebHost(webView: model.webView, active: true, touched: { if model.presenting { revealControls() } }).ignoresSafeArea(edges: model.presenting ? .all : []) }
+                if model.presenting && !external {
+                    PresentControls(model: model, screen: screen, shown: controlsShown).frame(maxHeight: .infinity, alignment: .bottom)
+                }
                 if model.workspace?.page == "projects" { ProjectGallery(model: model) }
                 if !model.connected || model.loading {
                     ProgressView("Opening your studio…").padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
@@ -49,6 +62,9 @@ struct StudioView: View {
             }
             .navigationTitle(editor ? model.workspace?.name ?? "Studio" : "Smart Ink Studio")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(model.presenting ? .hidden : .visible, for: .navigationBar)
+            .statusBarHidden(model.presenting)
+            .persistentSystemOverlays(model.presenting ? .hidden : .automatic)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {
                     if editor {
@@ -81,6 +97,8 @@ struct StudioView: View {
                                 .foregroundStyle(state.save == "error" ? .red : .secondary)
                                 .accessibilityLabel(state.save == "error" ? "Saving failed" : "Project \(state.save)")
                         }
+                        Button { model.present("showcase") } label: { Label("Present", systemImage: "play.rectangle") }
+                            .disabled(model.workspace?.shot.open == true || model.workspace?.measuring == true || model.workspace?.blocked == true || model.workspace?.loading == true)
                         Button { model.inspector.toggle() } label: { Label("Inspector", systemImage: "sidebar.right") }
                             .keyboardShortcut("i", modifiers: .command)
                     }
@@ -100,7 +118,7 @@ struct StudioView: View {
                     } label: { Label("Studio menu", systemImage: "ellipsis.circle") }
                 }
             }
-            .inspector(isPresented: Binding(get: { editor && model.inspector && model.workspace?.measuring != true }, set: { model.inspector = $0 })) {
+            .inspector(isPresented: Binding(get: { editor && model.inspector && model.workspace?.measuring != true && !model.presenting }, set: { model.inspector = $0 })) {
                 if let state = model.workspace {
                     StudioInspector(model: model, state: state, showImporter: $showImporter, photo: $photo)
                         .inspectorColumnWidth(min: 280, ideal: 310, max: 360)
@@ -161,7 +179,12 @@ struct StudioView: View {
         }
         .tint(Color(red: 0.66, green: 0.74, blue: 0.97))
         .preferredColorScheme(.dark)
-        .task { await model.startBundled() }
+        .task { screen.model = model; await model.startBundled() }
+        .onChange(of: model.presenting) { _, presenting in
+            // A show runs unattended; keep the screen awake only while presenting.
+            UIApplication.shared.isIdleTimerDisabled = presenting
+            if presenting { revealControls(); Task { await model.refreshProjects() } }
+        }
         .onChange(of: phase) { _, phase in
             if phase != .active, model.workspace != nil { model.send("save") }
         }
@@ -286,11 +309,6 @@ private struct NativeSlider: View {
     }
 }
 
-private struct StudioWebView: UIViewRepresentable {
-    let webView: WKWebView
-    func makeUIView(context: Context) -> WKWebView { webView }
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
-}
 struct ShareSheet: UIViewControllerRepresentable {
     let image: UIImage
     func makeUIViewController(context: Context) -> UIActivityViewController { UIActivityViewController(activityItems: [PhotoShareItem(image)], applicationActivities: nil) }

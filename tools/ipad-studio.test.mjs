@@ -48,4 +48,38 @@ await assert.rejects(dispatch({ action: 'scale', value: 99 }), /Invalid/);
 scope.historyBlocked = true; await assert.rejects(dispatch({ action: 'rotation', value: 20 }), /Finish/); scope.historyBlocked = false;
 fail = true; await assert.rejects(dispatch({ action: 'gallery' }), /Save failed/); assert.deepEqual(changes, [1.4], 'Save failure must prevent leaving the editor');
 fail = false; await dispatch({ action: 'gallery' }); assert.equal(changes.at(-1), true);
-console.log('Native studio: account isolation, offline approval expiry, durable drafts, command bounds, edit locks and save-before-navigation passed.');
+
+// Present: motion choices are bounded, never start over an open shoot, and exit always works.
+const presented = [];
+Object.assign(scope, { reviewOpen: false, presenting: false, PRESENT_MOTIONS: ['showcase','turntable','still'],
+  startPresenting: motion => presented.push(motion), stopPresenting: () => presented.push('stop'),
+  presentReturnCamera: { current: null }, getScene: async id => id === 'a' ? project : undefined, loadScene: scene => presented.push(scene.id) });
+await dispatch({ action: 'present', value: 'turntable', key: 'motion' }); assert.deepEqual(presented, ['turntable']);
+await assert.rejects(dispatch({ action: 'present', value: 'spin', key: 'motion' }), /Unknown/);
+await assert.rejects(dispatch({ action: 'present', key: 'project', id: 'a' }), /Start presenting/);
+scope.presenting = true; await dispatch({ action: 'present', key: 'project', id: 'a' }); assert.equal(presented.at(-1), 'a');
+await assert.rejects(dispatch({ action: 'present', key: 'project', id: 'missing' }), /not found/);
+scope.snapshot = { open: true }; await assert.rejects(dispatch({ action: 'present', value: 'still', key: 'motion' }), /Finish/); scope.snapshot = { open: false };
+scope.modelLoading = true; await dispatch({ action: 'present', key: 'stop' }); assert.equal(presented.at(-1), 'stop', 'Exit works while the next design loads'); scope.modelLoading = false;
+
+const motion = await build({ entryPoints: ['src/render/presentMotion.ts'], bundle: true, format: 'esm', platform: 'node', write: false });
+const present = await import(`data:text/javascript;base64,${Buffer.from(motion.outputFiles[0].text).toString('base64')}`);
+const base = { position: [3, 1.5, 4], target: [0, 1, 0], fov: 40 };
+const near = (a, b, message) => a.forEach((value, i) => assert.ok(Math.abs(value - b[i]) < 1e-6, message));
+const flat = view => Math.hypot(view.position[0] - view.target[0], view.position[2] - view.target[2]);
+for (const seconds of [0, 5, 13, 27]) {
+  const view = present.turntableCamera(base, seconds);
+  assert.ok(Math.abs(flat(view) - flat(base)) < 1e-6 && view.position[1] === base.position[1], 'Turntable keeps its height and distance from the figure');
+  near(view.target, base.target, 'Turntable pivots on the figure');
+}
+near(present.turntableCamera(base, present.TURNTABLE_SECONDS).position, base.position, 'One revolution returns to the start');
+for (let s = 0; s < present.SHOWCASE_SECONDS; s += .25) {
+  const { azimuth, elevation, zoom } = present.showcaseAdjustment(s);
+  assert.ok(Math.abs(azimuth) <= 24 + 1e-9 && elevation >= 3 - 1e-9 && elevation <= 9 + 1e-9 && zoom >= .78 - 1e-9 && zoom <= .86 + 1e-9, 'Showcase stays inside gentle guided angles');
+}
+const path = Array.from({ length: 8 }, (_, i) => ({ position: [Math.cos(i / 8 * Math.PI * 2), 0, Math.sin(i / 8 * Math.PI * 2)], target: [0, 0, 0], fov: 38 }));
+near(present.samplePath(path, present.SHOWCASE_SECONDS).position, path[0].position, 'Showcase loops seamlessly');
+near(present.samplePath(path, present.SHOWCASE_SECONDS * 1.5 / 8).position, [(path[1].position[0] + path[2].position[0]) / 2, 0, (path[1].position[2] + path[2].position[2]) / 2], 'Showcase moves at a steady pace');
+near(present.blendPresentCamera(base, path[0], 0).position, base.position, 'Blending starts where the visitor left the camera');
+near(present.blendPresentCamera(base, path[0], present.PRESENT_BLEND_SECONDS).position, path[0].position, 'Blending lands on the moving shot');
+console.log('Native studio: account isolation, offline approval expiry, durable drafts, command bounds, edit locks, save-before-navigation and Present passed.');

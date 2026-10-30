@@ -108,6 +108,9 @@ final class StudioModel: NSObject, ObservableObject, WKNavigationDelegate, WKScr
             catch { self.error = error.localizedDescription }
         }
     }
+    var presenting: Bool { workspace?.page == "editor" && workspace?.present != nil }
+    func present(_ motion: String) { send("present", value: motion, key: "motion") }
+    func stopPresenting() { send("present", key: "stop") }
     func refreshProjects() async {
         do {
             let result = try await command("projects") ?? []

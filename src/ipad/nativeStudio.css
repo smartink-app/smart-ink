@@ -13,3 +13,6 @@ html.native-studio .snapshot-toolbar,
 html.native-studio .snapshot-compose-rail,
 html.native-studio .snapshot-footer { display: none !important; }
 html.native-studio .snapshot-overlay { grid-template-rows: 1fr; padding: 0; }
+/* Present keeps only the figure on screen, including while the next project loads. */
+html.native-studio .editor-app-root--presenting :is(.editor-notice, .editor-canvas-loading, .studio-shoot-discovery),
+html.native-studio:has(.editor-app-root--presenting) .bf-launch { display: none !important; }

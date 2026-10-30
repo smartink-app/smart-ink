@@ -8,7 +8,12 @@ import {
 } from './render/cameraTransition';
 
 export interface CameraSnapshot extends CameraView { aspect: number }
-export interface OrbitControlsHandle { getSnapshot: () => CameraSnapshot; freezeSnapshot: (finishTransition?: boolean) => CameraSnapshot }
+export interface OrbitControlsHandle {
+  getSnapshot: () => CameraSnapshot;
+  freezeSnapshot: (finishTransition?: boolean) => CameraSnapshot;
+  /** Place the camera for scripted motion. Never reported, so presenting cannot edit the saved view. */
+  drive: (view: CameraView) => void;
+}
 
 interface Props {
   enabled?: boolean;
@@ -100,7 +105,8 @@ const OrbitControlsWithCmdLock = forwardRef<OrbitControlsHandle, Props>(function
     report();
     return view;
   }, [stopTransition, snapshot, apply, report]);
-  useImperativeHandle(ref, () => ({ getSnapshot: snapshot, freezeSnapshot }), [snapshot, freezeSnapshot]);
+  const drive = useCallback((view: CameraView) => { stopTransition(false); apply(view); }, [stopTransition, apply]);
+  useImperativeHandle(ref, () => ({ getSnapshot: snapshot, freezeSnapshot, drive }), [snapshot, freezeSnapshot, drive]);
   useEffect(() => {
     // Placement may release its own temporary lock on window pointerup/blur.
     // Keep the external Snapshot lock separate so that release cannot override it.

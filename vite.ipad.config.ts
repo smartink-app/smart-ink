@@ -3,7 +3,7 @@ import base from './vite.config';
 
 // Separate preview leaves :4320 and its running render service untouched.
 // Proxy through the Mac so an iPad never requests its own 127.0.0.1.
-export default mergeConfig(base, defineConfig({
+export default defineConfig(env => mergeConfig(base(env), {
   define: {
     'import.meta.env.VITE_RENDER_URL': JSON.stringify(''),
     'import.meta.env.VITE_AUTH_MODE': JSON.stringify('demo'),
