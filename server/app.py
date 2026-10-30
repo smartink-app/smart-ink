@@ -159,6 +159,12 @@ def validate_contract(data: bytes) -> dict:
     ):
         if name in contract and (not isinstance(contract[name], str) or contract[name] not in allowed):
             _invalid(f"Unknown {name}")
+    if "inkUvRegion" in contract:
+        region = contract["inkUvRegion"]
+        if (not isinstance(region, list) or len(region) != 4
+            or any(type(v) not in (int, float) or v < 0 or v > 1 or not math.isfinite(v) for v in region) or min(region[2:]) < 1 / 8192
+            or region[0] + region[2] > 1.000001 or region[1] + region[3] > 1.000001):
+            _invalid("Invalid tattoo UV region")
     if "showEyes" in contract and type(contract["showEyes"]) is not bool:
         _invalid("showEyes must be true or false")
     if "eyeColor" in contract and (not isinstance(contract["eyeColor"], str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", contract["eyeColor"])):

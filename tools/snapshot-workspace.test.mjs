@@ -18,7 +18,7 @@ visit(ast);
 async function callback(name, names) {
   const declaration = declarations.get(name);
   assert.ok(declaration?.initializer, `Workspace still declares ${name}`);
-  const { code } = await transform(`(function(${names.join(',')}) { const ${name} = ${declaration.initializer.getText(ast)}; return ${name}; })`, { loader: 'tsx' });
+  const { code } = await transform(`(function(${names.join(',')}) { const ${name} = ${declaration.initializer.getText(ast)}; return ${name}; })`, { loader: 'tsx', define: { 'import.meta.env.VITE_RENDER_INK_REGION': '"1"' } });
   const create = (0, eval)(code);
   return (scope) => create(...names.map((key) => {
     assert.ok(Object.hasOwn(scope, key), `test supplies the real callback's ${key} dependency`);
@@ -321,3 +321,13 @@ for(const stillOpen of [true,false]) {
   else{assert.deepEqual(updates,[],'Closing Shoot owns camera restoration; preview cleanup must not overwrite it');assert.equal(request,0);}
 }
 console.log('Reveal preview lifecycle passed: motion, stop restoration, and no camera overwrite on Shoot exit.');
+
+// The localized bake must travel with the frozen shot, including rerenders.
+{
+  const region = [.1, .2, .3, .4];
+  const f = fixture({ bakeInkLayer: async params => { params.onUvRegion(region); return new Blob(['ink']); } });
+  const shot = await f.build()({ snapshot: 'detailed' });
+  assert.deepEqual(shot.contract.inkUvRegion, region);
+  assert.deepEqual(api.snapshotContract(shot.contract, 'quick').inkUvRegion, region);
+  f.dispose();
+}

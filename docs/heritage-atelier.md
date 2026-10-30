@@ -15,3 +15,11 @@ Local preview: port 4356, render service 4357. Use `tools/start-focus-studio.sh`
 Verification: frontend typecheck/lint/build; studio, lighting, persistence and contract tests; Python server/direct-importer validation. `tools/heritage-render-proof.py` exercises the real importer with the local arm texture fixture, reconstructs a full UV atlas for this beta baseline, and saves a packed Blend plus PNG under `reports/heritage/`. The fixture path can be supplied through `SMARTINK_HERITAGE_FIXTURE`.
 
 This is a local test branch. Production gateway/worker deployment is not part of this experiment. Do not expose the option on production until its renderer asset packaging and hosted contract acceptance are verified. No cloud rendering was used.
+
+## Sharp tattoo export
+
+The local launcher enables `VITE_RENDER_INK_REGION=1`. The baker measures occupied UV coverage, then redraws original artwork into that region at 4096 pixels; it does not upscale the low-resolution first pass. The contract carries `inkUvRegion`, which the importer uses for texture placement and tattoo autofocus. Cropped textures use CLIP extension to prevent repetition on other body regions. Empty and broadly covered atlases retain the legacy mapping.
+
+Ordinary builds keep the feature disabled unless that flag is set: older hosted workers do not understand localized UV coordinates. This change does not enable the separate portfolio/skin experiments.
+
+Regression checks: `node tools/ink-region.test.mjs`, `python tools/ink-region-backend.test.py`, and `npm run test:snapshot` (including propagation into frozen shots and quality rerenders).

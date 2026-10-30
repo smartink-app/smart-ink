@@ -550,6 +550,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
     const inkBlob = decalVisible && placement?.hasPlaced && placement.visible
       ? await bakeInkLayer({ tattooImage: placement.imageSource ?? resolveTattooSource(uploadedImage), center: placement.center,
           scaleUV: placement.scaleUV, rotationRad: placement.rotationRad, surface: placement.surface,
+          onUvRegion: import.meta.env.VITE_RENDER_INK_REGION === '1' ? region => { frozenContract.inkUvRegion = region } : undefined,
           // Both qualities retain the same source within the renderer's 16 MP upload limit.
           size: options?.snapshot || qualityTier === 'final' ? 4096 : 2048, signal: options?.signal })
       : await blankInkLayer()

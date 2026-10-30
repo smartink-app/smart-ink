@@ -38,5 +38,5 @@ else:
     raise SystemExit('Local render service did not start.')
 PY
 kill -0 "$FOCUS_RENDER_PID" 2>/dev/null || { echo 'The render port is already in use. Choose FOCUS_RENDER_PORT or stop the previous Focus preview.' >&2; exit 1; }
-VITE_AUTH_MODE=demo VITE_RENDER_URL="http://127.0.0.1:$FOCUS_RENDER_PORT" \
+VITE_RENDER_INK_REGION=1 VITE_AUTH_MODE=demo VITE_RENDER_URL="http://127.0.0.1:$FOCUS_RENDER_PORT" \
   npm run dev -- --configLoader runner --host 127.0.0.1 --port "$FOCUS_UI_PORT" --strictPort

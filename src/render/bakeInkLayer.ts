@@ -1,3 +1,4 @@
+import { inkUvRegion, type InkUvRegion } from './inkUvRegion';
 import * as THREE from 'three';
 import { SLEEVE_SOURCES } from './sleeveTypes';
 import { SLEEVE_VERTEX_DECL, SLEEVE_VERTEX_ASSIGN, SLEEVE_GLSL } from './sleeveShader';
@@ -13,6 +14,7 @@ const LEGACY_VERTEX = /* glsl */ `
 
 const SURFACE_VERTEX = /* glsl */ `
   ${SLEEVE_VERTEX_DECL}
+  uniform vec4 inkRegion;
   attribute vec2 aTattooUv;
   attribute float aTattooMask;
   attribute float aTattooBoundary;
@@ -27,7 +29,7 @@ const SURFACE_VERTEX = /* glsl */ `
     // GLTFLoader keeps glTF's downward V axis; Blender converts it back to
     // upward V during import. Bake into the UV coordinates Blender will use.
     vec2 atlasUv = vec2(uv.x, 1.0 - uv.y);
-    gl_Position = vec4(atlasUv * 2.0 - 1.0, 0.0, 1.0);
+    gl_Position = vec4(((atlasUv - inkRegion.xy) / inkRegion.zw) * 2.0 - 1.0, 0.0, 1.0);
   }
 `;
 
@@ -185,6 +187,8 @@ export interface BakeParams {
   signal?: AbortSignal;
   /** Bounded source-image timeout; defaults to twenty seconds. */
   textureTimeoutMs?: number;
+  /** Opt-in: caller MUST transmit this region to a compatible Blender worker. */
+  onUvRegion?: (region: InkUvRegion) => void;
 }
 
 /** Returns a straight-alpha sRGB PNG of the body atlas's tattoo layer. */
@@ -256,6 +260,7 @@ export async function bakeInkLayer(params: BakeParams): Promise<Blob> {
     });
 
     const uniforms: Record<string, THREE.IUniform> = {
+      inkRegion: { value: new THREE.Vector4(0, 0, 1, 1) },
       tattooTexture: { value: texture },
       tattooRotation: { value: params.rotationRad ?? 0 },
     };
@@ -300,9 +305,22 @@ export async function bakeInkLayer(params: BakeParams): Promise<Blob> {
     const pixels = new Uint8Array(size * size * 4);
     renderer.readRenderTargetPixels(target, 0, 0, size, size, pixels);
 
+    if (surface && params.onUvRegion) {
+      const region = inkUvRegion(pixels, size);
+      // Re-render original artwork into the occupied atlas region. Resizing the
+      // first bake would magnify its lost detail rather than recover it.
+      if (region[2] * region[3] < .75) {
+        (uniforms.inkRegion.value as THREE.Vector4).fromArray(region);
+        renderer.clear(); renderer.render(scene, camera);
+        renderer.readRenderTargetPixels(target, 0, 0, size, size, pixels);
+        params.onUvRegion(region);
+      }
+    }
+
     if (surface) {
       coverageMaterial = new THREE.ShaderMaterial({
         vertexShader: SURFACE_VERTEX,
+        uniforms: { inkRegion: uniforms.inkRegion },
         fragmentShader: 'void main() { gl_FragColor = vec4(1.0); }',
         side: THREE.DoubleSide,
         depthTest: false,
