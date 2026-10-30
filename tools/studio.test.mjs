@@ -22,6 +22,10 @@ assert.match(shadowShader.fragmentShader, /shadow \/ sampleCount : 1\.0/, 'empty
 shadowMaterial.dispose();
 assert.deepEqual(normalizeStudio(), defaults);
 assert.equal(defaults.mode, 'sweep');
+assert.equal(normalizeStudio({mode:'heritage'}).mode,'heritage');
+assert.deepEqual(api.studioValidationErrors({mode:'heritage'}),[]);
+assert.equal(api.migrateScene({studio:{mode:'heritage'}}).studio.mode,'heritage');
+assert.equal(api.studioForExport({...defaults,mode:'heritage'},'#fff').mode,'heritage');
 assert.equal(normalizeStudio({ mode: 'plain' }).mode, 'plain', 'preserve explicitly saved plain backgrounds');
 assert.deepEqual(api.migrateScene({}).studio, defaults, 'scenes without backdrop settings use the studio default');
 assert.deepEqual(normalizeStudio({ mode: 'unsupported', color: 'red', shadow: NaN, showGuides: 'yes' }), defaults);

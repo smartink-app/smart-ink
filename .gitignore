@@ -80,3 +80,6 @@ native/ipad/DerivedData/
 
 # Generated, configuration-specific iPad web bundle
 native/ipad/Bundled/
+
+# Local environment integration proofs
+reports/heritage/

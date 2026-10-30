@@ -197,7 +197,7 @@ def validate_contract(data: bytes) -> dict:
         if not isinstance(studio, dict) or any(key not in STUDIO_DEFAULTS and key != 'gradient' for key in studio):
             _invalid("Invalid studio settings")
         studio = {**STUDIO_DEFAULTS, **studio}
-        if not isinstance(studio["mode"], str) or studio["mode"] not in ("plain", "sweep"):
+        if not isinstance(studio["mode"], str) or studio["mode"] not in ("plain", "sweep", "heritage"):
             _invalid("Unknown studio mode")
         if not isinstance(studio["color"], str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", studio["color"]):
             _invalid("studio.color must be a six-digit hex color")

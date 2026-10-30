@@ -56,7 +56,7 @@ class StudioValidationTests(unittest.TestCase):
                 production['_studio_settings'](shot(studio={'gradient': stops}))
 
     def test_modes_partial_defaults_and_color_normalization(self):
-        for mode in ('plain', 'sweep'):
+        for mode in ('plain', 'sweep', 'heritage'):
             for shadow in (0, .4, 1):
                 studio = {'mode': mode, 'color': '#D6CdC1', 'shadow': shadow, 'showGuides': True}
                 self.assertEqual(valid(studio=studio)['studio'], production['_studio_settings'](shot(studio=studio)))

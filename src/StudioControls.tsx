@@ -21,9 +21,9 @@ export default function StudioControls({ compact = false, studio, onStudioChange
   const id = useId();
   const update = (change: Partial<StudioSettings>) => onStudioChange(normalizeStudio({ ...studio, ...change }));
   return <details className="ep-section ep-details studio-controls" open>
-    <summary><span className="ep-section-label">Backdrop</span><span className="ep-details-summary">{studio.mode === 'sweep' ? STUDIO_PAPERS.find(paper => paper.color === studio.color)?.name ?? 'Custom paper' : BACKGROUND_LABELS[background]}</span></summary>
+    <summary><span className="ep-section-label">Backdrop</span><span className="ep-details-summary">{studio.mode === 'heritage' ? 'Heritage Atelier' : studio.mode === 'sweep' ? STUDIO_PAPERS.find(paper => paper.color === studio.color)?.name ?? 'Custom paper' : BACKGROUND_LABELS[background]}</span></summary>
     <p className="ep-hint">Set the scene around your figure.</p>
-    <div className="ep-pill-row studio-mode">
+    <div className="ep-pill-row studio-mode"><button type="button" className="ep-pill" aria-pressed={studio.mode === 'heritage'} onClick={() => update({ mode: 'heritage' })}>Heritage Atelier</button>
       <button type="button" className="ep-pill" aria-pressed={studio.mode === 'sweep'} onClick={() => update({ mode: 'sweep' })}>Studio sweep</button>
       <button type="button" className="ep-pill" aria-pressed={studio.mode === 'plain'} onClick={() => update({ mode: 'plain' })}>Simple background</button>
     </div>
@@ -40,7 +40,7 @@ export default function StudioControls({ compact = false, studio, onStudioChange
       <AdjustmentControl label="Ground shadow" value={studio.shadow * 100} min={0} max={100} step={5} unit="%" resetValue={DEFAULT_STUDIO.shadow * 100} onChange={value => update({ shadow: value / 100 })} />
       </MoreControls>
       <p className="ep-hint studio-note">{isolateRegion ? 'Focus keeps your backdrop color and hides the floor.' : 'The paper curves into the floor and follows your viewing angle. Ground shadows are hidden in fast mode.'}</p>
-    </> : onBackgroundChange ? <>
+    </> : studio.mode === 'heritage' ? <p className="ep-hint">An editable atelier environment. Included in Blender photos; the live view approximates its materials and lighting.</p> : onBackgroundChange ? <>
       <div className="studio-papers studio-backgrounds" role="group" aria-label="Simple background">
         {(Object.keys(BACKGROUNDS) as BackgroundId[]).map(key => <button type="button" className="studio-paper" key={key}
           aria-pressed={background === key} aria-label={`${BACKGROUND_LABELS[key]} background`} onClick={() => onBackgroundChange(key)}>

@@ -1,5 +1,5 @@
 export interface StudioSettings {
-  mode: 'plain' | 'sweep';
+  mode: 'plain' | 'sweep' | 'heritage';
   /** Screen-aligned plain backdrop; never used as lighting. */
   gradient?: string[];
   color: string;
@@ -17,7 +17,7 @@ export const STUDIO_PAPERS = [
 export function normalizeStudio(input?: Partial<StudioSettings> | null): StudioSettings {
   const value = input && typeof input === 'object' ? input : {};
   return {
-    mode: value.mode === 'plain' || value.mode === 'sweep' ? value.mode : DEFAULT_STUDIO.mode,
+    mode: value.mode === 'plain' || value.mode === 'sweep' || value.mode === 'heritage' ? value.mode : DEFAULT_STUDIO.mode,
     ...(value.mode === 'plain' && Array.isArray(value.gradient) && value.gradient.length >= 2 && value.gradient.length <= 8 && value.gradient.every(c => typeof c === 'string' && /^#[\da-f]{6}$/i.test(c)) ? { gradient: value.gradient.map(c => c.toLowerCase()) } : {}),
     color: typeof value.color === 'string' && /^#[\da-f]{6}$/i.test(value.color) ? value.color.toLowerCase() : DEFAULT_STUDIO.color,
     shadow: typeof value.shadow === 'number' && Number.isFinite(value.shadow) ? Math.max(0, Math.min(1, value.shadow)) : DEFAULT_STUDIO.shadow,
@@ -39,7 +39,7 @@ export function studioValidationErrors(value: unknown): string[] {
     if (key === 'gradient') {
       if (!Array.isArray(entry) || entry.length < 2 || entry.length > 8 || !entry.every(c => typeof c === 'string' && /^#[\da-f]{6}$/i.test(c))) errors.push('invalid studio.gradient');
     } else if (!Object.hasOwn(DEFAULT_STUDIO, key)) errors.push(`unknown studio key ${key}`);
-    else if (key === 'mode' && entry !== 'plain' && entry !== 'sweep') errors.push('unsupported studio.mode');
+    else if (key === 'mode' && entry !== 'plain' && entry !== 'sweep' && entry !== 'heritage') errors.push('unsupported studio.mode');
     else if (key === 'color' && (typeof entry !== 'string' || !/^#[\da-f]{6}$/i.test(entry))) errors.push('studio.color must be a six-digit hex color');
     else if (key === 'shadow' && (typeof entry !== 'number' || !Number.isFinite(entry) || entry < 0 || entry > 1)) errors.push('studio.shadow must be between zero and one');
     else if (key === 'showGuides' && typeof entry !== 'boolean') errors.push('studio.showGuides must be a boolean');

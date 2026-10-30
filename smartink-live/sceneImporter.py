@@ -61,7 +61,7 @@ def _studio_settings(contract):
     if not isinstance(value, dict) or any(key not in STUDIO_DEFAULTS and key != 'gradient' for key in value):
         raise ValueError('Invalid studio settings')
     studio = {**STUDIO_DEFAULTS, **value}
-    if not isinstance(studio['mode'], str) or studio['mode'] not in ('plain', 'sweep'):
+    if not isinstance(studio['mode'], str) or studio['mode'] not in ('plain', 'sweep', 'heritage'):
         raise ValueError('Unknown studio mode')
     color = studio['color']
     if not isinstance(color, str) or len(color) != 7 or color[0] != '#' or any(c not in '0123456789abcdefABCDEF' for c in color[1:]):
@@ -2471,6 +2471,29 @@ def _studio_body_bounds(body):
     return min(point.z for point in points), max(point.z for point in points)
 
 
+def _append_heritage_atelier():
+    """Fixed room placement shared with HeritageAtelier.tsx; camera stays authoritative."""
+    from pathlib import Path
+    source = Path(__file__).resolve().parent / 'environments' / 'heritage-atelier.blend'
+    if not source.is_file():
+        raise ValueError('Heritage Atelier asset is missing from this renderer')
+    with bpy.data.libraries.load(str(source), link=False) as (available, loaded):
+        loaded.objects = available.objects
+    for obj in loaded.objects:
+        if obj is None or obj.type not in {'MESH', 'LIGHT'}:
+            continue
+        bpy.context.scene.collection.objects.link(obj)
+        obj.name = 'Heritage · ' + obj.name
+        obj.location *= 2.0
+        obj.location.z -= 2.12
+        obj.scale *= 2.0
+        if obj.type == 'LIGHT':
+            obj.data.energy *= 4.0
+            if hasattr(obj.data, 'size'): obj.data.size *= 2.0
+            if hasattr(obj.data, 'size_y'): obj.data.size_y *= 2.0
+        obj['studioBackdrop'] = True
+
+
 def _studio_backdrop_material(color, shadow):
     material = bpy.data.materials.new('Studio backdrop')
     material.use_nodes = True
@@ -3375,6 +3398,9 @@ def apply_world(
         setup_lights_from_list(LIGHTING_PRESETS.get(preset, LIGHTING_PRESETS['studio']), scale, physical=True)
 
     if studio is not None:
+        if studio['mode'] == 'heritage':
+            _append_heritage_atelier()
+            return
         if studio['mode'] != 'sweep' or body_region:
             return
         low, high = _studio_body_bounds(body) if body is not None else (-2.1, 2.1)

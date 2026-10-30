@@ -36,6 +36,7 @@ import ModelWithUVTattoo, { type ModelWithUVTattooHandle } from './ModelWithUVTa
 import CinematicLights from './CinematicLights'
 import LightHandles from './LightHandles'
 import StudioBackdrop from './StudioBackdrop'
+import HeritageAtelier from './HeritageAtelier'
 import { DEFAULT_STUDIO, normalizeStudio, studioForExport, type StudioSettings } from './render/studioSettings'
 import TopMenuBar, { type InspectorTab } from './TopMenuBar'
 import ViewportControls from './ViewportControls'
@@ -989,7 +990,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
       const camera = frameTattoo(framing, preset.adjustment, viewportAspect, preset.fov)
       setLightingPreset('studio')
       setLights(cinematicLights(preset, camera, LIGHTING_PRESETS.studio.threeIntensityScale))
-      setStudio(previous => ({ ...previous, mode: 'sweep', color: preset.background, gradient: undefined, showGuides: false }))
+      setStudio(previous => previous.mode === 'heritage' ? previous : ({ ...previous, mode: 'sweep', color: preset.background, gradient: undefined, showGuides: false }))
     }
     snapshotSession.open(async (signal) => ({
       ...await currentShotBuilder.current({ snapshot: snapshotSession.getState().quality, signal }), sceneName: currentScene?.name,
@@ -1004,7 +1005,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
     setSnapshotCamera({ ...preset.adjustment })
     setLightingPreset('studio')
     setLights(cinematicLights(preset, camera, LIGHTING_PRESETS.studio.threeIntensityScale))
-    setStudio(previous => ({ ...previous, mode: 'sweep', color: preset.background, gradient: undefined, showGuides: false }))
+    setStudio(previous => previous.mode === 'heritage' ? previous : ({ ...previous, mode: 'sweep', color: preset.background, gradient: undefined, showGuides: false }))
     setSelectedLight(1)
   }
   const aimSnapshotLights = () => {
@@ -1720,6 +1721,7 @@ export default function Workspace({ session, onHome, onSignOut, initialSection =
           scale={LIGHTING_PRESETS[lightingPreset].threeIntensityScale}
           performanceMode={performanceMode}
         />
+        {studio.mode === 'heritage' && <HeritageAtelier />}
         <StudioBackdrop studio={studio} isolateRegion={isolateRegion} performanceMode={performanceMode} />
         {!reviewOpen && !photoMode && !snapshot.open && !measureOpen && studio.showGuides && <LightHandles lights={lights} selectedIndex={selectedLight} onSelect={setSelectedLight} />}
         <Suspense fallback={<LoadingSignal onChange={setModelLoading} />}>
